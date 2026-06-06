@@ -6,6 +6,11 @@ use uuid::Uuid;
 
 pub struct ReminderRepository;
 
+const REMIND_AT_COLUMN_INDEX: usize = 3;
+const CREATED_AT_COLUMN_INDEX: usize = 6;
+const UPDATED_AT_COLUMN_INDEX: usize = 7;
+const TRIGGERED_AT_COLUMN_INDEX: usize = 8;
+
 impl ReminderStatus {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -188,7 +193,7 @@ impl ReminderRepository {
             id: row.get("id")?,
             title: row.get("title")?,
             notes: row.get("notes")?,
-            remind_at: millis_to_datetime(row.get("remind_at")?),
+            remind_at: millis_to_datetime(row.get("remind_at")?, REMIND_AT_COLUMN_INDEX)?,
             enabled: row.get("enabled")?,
             status: ReminderStatus::from_db(&status).map_err(|err| {
                 rusqlite::Error::FromSqlConversionFailure(
@@ -197,17 +202,27 @@ impl ReminderRepository {
                     Box::new(err),
                 )
             })?,
-            created_at: millis_to_datetime(row.get("created_at")?),
-            updated_at: millis_to_datetime(row.get("updated_at")?),
+            created_at: millis_to_datetime(row.get("created_at")?, CREATED_AT_COLUMN_INDEX)?,
+            updated_at: millis_to_datetime(row.get("updated_at")?, UPDATED_AT_COLUMN_INDEX)?,
             triggered_at: row
                 .get::<_, Option<i64>>("triggered_at")?
-                .map(millis_to_datetime),
+                .map(|millis| millis_to_datetime(millis, TRIGGERED_AT_COLUMN_INDEX))
+                .transpose()?,
         })
     }
 }
 
-fn millis_to_datetime(millis: i64) -> DateTime<Utc> {
-    DateTime::<Utc>::from_timestamp_millis(millis).expect("database timestamp should be valid")
+fn millis_to_datetime(millis: i64, column_index: usize) -> rusqlite::Result<DateTime<Utc>> {
+    DateTime::<Utc>::from_timestamp_millis(millis).ok_or_else(|| {
+        rusqlite::Error::FromSqlConversionFailure(
+            column_index,
+            rusqlite::types::Type::Integer,
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("invalid reminder timestamp millis {millis}"),
+            )),
+        )
+    })
 }
 
 #[cfg(test)]
@@ -287,6 +302,144 @@ mod tests {
         );
     }
 
+    #[test]
+    fn set_enabled_rejects_past_reminder() {
+        let conn = db::test_connection();
+        let id = insert_raw(&conn, "Past", -5, false, ReminderStatus::Pending);
+
+        let err = ReminderRepository::set_enabled(&conn, &id, true).unwrap_err();
+
+        assert!(matches!(err, BackendError::ReminderTimeInPast));
+    }
+
+    #[test]
+    fn pending_future_enabled_filters_and_orders() {
+        let conn = db::test_connection();
+        let now = Utc::now();
+        let later = insert_raw_at(
+            &conn,
+            "Later",
+            now + Duration::minutes(10),
+            true,
+            ReminderStatus::Pending,
+            None,
+        );
+        let sooner = insert_raw_at(
+            &conn,
+            "Sooner",
+            now + Duration::minutes(5),
+            true,
+            ReminderStatus::Pending,
+            None,
+        );
+        insert_raw_at(
+            &conn,
+            "Disabled",
+            now + Duration::minutes(3),
+            false,
+            ReminderStatus::Pending,
+            None,
+        );
+        insert_raw_at(
+            &conn,
+            "Due",
+            now - Duration::minutes(1),
+            true,
+            ReminderStatus::Pending,
+            None,
+        );
+        insert_raw_at(
+            &conn,
+            "Triggered",
+            now + Duration::minutes(1),
+            true,
+            ReminderStatus::Triggered,
+            Some(now),
+        );
+        insert_raw_at(
+            &conn,
+            "Expired",
+            now + Duration::minutes(2),
+            true,
+            ReminderStatus::Expired,
+            Some(now),
+        );
+
+        let pending = ReminderRepository::pending_future_enabled(&conn, now).unwrap();
+
+        let ids = pending
+            .into_iter()
+            .map(|reminder| reminder.id)
+            .collect::<Vec<_>>();
+        assert_eq!(ids, vec![sooner, later]);
+    }
+
+    #[test]
+    fn mark_expired_skips_due_non_pending_reminders() {
+        let conn = db::test_connection();
+        let now = Utc::now();
+        let pending = insert_raw_at(
+            &conn,
+            "Pending",
+            now - Duration::minutes(3),
+            true,
+            ReminderStatus::Pending,
+            None,
+        );
+        let triggered = insert_raw_at(
+            &conn,
+            "Triggered",
+            now - Duration::minutes(2),
+            true,
+            ReminderStatus::Triggered,
+            Some(now - Duration::minutes(1)),
+        );
+        let expired = insert_raw_at(
+            &conn,
+            "Expired",
+            now - Duration::minutes(1),
+            true,
+            ReminderStatus::Expired,
+            Some(now - Duration::minutes(1)),
+        );
+
+        let changed = ReminderRepository::mark_due_pending_as_expired(&conn, now).unwrap();
+
+        assert_eq!(changed.len(), 1);
+        assert_eq!(changed[0].id, pending);
+        assert_eq!(changed[0].status, ReminderStatus::Expired);
+        assert_eq!(
+            ReminderRepository::get(&conn, &triggered).unwrap().status,
+            ReminderStatus::Triggered
+        );
+        assert_eq!(
+            ReminderRepository::get(&conn, &expired).unwrap().status,
+            ReminderStatus::Expired
+        );
+    }
+
+    #[test]
+    fn invalid_timestamp_returns_database_error() {
+        let conn = db::test_connection();
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now();
+        conn.execute(
+            "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, created_at, updated_at, triggered_at)
+             VALUES (?1, 'Invalid', NULL, ?2, 1, 'pending', ?3, ?4, NULL)",
+            (
+                &id,
+                i64::MAX,
+                now.timestamp_millis(),
+                now.timestamp_millis(),
+            ),
+        )
+        .unwrap();
+
+        let err = ReminderRepository::get(&conn, &id).unwrap_err();
+
+        assert!(matches!(err, BackendError::Database(_)));
+    }
+
     fn insert_raw(
         conn: &Connection,
         title: &str,
@@ -294,12 +447,30 @@ mod tests {
         enabled: bool,
         status: ReminderStatus,
     ) -> String {
+        insert_raw_at(
+            conn,
+            title,
+            Utc::now() + Duration::minutes(offset_minutes),
+            enabled,
+            status,
+            None,
+        )
+    }
+
+    fn insert_raw_at(
+        conn: &Connection,
+        title: &str,
+        remind_at: DateTime<Utc>,
+        enabled: bool,
+        status: ReminderStatus,
+        triggered_at: Option<DateTime<Utc>>,
+    ) -> String {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now();
-        let remind_at = now + Duration::minutes(offset_minutes);
+        let triggered_at = triggered_at.map(|when| when.timestamp_millis());
         conn.execute(
             "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, created_at, updated_at, triggered_at)
-             VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7, NULL)",
+             VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7, ?8)",
             (
                 &id,
                 title,
@@ -308,6 +479,7 @@ mod tests {
                 status.as_str(),
                 now.timestamp_millis(),
                 now.timestamp_millis(),
+                triggered_at,
             ),
         )
         .unwrap();
