@@ -7,7 +7,12 @@ use tokio::task::JoinHandle;
 
 #[derive(Default, Clone)]
 pub struct Scheduler {
-    handles: Arc<Mutex<HashMap<String, JoinHandle<()>>>>,
+    handles: Arc<Mutex<HashMap<String, ScheduledTask>>>,
+}
+
+struct ScheduledTask {
+    generation: u64,
+    handle: JoinHandle<()>,
 }
 
 impl Scheduler {
@@ -15,8 +20,6 @@ impl Scheduler {
     where
         F: FnOnce(String) + Send + 'static,
     {
-        self.cancel(&reminder.id).await;
-
         let id = reminder.id.clone();
         let delay = (reminder.remind_at - chrono::Utc::now())
             .to_std()
@@ -25,30 +28,45 @@ impl Scheduler {
         let handles = Arc::clone(&self.handles);
         let (start_tx, start_rx) = oneshot::channel();
         let id_for_task = id.clone();
+        let mut handles_guard = self.handles.lock().await;
+        let generation = handles_guard
+            .get(&id)
+            .map_or(1, |task| task.generation.saturating_add(1));
         let handle = tokio::spawn(async move {
-            let _ = start_rx.await;
+            if start_rx.await.is_err() {
+                return;
+            }
             tokio::time::sleep(delay).await;
             {
                 let mut handles = handles.lock().await;
-                handles.remove(&id_for_task);
+                if handles
+                    .get(&id_for_task)
+                    .is_some_and(|task| task.generation == generation)
+                {
+                    handles.remove(&id_for_task);
+                }
             }
             on_fire(id_for_task);
         });
 
-        self.handles.lock().await.insert(id, handle);
+        let old = handles_guard.insert(id, ScheduledTask { generation, handle });
+        if let Some(task) = old {
+            task.handle.abort();
+        }
+        drop(handles_guard);
         let _ = start_tx.send(());
     }
 
     pub async fn cancel(&self, id: &str) {
-        if let Some(handle) = self.handles.lock().await.remove(id) {
-            handle.abort();
+        if let Some(task) = self.handles.lock().await.remove(id) {
+            task.handle.abort();
         }
     }
 
     pub async fn clear(&self) {
         let mut handles = self.handles.lock().await;
-        for (_, handle) in handles.drain() {
-            handle.abort();
+        for (_, task) in handles.drain() {
+            task.handle.abort();
         }
     }
 
@@ -122,6 +140,43 @@ mod tests {
             .unwrap();
 
         assert_eq!(fired, reminder.id);
+        assert!(!scheduler.is_scheduled(&reminder.id).await);
+    }
+
+    #[tokio::test]
+    async fn reschedule_same_id_replaces_previous_handle() {
+        let scheduler = Scheduler::default();
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let reminder = reminder_in(Duration::milliseconds(120));
+        let replacement = Reminder {
+            remind_at: Utc::now() + Duration::milliseconds(20),
+            ..reminder.clone()
+        };
+
+        scheduler
+            .schedule(reminder.clone(), {
+                let tx = tx.clone();
+                move |id| {
+                    tx.send(format!("old:{id}")).unwrap();
+                }
+            })
+            .await;
+        scheduler
+            .schedule(replacement.clone(), move |id| {
+                tx.send(format!("new:{id}")).unwrap();
+            })
+            .await;
+
+        let fired = tokio::time::timeout(std::time::Duration::from_millis(200), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(fired, format!("new:{}", reminder.id));
+        let old_result =
+            tokio::time::timeout(std::time::Duration::from_millis(180), rx.recv()).await;
+
+        assert!(old_result.is_err());
         assert!(!scheduler.is_scheduled(&reminder.id).await);
     }
 
