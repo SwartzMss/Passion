@@ -58,12 +58,15 @@ pub async fn toggle_reminder(
 
 #[tauri::command]
 pub async fn delete_reminder(state: State<'_, AppState>, id: String) -> CommandResult<()> {
+    {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        ReminderRepository::delete(&conn, &id).map_err(ErrorPayload::from)?;
+    }
     state.scheduler.cancel(&id).await;
-    let conn = state
-        .conn
-        .lock()
-        .map_err(|err| BackendError::Database(err.to_string()))?;
-    ReminderRepository::delete(&conn, &id).map_err(ErrorPayload::from)
+    Ok(())
 }
 
 #[tauri::command]

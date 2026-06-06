@@ -11,6 +11,11 @@ use app_state::AppState;
 use scheduler::Scheduler;
 use tauri::Manager;
 
+#[tauri::command]
+fn greet(name: &str) -> String {
+    format!("Hello, {}! You've been greeted from Rust!", name)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -30,6 +35,7 @@ pub fn run() {
             commands::get_settings,
             commands::update_settings,
             commands::test_notification,
+            greet,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
