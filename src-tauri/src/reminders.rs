@@ -143,6 +143,29 @@ impl ReminderRepository {
         Self::mark_status(conn, id, ReminderStatus::Triggered, when)
     }
 
+    pub fn mark_due_pending_enabled_as_triggered(
+        conn: &Connection,
+        id: &str,
+        when: DateTime<Utc>,
+    ) -> BackendResult<Option<Reminder>> {
+        let count = conn
+            .execute(
+                "UPDATE reminders
+                 SET status = ?1, triggered_at = ?2, updated_at = ?2
+                 WHERE id = ?3 AND status = 'pending' AND enabled = 1 AND remind_at <= ?2",
+                params![
+                    ReminderStatus::Triggered.as_str(),
+                    when.timestamp_millis(),
+                    id
+                ],
+            )
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        if count == 0 {
+            return Ok(None);
+        }
+        Self::get(conn, id).map(Some)
+    }
+
     pub fn mark_due_pending_as_expired(
         conn: &Connection,
         now: DateTime<Utc>,
@@ -372,6 +395,83 @@ mod tests {
             .map(|reminder| reminder.id)
             .collect::<Vec<_>>();
         assert_eq!(ids, vec![sooner, later]);
+    }
+
+    #[test]
+    fn mark_due_pending_enabled_as_triggered_only_changes_due_active_reminders() {
+        let conn = db::test_connection();
+        let now = Utc::now();
+        let due = insert_raw_at(
+            &conn,
+            "Due",
+            now - Duration::minutes(1),
+            true,
+            ReminderStatus::Pending,
+            None,
+        );
+        let future = insert_raw_at(
+            &conn,
+            "Future",
+            now + Duration::minutes(1),
+            true,
+            ReminderStatus::Pending,
+            None,
+        );
+        let disabled = insert_raw_at(
+            &conn,
+            "Disabled",
+            now - Duration::minutes(1),
+            false,
+            ReminderStatus::Pending,
+            None,
+        );
+        let triggered = insert_raw_at(
+            &conn,
+            "Triggered",
+            now - Duration::minutes(1),
+            true,
+            ReminderStatus::Triggered,
+            Some(now - Duration::minutes(1)),
+        );
+
+        let changed =
+            ReminderRepository::mark_due_pending_enabled_as_triggered(&conn, &due, now).unwrap();
+
+        let changed = changed.unwrap();
+        assert_eq!(changed.id, due);
+        assert_eq!(changed.status, ReminderStatus::Triggered);
+        assert_eq!(
+            changed.triggered_at.unwrap().timestamp_millis(),
+            now.timestamp_millis()
+        );
+        assert!(
+            ReminderRepository::mark_due_pending_enabled_as_triggered(&conn, &future, now)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            ReminderRepository::mark_due_pending_enabled_as_triggered(&conn, &disabled, now)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            ReminderRepository::mark_due_pending_enabled_as_triggered(&conn, &triggered, now)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            ReminderRepository::get(&conn, &future).unwrap().status,
+            ReminderStatus::Pending
+        );
+        assert_eq!(
+            ReminderRepository::get(&conn, &disabled).unwrap().status,
+            ReminderStatus::Pending
+        );
+        assert!(!ReminderRepository::get(&conn, &disabled).unwrap().enabled);
+        assert_eq!(
+            ReminderRepository::get(&conn, &triggered).unwrap().status,
+            ReminderStatus::Triggered
+        );
     }
 
     #[test]

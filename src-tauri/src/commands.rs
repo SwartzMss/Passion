@@ -88,14 +88,12 @@ pub async fn update_settings(
     state: State<'_, AppState>,
     settings: Settings,
 ) -> CommandResult<Settings> {
-    crate::settings::sync_autostart(&app, settings.launch_on_startup)
-        .map_err(ErrorPayload::from)?;
-    {
-        let conn = state
-            .conn
-            .lock()
-            .map_err(|err| BackendError::Database(err.to_string()))?;
-        SettingsRepository::save(&conn, &settings).map_err(ErrorPayload::from)?;
+    let previous = save_settings_and_get_previous(state.inner(), &settings)?;
+    if previous.launch_on_startup != settings.launch_on_startup {
+        if let Err(err) = crate::settings::sync_autostart(&app, settings.launch_on_startup) {
+            rollback_settings(state.inner(), &previous);
+            return Err(ErrorPayload::from(err));
+        }
     }
     Ok(settings)
 }
@@ -131,7 +129,9 @@ async fn dispatch_triggered_reminder(
     state: AppState,
     id: String,
 ) -> crate::error::BackendResult<()> {
-    let (reminder, settings) = mark_reminder_triggered_and_load_settings(&state, &id)?;
+    let Some((reminder, settings)) = mark_reminder_triggered_and_load_settings(&state, &id)? else {
+        return Ok(());
+    };
 
     if settings.notification_enabled {
         if let Err(err) = notifications::send_reminder_notification(&app, &reminder) {
@@ -151,14 +151,42 @@ async fn dispatch_triggered_reminder(
 fn mark_reminder_triggered_and_load_settings(
     state: &AppState,
     id: &str,
-) -> crate::error::BackendResult<(Reminder, Settings)> {
+) -> crate::error::BackendResult<Option<(Reminder, Settings)>> {
     let conn = state
         .conn
         .lock()
         .map_err(|err| BackendError::Database(err.to_string()))?;
-    let reminder = ReminderRepository::mark_triggered(&conn, id, Utc::now())?;
+    let Some(reminder) =
+        ReminderRepository::mark_due_pending_enabled_as_triggered(&conn, id, Utc::now())?
+    else {
+        return Ok(None);
+    };
     let settings = SettingsRepository::get(&conn)?;
-    Ok((reminder, settings))
+    Ok(Some((reminder, settings)))
+}
+
+fn save_settings_and_get_previous(
+    state: &AppState,
+    settings: &Settings,
+) -> crate::error::BackendResult<Settings> {
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+    let previous = SettingsRepository::get(&conn)?;
+    SettingsRepository::save(&conn, settings)?;
+    Ok(previous)
+}
+
+fn rollback_settings(state: &AppState, previous: &Settings) {
+    let result = state
+        .conn
+        .lock()
+        .map_err(|err| BackendError::Database(err.to_string()))
+        .and_then(|conn| SettingsRepository::save(&conn, previous));
+    if let Err(err) = result {
+        eprintln!("failed to roll back settings after startup sync failure: {err}");
+    }
 }
 
 #[cfg(test)]
@@ -172,15 +200,7 @@ mod tests {
     #[test]
     fn trigger_dispatch_marks_reminder_and_loads_settings() {
         let conn = db::test_connection();
-        let reminder = ReminderRepository::create(
-            &conn,
-            NewReminder {
-                title: "Stretch".to_string(),
-                notes: None,
-                remind_at: Utc::now() + Duration::minutes(5),
-            },
-        )
-        .unwrap();
+        let reminder = insert_raw(&conn, "Stretch", -5, true, ReminderStatus::Pending);
         SettingsRepository::save(
             &conn,
             &Settings {
@@ -192,14 +212,86 @@ mod tests {
         .unwrap();
         let state = AppState::new(conn, Scheduler::default());
 
-        let (triggered, settings) =
-            mark_reminder_triggered_and_load_settings(&state, &reminder.id).unwrap();
+        let (triggered, settings) = mark_reminder_triggered_and_load_settings(&state, &reminder)
+            .unwrap()
+            .unwrap();
 
-        assert_eq!(triggered.id, reminder.id);
+        assert_eq!(triggered.id, reminder);
         assert_eq!(triggered.status, ReminderStatus::Triggered);
         assert!(triggered.triggered_at.is_some());
         assert!(settings.launch_on_startup);
         assert!(!settings.minimize_to_tray);
         assert!(!settings.notification_enabled);
+    }
+
+    #[test]
+    fn trigger_dispatch_skips_future_reminder() {
+        let conn = db::test_connection();
+        let reminder = ReminderRepository::create(
+            &conn,
+            NewReminder {
+                title: "Stretch".to_string(),
+                notes: None,
+                remind_at: Utc::now() + Duration::minutes(5),
+            },
+        )
+        .unwrap();
+        let state = AppState::new(conn, Scheduler::default());
+
+        let result = mark_reminder_triggered_and_load_settings(&state, &reminder.id).unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn save_settings_returns_previous_settings() {
+        let conn = db::test_connection();
+        let previous = Settings {
+            launch_on_startup: true,
+            minimize_to_tray: false,
+            notification_enabled: true,
+        };
+        let next = Settings {
+            launch_on_startup: false,
+            minimize_to_tray: true,
+            notification_enabled: false,
+        };
+        SettingsRepository::save(&conn, &previous).unwrap();
+        let state = AppState::new(conn, Scheduler::default());
+
+        let returned = save_settings_and_get_previous(&state, &next).unwrap();
+        let saved = {
+            let conn = state.conn.lock().unwrap();
+            SettingsRepository::get(&conn).unwrap()
+        };
+
+        assert_eq!(returned, previous);
+        assert_eq!(saved, next);
+    }
+
+    fn insert_raw(
+        conn: &rusqlite::Connection,
+        title: &str,
+        offset_minutes: i64,
+        enabled: bool,
+        status: ReminderStatus,
+    ) -> String {
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = Utc::now();
+        conn.execute(
+            "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, created_at, updated_at, triggered_at)
+             VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7, NULL)",
+            (
+                &id,
+                title,
+                (now + Duration::minutes(offset_minutes)).timestamp_millis(),
+                enabled,
+                status.as_str(),
+                now.timestamp_millis(),
+                now.timestamp_millis(),
+            ),
+        )
+        .unwrap();
+        id
     }
 }
