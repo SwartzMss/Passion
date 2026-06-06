@@ -1,6 +1,8 @@
 use crate::error::{BackendError, BackendResult};
 use crate::models::Settings;
 use rusqlite::{params, Connection};
+use tauri::AppHandle;
+use tauri_plugin_autostart::ManagerExt;
 
 pub struct SettingsRepository;
 
@@ -19,6 +21,16 @@ impl SettingsRepository {
         write_bool(conn, "notification_enabled", settings.notification_enabled)?;
         Ok(())
     }
+}
+
+pub fn sync_autostart(app: &AppHandle, enabled: bool) -> BackendResult<()> {
+    let manager = app.autolaunch();
+    if enabled {
+        manager.enable()
+    } else {
+        manager.disable()
+    }
+    .map_err(|err| BackendError::Startup(err.to_string()))
 }
 
 fn read_bool(conn: &Connection, key: &str) -> BackendResult<Option<bool>> {
