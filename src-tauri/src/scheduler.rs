@@ -1,6 +1,7 @@
 use crate::models::Reminder;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
@@ -22,8 +23,10 @@ impl Scheduler {
             .unwrap_or_else(|_| std::time::Duration::from_millis(0));
 
         let handles = Arc::clone(&self.handles);
+        let (start_tx, start_rx) = oneshot::channel();
         let id_for_task = id.clone();
         let handle = tokio::spawn(async move {
+            let _ = start_rx.await;
             tokio::time::sleep(delay).await;
             {
                 let mut handles = handles.lock().await;
@@ -33,6 +36,7 @@ impl Scheduler {
         });
 
         self.handles.lock().await.insert(id, handle);
+        let _ = start_tx.send(());
     }
 
     pub async fn cancel(&self, id: &str) {
@@ -97,6 +101,27 @@ mod tests {
         let result = tokio::time::timeout(std::time::Duration::from_millis(140), rx.recv()).await;
 
         assert!(result.is_err());
+        assert!(!scheduler.is_scheduled(&reminder.id).await);
+    }
+
+    #[tokio::test]
+    async fn immediate_schedule_does_not_leave_stale_handle() {
+        let scheduler = Scheduler::default();
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let reminder = reminder_in(Duration::milliseconds(-1));
+
+        scheduler
+            .schedule(reminder.clone(), move |id| {
+                tx.send(id).unwrap();
+            })
+            .await;
+
+        let fired = tokio::time::timeout(std::time::Duration::from_millis(200), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(fired, reminder.id);
         assert!(!scheduler.is_scheduled(&reminder.id).await);
     }
 
