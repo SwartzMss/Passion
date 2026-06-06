@@ -3,6 +3,7 @@ mod db;
 mod error;
 mod models;
 mod reminders;
+mod scheduler;
 mod settings;
 
 #[tauri::command]
