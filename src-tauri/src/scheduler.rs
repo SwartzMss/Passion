@@ -81,6 +81,7 @@ mod tests {
     use crate::models::ReminderStatus;
     use chrono::{Duration, Utc};
     use tokio::sync::mpsc;
+    use tokio::sync::Barrier;
 
     #[tokio::test]
     async fn schedule_fires_once() {
@@ -180,18 +181,21 @@ mod tests {
         assert!(!scheduler.is_scheduled(&reminder.id).await);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn concurrent_same_id_schedules_fire_once() {
         let scheduler = Scheduler::default();
         let (tx, mut rx) = mpsc::unbounded_channel();
         let reminder = reminder_in(Duration::milliseconds(80));
+        let barrier = Arc::new(Barrier::new(17));
         let mut schedule_tasks = Vec::new();
 
         for _ in 0..16 {
             let scheduler = scheduler.clone();
             let reminder = reminder.clone();
             let tx = tx.clone();
+            let barrier = Arc::clone(&barrier);
             schedule_tasks.push(tokio::spawn(async move {
+                barrier.wait().await;
                 scheduler
                     .schedule(reminder, move |id| {
                         tx.send(id).unwrap();
@@ -200,6 +204,7 @@ mod tests {
             }));
         }
         drop(tx);
+        barrier.wait().await;
 
         for task in schedule_tasks {
             task.await.unwrap();
