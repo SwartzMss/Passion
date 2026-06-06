@@ -22,3 +22,7 @@ target
 
 # Local isolated worktrees
 .worktrees/
+
+# Node and frontend build output
+node_modules/
+dist/
