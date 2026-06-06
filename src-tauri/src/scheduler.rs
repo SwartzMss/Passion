@@ -180,6 +180,43 @@ mod tests {
         assert!(!scheduler.is_scheduled(&reminder.id).await);
     }
 
+    #[tokio::test]
+    async fn concurrent_same_id_schedules_fire_once() {
+        let scheduler = Scheduler::default();
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let reminder = reminder_in(Duration::milliseconds(80));
+        let mut schedule_tasks = Vec::new();
+
+        for _ in 0..16 {
+            let scheduler = scheduler.clone();
+            let reminder = reminder.clone();
+            let tx = tx.clone();
+            schedule_tasks.push(tokio::spawn(async move {
+                scheduler
+                    .schedule(reminder, move |id| {
+                        tx.send(id).unwrap();
+                    })
+                    .await;
+            }));
+        }
+        drop(tx);
+
+        for task in schedule_tasks {
+            task.await.unwrap();
+        }
+
+        let fired = tokio::time::timeout(std::time::Duration::from_millis(200), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(fired, reminder.id);
+
+        let second = tokio::time::timeout(std::time::Duration::from_millis(120), rx.recv()).await;
+        assert!(matches!(second, Err(_) | Ok(None)));
+        assert!(!scheduler.is_scheduled(&reminder.id).await);
+    }
+
     fn reminder_in(offset: Duration) -> Reminder {
         let now = Utc::now();
         Reminder {
