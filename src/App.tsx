@@ -1,38 +1,119 @@
-import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { useEffect, useState } from "react";
+import "./styles.css";
+import { AddReminderDialog } from "./components/AddReminderDialog";
+import { ReminderList } from "./components/ReminderList";
+import { ReminderPopup } from "./components/ReminderPopup";
+import { SettingsPanel } from "./components/SettingsPanel";
+import {
+  createReminder,
+  deleteReminder,
+  listReminders,
+  toggleReminder,
+} from "./lib/api";
+import { onReminderTriggered } from "./lib/events";
+import type { NewReminder, Reminder } from "./types";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+type Tab = "reminders" | "settings";
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+export default function App() {
+  const [tab, setTab] = useState<Tab>("reminders");
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [popup, setPopup] = useState<Reminder | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function refresh() {
+    setReminders(await listReminders());
+  }
+
+  useEffect(() => {
+    refresh().catch((err) => setError(readError(err)));
+    const unlisten = onReminderTriggered((reminder) => {
+      setPopup(reminder);
+      refresh().catch((err) => setError(readError(err)));
+    });
+    return () => {
+      unlisten.then((fn) => fn()).catch(() => {});
+    };
+  }, []);
+
+  async function saveReminder(input: NewReminder) {
+    try {
+      await createReminder(input);
+      setShowAdd(false);
+      await refresh();
+    } catch (err) {
+      setError(readError(err));
+    }
+  }
+
+  async function changeEnabled(id: string, enabled: boolean) {
+    try {
+      await toggleReminder(id, enabled);
+      await refresh();
+    } catch (err) {
+      setError(readError(err));
+    }
+  }
+
+  async function remove(id: string) {
+    try {
+      await deleteReminder(id);
+      await refresh();
+    } catch (err) {
+      setError(readError(err));
+    }
   }
 
   return (
-    <main className="container">
-      <h1>Passion</h1>
-      <p>Personal desktop reminders powered by Tauri and React.</p>
+    <main>
+      <header className="app-header">
+        <h1>Passion</h1>
+        <nav>
+          <button
+            className={tab === "reminders" ? "active" : ""}
+            onClick={() => setTab("reminders")}
+          >
+            Reminders
+          </button>
+          <button
+            className={tab === "settings" ? "active" : ""}
+            onClick={() => setTab("settings")}
+          >
+            Settings
+          </button>
+        </nav>
+      </header>
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
+      {error ? (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {tab === "reminders" ? (
+        <ReminderList
+          reminders={reminders}
+          onAdd={() => setShowAdd(true)}
+          onToggle={changeEnabled}
+          onDelete={remove}
         />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
+      ) : (
+        <SettingsPanel />
+      )}
+      {showAdd ? (
+        <AddReminderDialog
+          onCancel={() => setShowAdd(false)}
+          onSave={saveReminder}
+        />
+      ) : null}
+      <ReminderPopup reminder={popup} onClose={() => setPopup(null)} />
     </main>
   );
 }
 
-export default App;
+function readError(err: unknown) {
+  if (typeof err === "object" && err && "message" in err) {
+    return String((err as { message: string }).message);
+  }
+  return "Operation failed.";
+}
