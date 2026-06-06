@@ -3,6 +3,7 @@ mod db;
 mod error;
 mod models;
 mod reminders;
+mod settings;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
