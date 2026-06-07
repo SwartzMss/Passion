@@ -1,15 +1,15 @@
 use crate::error::{BackendError, BackendResult};
-use crate::models::{NewReminder, Reminder, ReminderStatus};
-use chrono::{DateTime, Utc};
+use crate::models::{NewReminder, Reminder, ReminderRepeatRule, ReminderStatus};
+use chrono::{DateTime, Datelike, Duration, FixedOffset, TimeZone, Timelike, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use uuid::Uuid;
 
 pub struct ReminderRepository;
 
 const REMIND_AT_COLUMN_INDEX: usize = 3;
-const CREATED_AT_COLUMN_INDEX: usize = 6;
-const UPDATED_AT_COLUMN_INDEX: usize = 7;
-const TRIGGERED_AT_COLUMN_INDEX: usize = 8;
+const CREATED_AT_COLUMN_INDEX: usize = 7;
+const UPDATED_AT_COLUMN_INDEX: usize = 8;
+const TRIGGERED_AT_COLUMN_INDEX: usize = 9;
 
 impl ReminderStatus {
     pub fn as_str(self) -> &'static str {
@@ -32,13 +32,38 @@ impl ReminderStatus {
     }
 }
 
+impl ReminderRepeatRule {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReminderRepeatRule::Once => "once",
+            ReminderRepeatRule::CnWorkday => "cn_workday",
+        }
+    }
+
+    fn from_db(value: &str) -> BackendResult<Self> {
+        match value {
+            "once" => Ok(Self::Once),
+            "cn_workday" => Ok(Self::CnWorkday),
+            other => Err(BackendError::Database(format!(
+                "invalid reminder repeat rule {other}"
+            ))),
+        }
+    }
+}
+
 impl ReminderRepository {
     pub fn create(conn: &Connection, input: NewReminder) -> BackendResult<Reminder> {
         let title = input.title.trim().to_string();
         if title.is_empty() {
             return Err(BackendError::EmptyTitle);
         }
-        if input.remind_at <= Utc::now() {
+        let remind_at = match input.repeat_rule {
+            ReminderRepeatRule::Once => input.remind_at,
+            ReminderRepeatRule::CnWorkday => {
+                next_cn_workday_remind_at(input.remind_at, Utc::now())?
+            }
+        };
+        if remind_at <= Utc::now() {
             return Err(BackendError::ReminderTimeInPast);
         }
 
@@ -50,17 +75,18 @@ impl ReminderRepository {
                 .notes
                 .map(|notes| notes.trim().to_string())
                 .filter(|notes| !notes.is_empty()),
-            remind_at: input.remind_at,
+            remind_at,
             enabled: true,
             status: ReminderStatus::Pending,
+            repeat_rule: input.repeat_rule,
             created_at: now,
             updated_at: now,
             triggered_at: None,
         };
 
         conn.execute(
-            "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, created_at, updated_at, triggered_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL)",
+            "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, repeat_rule, created_at, updated_at, triggered_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL)",
             params![
                 reminder.id,
                 reminder.title,
@@ -68,6 +94,7 @@ impl ReminderRepository {
                 reminder.remind_at.timestamp_millis(),
                 reminder.enabled,
                 reminder.status.as_str(),
+                reminder.repeat_rule.as_str(),
                 reminder.created_at.timestamp_millis(),
                 reminder.updated_at.timestamp_millis(),
             ],
@@ -176,8 +203,27 @@ impl ReminderRepository {
             now.timestamp_millis(),
         )?;
         due.into_iter()
-            .map(|reminder| Self::mark_status(conn, &reminder.id, ReminderStatus::Expired, now))
+            .map(|reminder| {
+                if reminder.repeat_rule == ReminderRepeatRule::CnWorkday {
+                    let next = next_cn_workday_remind_at(reminder.remind_at, now)?;
+                    Self::reschedule_repeating(conn, &reminder.id, next, now)
+                } else {
+                    Self::mark_status(conn, &reminder.id, ReminderStatus::Expired, now)
+                }
+            })
             .collect()
+    }
+
+    pub fn reschedule_after_trigger(
+        conn: &Connection,
+        reminder: &Reminder,
+        when: DateTime<Utc>,
+    ) -> BackendResult<Option<Reminder>> {
+        if reminder.repeat_rule != ReminderRepeatRule::CnWorkday {
+            return Ok(None);
+        }
+        let next = next_cn_workday_remind_at(reminder.remind_at, when)?;
+        Self::reschedule_repeating(conn, &reminder.id, next, when).map(Some)
     }
 
     fn mark_status(
@@ -189,6 +235,26 @@ impl ReminderRepository {
         conn.execute(
             "UPDATE reminders SET status = ?1, triggered_at = ?2, updated_at = ?2 WHERE id = ?3",
             params![status.as_str(), when.timestamp_millis(), id],
+        )
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+        Self::get(conn, id)
+    }
+
+    fn reschedule_repeating(
+        conn: &Connection,
+        id: &str,
+        next_remind_at: DateTime<Utc>,
+        when: DateTime<Utc>,
+    ) -> BackendResult<Reminder> {
+        conn.execute(
+            "UPDATE reminders
+             SET remind_at = ?1, status = 'pending', triggered_at = ?2, updated_at = ?2
+             WHERE id = ?3",
+            params![
+                next_remind_at.timestamp_millis(),
+                when.timestamp_millis(),
+                id
+            ],
         )
         .map_err(|err| BackendError::Database(err.to_string()))?;
         Self::get(conn, id)
@@ -212,6 +278,7 @@ impl ReminderRepository {
 
     fn from_row(row: &Row<'_>) -> rusqlite::Result<Reminder> {
         let status: String = row.get("status")?;
+        let repeat_rule: String = row.get("repeat_rule")?;
         Ok(Reminder {
             id: row.get("id")?,
             title: row.get("title")?,
@@ -219,6 +286,13 @@ impl ReminderRepository {
             remind_at: millis_to_datetime(row.get("remind_at")?, REMIND_AT_COLUMN_INDEX)?,
             enabled: row.get("enabled")?,
             status: ReminderStatus::from_db(&status).map_err(|err| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    0,
+                    rusqlite::types::Type::Text,
+                    Box::new(err),
+                )
+            })?,
+            repeat_rule: ReminderRepeatRule::from_db(&repeat_rule).map_err(|err| {
                 rusqlite::Error::FromSqlConversionFailure(
                     0,
                     rusqlite::types::Type::Text,
@@ -233,6 +307,42 @@ impl ReminderRepository {
                 .transpose()?,
         })
     }
+}
+
+pub fn next_cn_workday_remind_at(
+    requested: DateTime<Utc>,
+    now: DateTime<Utc>,
+) -> BackendResult<DateTime<Utc>> {
+    let china = FixedOffset::east_opt(8 * 3600)
+        .ok_or_else(|| BackendError::Database("invalid China timezone offset".to_string()))?;
+    let requested_cn = requested.with_timezone(&china);
+    let time = requested_cn.time();
+    let mut date = requested_cn.date_naive();
+
+    for _ in 0..400 {
+        let candidate = china
+            .with_ymd_and_hms(
+                date.year(),
+                date.month(),
+                date.day(),
+                time.hour(),
+                time.minute(),
+                time.second(),
+            )
+            .single()
+            .ok_or_else(|| BackendError::Database("invalid reminder local time".to_string()))?
+            .with_timezone(&Utc);
+        if candidate > now && crate::workday_calendar::is_cn_legal_workday(date)? {
+            return Ok(candidate);
+        }
+        date = date
+            .checked_add_signed(Duration::days(1))
+            .ok_or_else(|| BackendError::Database("invalid reminder next date".to_string()))?;
+    }
+
+    Err(BackendError::Database(
+        "could not find next China legal workday".to_string(),
+    ))
 }
 
 fn millis_to_datetime(millis: i64, column_index: usize) -> rusqlite::Result<DateTime<Utc>> {
@@ -252,7 +362,7 @@ fn millis_to_datetime(millis: i64, column_index: usize) -> rusqlite::Result<Date
 mod tests {
     use super::*;
     use crate::db;
-    use chrono::Duration;
+    use chrono::{Duration, TimeZone};
 
     #[test]
     fn create_rejects_empty_title() {
@@ -261,6 +371,7 @@ mod tests {
             title: "  ".to_string(),
             notes: None,
             remind_at: Utc::now() + Duration::minutes(5),
+            repeat_rule: ReminderRepeatRule::Once,
         };
 
         let err = ReminderRepository::create(&conn, input).unwrap_err();
@@ -275,6 +386,7 @@ mod tests {
             title: "Past".to_string(),
             notes: None,
             remind_at: Utc::now() - Duration::minutes(1),
+            repeat_rule: ReminderRepeatRule::Once,
         };
 
         let err = ReminderRepository::create(&conn, input).unwrap_err();
@@ -291,6 +403,7 @@ mod tests {
                 title: "Drink water".to_string(),
                 notes: Some("Stand up first".to_string()),
                 remind_at: Utc::now() + Duration::minutes(5),
+                repeat_rule: ReminderRepeatRule::Once,
             },
         )
         .unwrap();
@@ -540,6 +653,48 @@ mod tests {
         assert!(matches!(err, BackendError::Database(_)));
     }
 
+    #[test]
+    fn create_cn_workday_reminder_moves_holiday_to_next_legal_workday() {
+        let conn = db::test_connection();
+        let input = NewReminder {
+            title: "Standup".to_string(),
+            notes: None,
+            remind_at: china_time(2026, 10, 1, 9, 0),
+            repeat_rule: ReminderRepeatRule::CnWorkday,
+        };
+
+        let reminder = ReminderRepository::create(&conn, input).unwrap();
+
+        assert_eq!(reminder.repeat_rule, ReminderRepeatRule::CnWorkday);
+        assert_eq!(reminder.remind_at, china_time(2026, 10, 8, 9, 0));
+    }
+
+    #[test]
+    fn reschedule_after_trigger_moves_to_next_legal_workday() {
+        let conn = db::test_connection();
+        let reminder = insert_raw_at_with_repeat(
+            &conn,
+            "Standup",
+            china_time(2026, 2, 14, 9, 0),
+            true,
+            ReminderStatus::Pending,
+            ReminderRepeatRule::CnWorkday,
+            None,
+        );
+        let reminder = ReminderRepository::get(&conn, &reminder).unwrap();
+
+        let next = ReminderRepository::reschedule_after_trigger(
+            &conn,
+            &reminder,
+            china_time(2026, 2, 14, 9, 0),
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(next.status, ReminderStatus::Pending);
+        assert_eq!(next.remind_at, china_time(2026, 2, 24, 9, 0));
+    }
+
     fn insert_raw(
         conn: &Connection,
         title: &str,
@@ -569,8 +724,8 @@ mod tests {
         let now = Utc::now();
         let triggered_at = triggered_at.map(|when| when.timestamp_millis());
         conn.execute(
-            "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, created_at, updated_at, triggered_at)
-             VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, repeat_rule, created_at, updated_at, triggered_at)
+             VALUES (?1, ?2, NULL, ?3, ?4, ?5, 'once', ?6, ?7, ?8)",
             (
                 &id,
                 title,
@@ -584,5 +739,44 @@ mod tests {
         )
         .unwrap();
         id
+    }
+
+    fn insert_raw_at_with_repeat(
+        conn: &Connection,
+        title: &str,
+        remind_at: DateTime<Utc>,
+        enabled: bool,
+        status: ReminderStatus,
+        repeat_rule: ReminderRepeatRule,
+        triggered_at: Option<DateTime<Utc>>,
+    ) -> String {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now();
+        let triggered_at = triggered_at.map(|when| when.timestamp_millis());
+        conn.execute(
+            "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, repeat_rule, created_at, updated_at, triggered_at)
+             VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            (
+                &id,
+                title,
+                remind_at.timestamp_millis(),
+                enabled,
+                status.as_str(),
+                repeat_rule.as_str(),
+                now.timestamp_millis(),
+                now.timestamp_millis(),
+                triggered_at,
+            ),
+        )
+        .unwrap();
+        id
+    }
+
+    fn china_time(year: i32, month: u32, day: u32, hour: u32, minute: u32) -> DateTime<Utc> {
+        chrono::FixedOffset::east_opt(8 * 3600)
+            .unwrap()
+            .with_ymd_and_hms(year, month, day, hour, minute, 0)
+            .unwrap()
+            .with_timezone(&Utc)
     }
 }

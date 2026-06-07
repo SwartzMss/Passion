@@ -28,6 +28,9 @@ export function ReminderList({ reminders, onAdd, onToggle, onDelete }: Props) {
           <div>
             <h3>{reminder.title}</h3>
             <p>{formatTime(reminder.remindAt)}</p>
+            {reminder.repeatRule !== "once" ? (
+              <p className="muted">{repeatRuleLabel(reminder.repeatRule)}</p>
+            ) : null}
             {reminder.notes ? <p className="muted">{reminder.notes}</p> : null}
           </div>
           <span className={`status status-${reminder.status}`}>
@@ -50,6 +53,15 @@ export function ReminderList({ reminders, onAdd, onToggle, onDelete }: Props) {
       ))}
     </section>
   );
+}
+
+function repeatRuleLabel(rule: Reminder["repeatRule"]) {
+  switch (rule) {
+    case "once":
+      return "单次提醒";
+    case "cn_workday":
+      return "中国法定工作日";
+  }
 }
 
 function statusLabel(status: Reminder["status"]) {

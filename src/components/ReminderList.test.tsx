@@ -11,6 +11,7 @@ const reminder: Reminder = {
   remindAt: new Date(Date.now() + 60_000).toISOString(),
   enabled: true,
   status: "pending",
+  repeatRule: "cn_workday",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   triggeredAt: null,
@@ -41,6 +42,8 @@ it("renders reminder actions", async () => {
       onDelete={onDelete}
     />,
   );
+
+  expect(screen.getByText("中国法定工作日")).toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "停用 Stand up" }));
   await user.click(screen.getByRole("button", { name: "删除 Stand up" }));

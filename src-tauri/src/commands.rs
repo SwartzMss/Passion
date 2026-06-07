@@ -284,8 +284,8 @@ pub async fn run_script_task_now(
 async fn schedule_reminder(app: AppHandle, state: AppState, reminder: Reminder) {
     let app_for_callback = app.clone();
     let state_for_callback = state.clone();
-    state
-        .scheduler
+    let scheduler = state.scheduler.clone();
+    scheduler
         .schedule(reminder, move |id| {
             let app = app_for_callback.clone();
             let state = state_for_callback.clone();
@@ -356,11 +356,27 @@ async fn dispatch_triggered_reminder(
     if let Err(err) = notifications::show_main_window(&app) {
         eprintln!("failed to show main window for reminder: {err}");
     }
-    if let Err(err) = app.emit("reminder_triggered", reminder) {
+    if let Err(err) = app.emit("reminder_triggered", reminder.clone()) {
         eprintln!("failed to emit reminder_triggered event: {err}");
+    }
+    if let Some(next) = reschedule_repeating_reminder(&state, &reminder)? {
+        std::thread::spawn(move || {
+            tauri::async_runtime::block_on(schedule_reminder(app, state, next));
+        });
     }
 
     Ok(())
+}
+
+fn reschedule_repeating_reminder(
+    state: &AppState,
+    reminder: &Reminder,
+) -> crate::error::BackendResult<Option<Reminder>> {
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+    ReminderRepository::reschedule_after_trigger(&conn, reminder, Utc::now())
 }
 
 fn mark_reminder_triggered_and_load_settings(
@@ -408,7 +424,7 @@ fn rollback_settings(state: &AppState, previous: &Settings) {
 mod tests {
     use super::*;
     use crate::db;
-    use crate::models::{NewReminder, ReminderStatus};
+    use crate::models::{NewReminder, ReminderRepeatRule, ReminderStatus};
     use crate::scheduler::Scheduler;
     use chrono::{Duration, Utc};
 
@@ -448,6 +464,7 @@ mod tests {
                 title: "Stretch".to_string(),
                 notes: None,
                 remind_at: Utc::now() + Duration::minutes(5),
+                repeat_rule: ReminderRepeatRule::Once,
             },
         )
         .unwrap();
@@ -484,6 +501,32 @@ mod tests {
         assert_eq!(saved, next);
     }
 
+    #[test]
+    fn dispatch_reschedules_cn_workday_reminder() {
+        let conn = db::test_connection();
+        let id = insert_raw_with_repeat(
+            &conn,
+            "Standup",
+            -5,
+            true,
+            ReminderStatus::Triggered,
+            ReminderRepeatRule::CnWorkday,
+        );
+        let state = AppState::new(conn, Scheduler::default());
+        let reminder = {
+            let conn = state.conn.lock().unwrap();
+            ReminderRepository::get(&conn, &id).unwrap()
+        };
+
+        let next = reschedule_repeating_reminder(&state, &reminder)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(next.status, ReminderStatus::Pending);
+        assert!(next.remind_at > Utc::now());
+        assert_eq!(next.repeat_rule, ReminderRepeatRule::CnWorkday);
+    }
+
     fn insert_raw(
         conn: &rusqlite::Connection,
         title: &str,
@@ -494,14 +537,42 @@ mod tests {
         let id = uuid::Uuid::new_v4().to_string();
         let now = Utc::now();
         conn.execute(
-            "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, created_at, updated_at, triggered_at)
-             VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7, NULL)",
+            "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, repeat_rule, created_at, updated_at, triggered_at)
+             VALUES (?1, ?2, NULL, ?3, ?4, ?5, 'once', ?6, ?7, NULL)",
             (
                 &id,
                 title,
                 (now + Duration::minutes(offset_minutes)).timestamp_millis(),
                 enabled,
                 status.as_str(),
+                now.timestamp_millis(),
+                now.timestamp_millis(),
+            ),
+        )
+        .unwrap();
+        id
+    }
+
+    fn insert_raw_with_repeat(
+        conn: &rusqlite::Connection,
+        title: &str,
+        offset_minutes: i64,
+        enabled: bool,
+        status: ReminderStatus,
+        repeat_rule: ReminderRepeatRule,
+    ) -> String {
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = Utc::now();
+        conn.execute(
+            "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, repeat_rule, created_at, updated_at, triggered_at)
+             VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7, ?8, NULL)",
+            (
+                &id,
+                title,
+                (now + Duration::minutes(offset_minutes)).timestamp_millis(),
+                enabled,
+                status.as_str(),
+                repeat_rule.as_str(),
                 now.timestamp_millis(),
                 now.timestamp_millis(),
             ),

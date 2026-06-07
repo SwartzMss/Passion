@@ -25,5 +25,23 @@ it("saves valid reminder", async () => {
     title: "Pay rent",
     notes: null,
     remindAt: new Date("2099-01-01T09:00").toISOString(),
+    repeatRule: "once",
   });
+});
+
+it("saves China legal workday reminders", async () => {
+  const user = userEvent.setup();
+  const onSave = vi.fn();
+  render(<AddReminderDialog onCancel={() => {}} onSave={onSave} />);
+
+  await user.type(screen.getByLabelText("标题"), "Standup");
+  await user.type(screen.getByLabelText("日期和时间"), "2099-01-01T09:00");
+  await user.selectOptions(screen.getByLabelText("重复规则"), "cn_workday");
+  await user.click(screen.getByRole("button", { name: "保存" }));
+
+  expect(onSave).toHaveBeenCalledWith(
+    expect.objectContaining({
+      repeatRule: "cn_workday",
+    }),
+  );
 });
