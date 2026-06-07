@@ -2,12 +2,13 @@ use crate::ai_settings::AiSettingsRepository;
 use crate::app_state::AppState;
 use crate::error::{BackendError, ErrorPayload};
 use crate::models::{
-    AiSettings, DownloadRequest, DownloadResult, NewReminder, PingRequest, PingResult,
-    PortCheckRequest, PortCheckResult, Reminder, Settings, SystemSnapshot, TranslationRequest,
-    TranslationResult,
+    AiSettings, DownloadRequest, DownloadResult, NewReminder, NewScriptTask, PingRequest,
+    PingResult, PortCheckRequest, PortCheckResult, Reminder, ScriptTask, Settings, SystemSnapshot,
+    TranslationRequest, TranslationResult,
 };
 use crate::notifications;
 use crate::reminders::ReminderRepository;
+use crate::script_tasks::ScriptTaskRepository;
 use crate::settings::SettingsRepository;
 use chrono::Utc;
 use tauri::{AppHandle, Emitter, State};
@@ -191,6 +192,95 @@ pub async fn get_system_snapshot() -> CommandResult<SystemSnapshot> {
     Ok(crate::system_monitor::get_system_snapshot())
 }
 
+#[tauri::command]
+pub async fn list_script_tasks(state: State<'_, AppState>) -> CommandResult<Vec<ScriptTask>> {
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+    ScriptTaskRepository::list(&conn).map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn create_script_task(
+    state: State<'_, AppState>,
+    input: NewScriptTask,
+) -> CommandResult<ScriptTask> {
+    let task = {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        ScriptTaskRepository::create(&conn, input).map_err(ErrorPayload::from)?
+    };
+    if task.enabled {
+        schedule_script_task(state.inner().clone(), task.clone()).await;
+    }
+    Ok(task)
+}
+
+#[tauri::command]
+pub async fn set_script_task_enabled(
+    state: State<'_, AppState>,
+    id: String,
+    enabled: bool,
+) -> CommandResult<ScriptTask> {
+    let task = {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        ScriptTaskRepository::set_enabled(&conn, &id, enabled).map_err(ErrorPayload::from)?
+    };
+    if task.enabled {
+        schedule_script_task(state.inner().clone(), task.clone()).await;
+    } else {
+        state.script_task_scheduler.cancel(&task.id).await;
+    }
+    Ok(task)
+}
+
+#[tauri::command]
+pub async fn delete_script_task(state: State<'_, AppState>, id: String) -> CommandResult<()> {
+    {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        ScriptTaskRepository::delete(&conn, &id).map_err(ErrorPayload::from)?;
+    }
+    state.script_task_scheduler.cancel(&id).await;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn run_script_task_now(
+    state: State<'_, AppState>,
+    id: String,
+) -> CommandResult<ScriptTask> {
+    let task = {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        ScriptTaskRepository::get(&conn, &id).map_err(ErrorPayload::from)?
+    };
+    let state_for_run = state.inner().clone();
+    let id_for_run = task.id.clone();
+    let result = state
+        .script_task_scheduler
+        .run_if_idle(&task.id, move || {
+            let state = state_for_run.clone();
+            let id = id_for_run.clone();
+            async move { execute_script_task(state, id).await }
+        })
+        .await
+        .ok_or_else(|| {
+            ErrorPayload::from(BackendError::ScriptTask("脚本任务正在运行。".to_string()))
+        })?;
+    result.map_err(ErrorPayload::from)
+}
+
 async fn schedule_reminder(app: AppHandle, state: AppState, reminder: Reminder) {
     let app_for_callback = app.clone();
     let state_for_callback = state.clone();
@@ -210,6 +300,43 @@ async fn schedule_reminder(app: AppHandle, state: AppState, reminder: Reminder) 
 
 pub async fn schedule_existing_reminder(app: AppHandle, state: AppState, reminder: Reminder) {
     schedule_reminder(app, state, reminder).await;
+}
+
+pub async fn schedule_existing_script_task(state: AppState, task: ScriptTask) {
+    schedule_script_task(state, task).await;
+}
+
+async fn schedule_script_task(state: AppState, task: ScriptTask) {
+    let scheduler = state.script_task_scheduler.clone();
+    scheduler
+        .schedule(&task, move |id| {
+            let state = state.clone();
+            async move {
+                if let Err(err) = execute_script_task(state, id).await {
+                    eprintln!("failed to execute scheduled script task: {err}");
+                }
+            }
+        })
+        .await;
+}
+
+async fn execute_script_task(
+    state: AppState,
+    id: String,
+) -> crate::error::BackendResult<ScriptTask> {
+    let task = {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        ScriptTaskRepository::get(&conn, &id)?
+    };
+    let result = crate::script_runner::run_script(&task).await;
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+    ScriptTaskRepository::record_execution_result(&conn, &id, &result)
 }
 
 async fn dispatch_triggered_reminder(

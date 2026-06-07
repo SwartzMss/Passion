@@ -9,6 +9,9 @@ mod network_diagnostics;
 mod notifications;
 mod reminders;
 mod scheduler;
+mod script_runner;
+mod script_task_scheduler;
+mod script_tasks;
 mod settings;
 mod system_monitor;
 mod translator;
@@ -49,6 +52,13 @@ pub fn run() {
                 ReminderRepository::mark_due_pending_as_expired(&conn, now)?;
                 ReminderRepository::pending_future_enabled(&conn, now)?
             };
+            let enabled_script_tasks = {
+                let conn = state
+                    .conn
+                    .lock()
+                    .map_err(|err| error::BackendError::Database(err.to_string()))?;
+                script_tasks::ScriptTaskRepository::enabled(&conn)?
+            };
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::block_on(async {
@@ -59,6 +69,9 @@ pub fn run() {
                         reminder,
                     )
                     .await;
+                }
+                for task in enabled_script_tasks {
+                    commands::schedule_existing_script_task(state.clone(), task).await;
                 }
             });
 
@@ -92,6 +105,11 @@ pub fn run() {
             commands::check_port,
             commands::download_file,
             commands::get_system_snapshot,
+            commands::list_script_tasks,
+            commands::create_script_task,
+            commands::set_script_task_enabled,
+            commands::delete_script_task,
+            commands::run_script_task_now,
             greet,
         ])
         .run(tauri::generate_context!())

@@ -1,4 +1,5 @@
 use crate::scheduler::Scheduler;
+use crate::script_task_scheduler::ScriptTaskScheduler;
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 
@@ -6,6 +7,7 @@ use std::sync::{Arc, Mutex};
 pub struct AppState {
     pub conn: Arc<Mutex<Connection>>,
     pub scheduler: Scheduler,
+    pub script_task_scheduler: ScriptTaskScheduler,
 }
 
 impl AppState {
@@ -13,6 +15,7 @@ impl AppState {
         Self {
             conn: Arc::new(Mutex::new(conn)),
             scheduler,
+            script_task_scheduler: ScriptTaskScheduler::default(),
         }
     }
 }

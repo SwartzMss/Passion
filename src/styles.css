@@ -218,6 +218,11 @@ nav .active {
   gap: 16px;
 }
 
+.script-panel {
+  display: grid;
+  gap: 16px;
+}
+
 .download-card {
   display: grid;
   gap: 12px;
@@ -275,6 +280,40 @@ nav .active {
 
 .system-card strong {
   font-size: 26px;
+}
+
+.script-form,
+.script-task-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #e0e5ee;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.script-form h3,
+.script-task-card h3,
+.script-task-card p {
+  margin: 0;
+}
+
+.script-task-list {
+  display: grid;
+  gap: 12px;
+}
+
+.script-task-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .field-label {
