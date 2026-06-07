@@ -4,8 +4,14 @@ export function WindowControls() {
   const appWindow = getCurrentWindow();
 
   return (
-    <div className="window-frame" data-tauri-drag-region>
-      <div className="window-drag-region" data-tauri-drag-region />
+    <div className="window-frame">
+      <button
+        type="button"
+        className="window-titlebar"
+        onMouseDown={() => appWindow.startDragging()}
+      >
+        <span className="window-title">Passion</span>
+      </button>
       <div className="window-controls">
         <button
           type="button"
@@ -19,7 +25,7 @@ export function WindowControls() {
           type="button"
           aria-label="关闭"
           title="关闭"
-          onClick={() => appWindow.close()}
+          onClick={() => appWindow.hide()}
         >
           x
         </button>

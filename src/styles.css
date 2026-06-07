@@ -36,9 +36,28 @@ button:disabled {
   user-select: none;
 }
 
-.window-drag-region {
+.window-titlebar {
+  display: flex;
+  align-items: center;
   flex: 1;
   height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 0 0 14px;
+  cursor: default;
+  text-align: left;
+}
+
+.window-titlebar:hover {
+  background: transparent;
+}
+
+.window-title {
+  color: #172033;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .window-controls {
