@@ -25,7 +25,7 @@ rusqlite = { version = "0.40.0", features = ["bundled"] }
 chrono = { version = "0.4.45", features = ["serde"] }
 uuid = { version = "1.23.2", features = ["v4", "serde"] }
 thiserror = "2.0.18"
-tokio = { version = "1.52.3", features = ["macros", "rt", "time", "sync"] }
+tokio = { version = "1.52.3", features = ["macros", "process", "rt", "time", "sync"] }
 tauri-plugin-notification = "2.3.3"
 tauri-plugin-autostart = "2.5.1"
 reqwest = { version = "0.12.24", features = ["json"] }

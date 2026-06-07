@@ -142,6 +142,33 @@ pub struct SystemSnapshot {
     pub uptime_seconds: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewScriptTask {
+    pub name: String,
+    pub script_path: String,
+    pub interval_minutes: u32,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScriptTask {
+    pub id: String,
+    pub name: String,
+    pub script_path: String,
+    pub interval_minutes: u32,
+    pub enabled: bool,
+    pub last_started_at: Option<DateTime<Utc>>,
+    pub last_finished_at: Option<DateTime<Utc>>,
+    pub last_exit_code: Option<i32>,
+    pub last_stdout: Option<String>,
+    pub last_stderr: Option<String>,
+    pub last_error: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -86,6 +86,29 @@ export interface SystemSnapshot {
   uptimeSeconds: number;
 }
 
+export interface NewScriptTask {
+  name: string;
+  scriptPath: string;
+  intervalMinutes: number;
+  enabled: boolean;
+}
+
+export interface ScriptTask {
+  id: string;
+  name: string;
+  scriptPath: string;
+  intervalMinutes: number;
+  enabled: boolean;
+  lastStartedAt?: string | null;
+  lastFinishedAt?: string | null;
+  lastExitCode?: number | null;
+  lastStdout?: string | null;
+  lastStderr?: string | null;
+  lastError?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BackendError {
   message: string;
 }

@@ -6,6 +6,7 @@ interface Props {
   onOpenNetworkDiagnostics: () => void;
   onOpenDownloader: () => void;
   onOpenSystemMonitor: () => void;
+  onOpenScriptTasks: () => void;
   onOpenSettings: () => void;
 }
 
@@ -17,6 +18,7 @@ export function WorkbenchHome({
   onOpenNetworkDiagnostics,
   onOpenDownloader,
   onOpenSystemMonitor,
+  onOpenScriptTasks,
   onOpenSettings,
 }: Props) {
   return (
@@ -78,6 +80,16 @@ export function WorkbenchHome({
           </div>
           <div className="card-actions">
             <button onClick={onOpenSystemMonitor}>查看状态</button>
+          </div>
+        </article>
+
+        <article className="feature-card">
+          <div>
+            <h3>脚本任务</h3>
+            <p className="muted">定期执行本机脚本，并查看最近一次输出。</p>
+          </div>
+          <div className="card-actions">
+            <button onClick={onOpenScriptTasks}>管理任务</button>
           </div>
         </article>
       </div>

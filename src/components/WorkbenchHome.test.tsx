@@ -13,6 +13,7 @@ it("shows assistant feature cards", () => {
       onOpenNetworkDiagnostics={() => {}}
       onOpenDownloader={() => {}}
       onOpenSystemMonitor={() => {}}
+      onOpenScriptTasks={() => {}}
       onOpenSettings={() => {}}
     />,
   );
@@ -23,6 +24,7 @@ it("shows assistant feature cards", () => {
   expect(screen.getByText("网络检测")).toBeInTheDocument();
   expect(screen.getByText("下载工具")).toBeInTheDocument();
   expect(screen.getByText("系统监控")).toBeInTheDocument();
+  expect(screen.getByText("脚本任务")).toBeInTheDocument();
 });
 
 it("opens translation from the workbench", async () => {
@@ -37,6 +39,7 @@ it("opens translation from the workbench", async () => {
       onOpenNetworkDiagnostics={() => {}}
       onOpenDownloader={() => {}}
       onOpenSystemMonitor={() => {}}
+      onOpenScriptTasks={() => {}}
       onOpenSettings={() => {}}
     />,
   );
@@ -58,6 +61,7 @@ it("opens network diagnostics from the workbench", async () => {
       onOpenNetworkDiagnostics={onOpenNetworkDiagnostics}
       onOpenDownloader={() => {}}
       onOpenSystemMonitor={() => {}}
+      onOpenScriptTasks={() => {}}
       onOpenSettings={() => {}}
     />,
   );
@@ -79,6 +83,7 @@ it("opens downloader from the workbench", async () => {
       onOpenNetworkDiagnostics={() => {}}
       onOpenDownloader={onOpenDownloader}
       onOpenSystemMonitor={() => {}}
+      onOpenScriptTasks={() => {}}
       onOpenSettings={() => {}}
     />,
   );
@@ -100,6 +105,7 @@ it("opens system monitor from the workbench", async () => {
       onOpenNetworkDiagnostics={() => {}}
       onOpenDownloader={() => {}}
       onOpenSystemMonitor={onOpenSystemMonitor}
+      onOpenScriptTasks={() => {}}
       onOpenSettings={() => {}}
     />,
   );
@@ -107,4 +113,26 @@ it("opens system monitor from the workbench", async () => {
   await user.click(screen.getByRole("button", { name: "查看状态" }));
 
   expect(onOpenSystemMonitor).toHaveBeenCalledOnce();
+});
+
+it("opens script tasks from the workbench", async () => {
+  const user = userEvent.setup();
+  const onOpenScriptTasks = vi.fn();
+  render(
+    <WorkbenchHome
+      pendingReminderCount={0}
+      onOpenReminders={() => {}}
+      onAddReminder={() => {}}
+      onOpenTranslation={() => {}}
+      onOpenNetworkDiagnostics={() => {}}
+      onOpenDownloader={() => {}}
+      onOpenSystemMonitor={() => {}}
+      onOpenScriptTasks={onOpenScriptTasks}
+      onOpenSettings={() => {}}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "管理任务" }));
+
+  expect(onOpenScriptTasks).toHaveBeenCalledOnce();
 });

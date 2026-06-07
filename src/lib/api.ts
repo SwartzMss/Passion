@@ -4,12 +4,14 @@ import type {
   DownloadRequest,
   DownloadResult,
   NewReminder,
+  NewScriptTask,
   PingRequest,
   PingResult,
   PortCheckRequest,
   PortCheckResult,
   Reminder,
   Settings,
+  ScriptTask,
   SystemSnapshot,
   TranslationRequest,
   TranslationResult,
@@ -82,4 +84,29 @@ export async function downloadFile(
 
 export async function getSystemSnapshot(): Promise<SystemSnapshot> {
   return invoke<SystemSnapshot>("get_system_snapshot");
+}
+
+export async function listScriptTasks(): Promise<ScriptTask[]> {
+  return invoke<ScriptTask[]>("list_script_tasks");
+}
+
+export async function createScriptTask(
+  input: NewScriptTask,
+): Promise<ScriptTask> {
+  return invoke<ScriptTask>("create_script_task", { input });
+}
+
+export async function setScriptTaskEnabled(
+  id: string,
+  enabled: boolean,
+): Promise<ScriptTask> {
+  return invoke<ScriptTask>("set_script_task_enabled", { id, enabled });
+}
+
+export async function deleteScriptTask(id: string): Promise<void> {
+  return invoke<void>("delete_script_task", { id });
+}
+
+export async function runScriptTaskNow(id: string): Promise<ScriptTask> {
+  return invoke<ScriptTask>("run_script_task_now", { id });
 }
