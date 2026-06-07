@@ -20,6 +20,7 @@ pub fn migrate(conn: &Connection) -> BackendResult<()> {
             remind_at INTEGER NOT NULL,
             enabled INTEGER NOT NULL,
             status TEXT NOT NULL CHECK (status IN ('pending', 'triggered', 'expired')),
+            repeat_rule TEXT NOT NULL DEFAULT 'once' CHECK (repeat_rule IN ('once', 'cn_workday')),
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
             triggered_at INTEGER
@@ -53,7 +54,36 @@ pub fn migrate(conn: &Connection) -> BackendResult<()> {
         ON script_tasks (enabled);
         ",
     )
-    .map_err(|err| BackendError::Database(err.to_string()))
+    .map_err(|err| BackendError::Database(err.to_string()))?;
+    add_column_if_missing(
+        conn,
+        "reminders",
+        "repeat_rule",
+        "ALTER TABLE reminders ADD COLUMN repeat_rule TEXT NOT NULL DEFAULT 'once' CHECK (repeat_rule IN ('once', 'cn_workday'))",
+    )?;
+    Ok(())
+}
+
+fn add_column_if_missing(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    statement: &str,
+) -> BackendResult<()> {
+    let mut stmt = conn
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+    let rows = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+    for row in rows {
+        if row.map_err(|err| BackendError::Database(err.to_string()))? == column {
+            return Ok(());
+        }
+    }
+    conn.execute(statement, [])
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+    Ok(())
 }
 
 #[cfg(test)]

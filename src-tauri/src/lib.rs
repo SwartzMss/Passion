@@ -16,6 +16,7 @@ mod settings;
 mod system_monitor;
 mod translator;
 mod tray;
+mod workday_calendar;
 
 use app_state::AppState;
 use chrono::Utc;

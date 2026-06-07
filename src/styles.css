@@ -191,6 +191,7 @@ nav .active {
 .settings-panel input,
 .settings-panel select,
 .translation-panel select,
+.modal select,
 .translation-panel textarea,
 .modal textarea {
   border: 1px solid #cfd6e4;

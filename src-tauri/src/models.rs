@@ -9,6 +9,14 @@ pub enum ReminderStatus {
     Expired,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ReminderRepeatRule {
+    #[default]
+    Once,
+    CnWorkday,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Reminder {
@@ -18,6 +26,7 @@ pub struct Reminder {
     pub remind_at: DateTime<Utc>,
     pub enabled: bool,
     pub status: ReminderStatus,
+    pub repeat_rule: ReminderRepeatRule,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub triggered_at: Option<DateTime<Utc>>,
@@ -29,6 +38,8 @@ pub struct NewReminder {
     pub title: String,
     pub notes: Option<String>,
     pub remind_at: DateTime<Utc>,
+    #[serde(default)]
+    pub repeat_rule: ReminderRepeatRule,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -198,5 +209,17 @@ mod tests {
         let value = serde_json::to_value(ReminderStatus::Triggered).unwrap();
 
         assert_eq!(value, json!("triggered"));
+    }
+
+    #[test]
+    fn reminder_repeat_rule_defaults_to_once() {
+        let value: NewReminder = serde_json::from_value(json!({
+            "title": "Test",
+            "notes": null,
+            "remindAt": "2026-01-05T01:00:00Z"
+        }))
+        .unwrap();
+
+        assert_eq!(value.repeat_rule, ReminderRepeatRule::Once);
     }
 }

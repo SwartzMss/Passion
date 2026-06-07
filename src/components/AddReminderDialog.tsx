@@ -10,6 +10,7 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [remindAt, setRemindAt] = useState("");
+  const [repeatRule, setRepeatRule] = useState("once");
   const [error, setError] = useState<string | null>(null);
 
   function submit(event: FormEvent) {
@@ -31,6 +32,7 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
       title: title.trim(),
       notes: notes.trim() || null,
       remindAt: date.toISOString(),
+      repeatRule: repeatRule as "once" | "cn_workday",
     });
   }
 
@@ -57,6 +59,16 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
             value={remindAt}
             onChange={(event) => setRemindAt(event.target.value)}
           />
+        </label>
+        <label>
+          重复规则
+          <select
+            value={repeatRule}
+            onChange={(event) => setRepeatRule(event.target.value)}
+          >
+            <option value="once">单次提醒</option>
+            <option value="cn_workday">中国法定工作日</option>
+          </select>
         </label>
         <div className="actions">
           <button type="button" onClick={onCancel}>

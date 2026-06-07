@@ -1,4 +1,5 @@
 export type ReminderStatus = "pending" | "triggered" | "expired";
+export type ReminderRepeatRule = "once" | "cn_workday";
 
 export interface Reminder {
   id: string;
@@ -7,6 +8,7 @@ export interface Reminder {
   remindAt: string;
   enabled: boolean;
   status: ReminderStatus;
+  repeatRule: ReminderRepeatRule;
   createdAt: string;
   updatedAt: string;
   triggeredAt?: string | null;
@@ -16,6 +18,7 @@ export interface NewReminder {
   title: string;
   notes?: string | null;
   remindAt: string;
+  repeatRule: ReminderRepeatRule;
 }
 
 export interface Settings {
