@@ -9,6 +9,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { ScriptTasksPanel } from "./components/ScriptTasksPanel";
 import { SystemMonitorPanel } from "./components/SystemMonitorPanel";
 import { TranslationPanel } from "./components/TranslationPanel";
+import { WindowControls } from "./components/WindowControls";
 import { WorkbenchHome } from "./components/WorkbenchHome";
 import {
   createReminder,
@@ -81,76 +82,79 @@ export default function App() {
   }
 
   return (
-    <main>
-      {error ? (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {view === "home" ? (
-        <WorkbenchHome
-          pendingReminderCount={
-            reminders.filter(
-              (reminder) => reminder.enabled && reminder.status === "pending",
-            ).length
-          }
-          onOpenReminders={() => setView("reminders")}
-          onAddReminder={() => {
-            setView("reminders");
-            setShowAdd(true);
-          }}
-          onOpenTranslation={() => setView("translation")}
-          onOpenNetworkDiagnostics={() => setView("network")}
-          onOpenDownloader={() => setView("download")}
-          onOpenSystemMonitor={() => setView("system")}
-          onOpenScriptTasks={() => setView("scripts")}
-          onOpenSettings={() => setView("settings")}
-        />
-      ) : null}
-      {view === "reminders" ? (
-        <ReminderList
-          reminders={reminders}
-          onBack={() => setView("home")}
-          onAdd={() => setShowAdd(true)}
-          onToggle={changeEnabled}
-          onDelete={remove}
-        />
-      ) : null}
-      {view === "translation" ? (
-        <TranslationPanel
-          defaultTargetLanguage={defaultTargetLanguage}
-          onBack={() => setView("home")}
-          onOpenSettings={() => setView("settings")}
-        />
-      ) : null}
-      {view === "network" ? (
-        <NetworkDiagnosticsPanel onBack={() => setView("home")} />
-      ) : null}
-      {view === "download" ? (
-        <DownloadPanel onBack={() => setView("home")} />
-      ) : null}
-      {view === "system" ? (
-        <SystemMonitorPanel onBack={() => setView("home")} />
-      ) : null}
-      {view === "scripts" ? (
-        <ScriptTasksPanel onBack={() => setView("home")} />
-      ) : null}
-      {view === "settings" ? (
-        <SettingsPanel
-          onBack={() => setView("home")}
-          onAiSettingsLoaded={(settings) =>
-            setDefaultTargetLanguage(settings.defaultTargetLanguage)
-          }
-        />
-      ) : null}
-      {showAdd ? (
-        <AddReminderDialog
-          onCancel={() => setShowAdd(false)}
-          onSave={saveReminder}
-        />
-      ) : null}
-      <ReminderPopup reminder={popup} onClose={() => setPopup(null)} />
-    </main>
+    <>
+      <WindowControls />
+      <main>
+        {error ? (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {view === "home" ? (
+          <WorkbenchHome
+            pendingReminderCount={
+              reminders.filter(
+                (reminder) => reminder.enabled && reminder.status === "pending",
+              ).length
+            }
+            onOpenReminders={() => setView("reminders")}
+            onAddReminder={() => {
+              setView("reminders");
+              setShowAdd(true);
+            }}
+            onOpenTranslation={() => setView("translation")}
+            onOpenNetworkDiagnostics={() => setView("network")}
+            onOpenDownloader={() => setView("download")}
+            onOpenSystemMonitor={() => setView("system")}
+            onOpenScriptTasks={() => setView("scripts")}
+            onOpenSettings={() => setView("settings")}
+          />
+        ) : null}
+        {view === "reminders" ? (
+          <ReminderList
+            reminders={reminders}
+            onBack={() => setView("home")}
+            onAdd={() => setShowAdd(true)}
+            onToggle={changeEnabled}
+            onDelete={remove}
+          />
+        ) : null}
+        {view === "translation" ? (
+          <TranslationPanel
+            defaultTargetLanguage={defaultTargetLanguage}
+            onBack={() => setView("home")}
+            onOpenSettings={() => setView("settings")}
+          />
+        ) : null}
+        {view === "network" ? (
+          <NetworkDiagnosticsPanel onBack={() => setView("home")} />
+        ) : null}
+        {view === "download" ? (
+          <DownloadPanel onBack={() => setView("home")} />
+        ) : null}
+        {view === "system" ? (
+          <SystemMonitorPanel onBack={() => setView("home")} />
+        ) : null}
+        {view === "scripts" ? (
+          <ScriptTasksPanel onBack={() => setView("home")} />
+        ) : null}
+        {view === "settings" ? (
+          <SettingsPanel
+            onBack={() => setView("home")}
+            onAiSettingsLoaded={(settings) =>
+              setDefaultTargetLanguage(settings.defaultTargetLanguage)
+            }
+          />
+        ) : null}
+        {showAdd ? (
+          <AddReminderDialog
+            onCancel={() => setShowAdd(false)}
+            onSave={saveReminder}
+          />
+        ) : null}
+        <ReminderPopup reminder={popup} onClose={() => setPopup(null)} />
+      </main>
+    </>
   );
 }
 

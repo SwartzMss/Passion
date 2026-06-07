@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import type { NewReminder } from "../types";
+import type { NewReminder, ReminderRepeatRule } from "../types";
 
 interface Props {
   onCancel: () => void;
@@ -11,6 +11,7 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
   const [notes, setNotes] = useState("");
   const [remindAt, setRemindAt] = useState("");
   const [repeatRule, setRepeatRule] = useState("once");
+  const [weeklyDays, setWeeklyDays] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   function submit(event: FormEvent) {
@@ -28,12 +29,28 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
       setError("提醒时间必须晚于当前时间。");
       return;
     }
+    if (repeatRule === "weekly" && weeklyDays.length === 0) {
+      setError("请选择至少一个星期几。");
+      return;
+    }
+    const resolvedRepeatRule: ReminderRepeatRule =
+      repeatRule === "weekly"
+        ? `weekly:${[...weeklyDays].sort((a, b) => a - b).join(",")}`
+        : (repeatRule as ReminderRepeatRule);
     onSave({
       title: title.trim(),
       notes: notes.trim() || null,
       remindAt: date.toISOString(),
-      repeatRule: repeatRule as "once" | "cn_workday",
+      repeatRule: resolvedRepeatRule,
     });
+  }
+
+  function toggleWeeklyDay(day: number) {
+    setWeeklyDays((current) =>
+      current.includes(day)
+        ? current.filter((value) => value !== day)
+        : [...current, day],
+    );
   }
 
   return (
@@ -67,9 +84,26 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
             onChange={(event) => setRepeatRule(event.target.value)}
           >
             <option value="once">单次提醒</option>
+            <option value="daily">每天</option>
+            <option value="weekly">每周</option>
             <option value="cn_workday">中国法定工作日</option>
           </select>
         </label>
+        {repeatRule === "weekly" ? (
+          <fieldset className="weekday-picker">
+            <legend>选择周几</legend>
+            {WEEKDAYS.map((day) => (
+              <label key={day.value}>
+                <input
+                  type="checkbox"
+                  checked={weeklyDays.includes(day.value)}
+                  onChange={() => toggleWeeklyDay(day.value)}
+                />
+                {day.label}
+              </label>
+            ))}
+          </fieldset>
+        ) : null}
         <div className="actions">
           <button type="button" onClick={onCancel}>
             取消
@@ -80,3 +114,13 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
     </div>
   );
 }
+
+const WEEKDAYS = [
+  { value: 1, label: "周一" },
+  { value: 2, label: "周二" },
+  { value: 3, label: "周三" },
+  { value: 4, label: "周四" },
+  { value: 5, label: "周五" },
+  { value: 6, label: "周六" },
+  { value: 7, label: "周日" },
+];

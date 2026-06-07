@@ -29,6 +29,43 @@ button:disabled {
   opacity: 0.55;
 }
 
+.window-frame {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  user-select: none;
+}
+
+.window-drag-region {
+  flex: 1;
+  height: 100%;
+}
+
+.window-controls {
+  display: flex;
+  height: 100%;
+}
+
+.window-controls button {
+  width: 42px;
+  height: 30px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: #667085;
+}
+
+.window-controls button:hover {
+  background: #edf1f7;
+  color: #172033;
+}
+
+.window-controls button:last-child:hover {
+  background: #f04438;
+  color: #ffffff;
+}
+
 .primary-action,
 button.primary-action {
   border-color: #172033;
@@ -39,7 +76,7 @@ button.primary-action {
 main {
   max-width: 760px;
   margin: 0 auto;
-  padding: 18px;
+  padding: 8px 18px 18px;
 }
 
 .section-header,
@@ -219,6 +256,27 @@ main {
 
 .modal label {
   display: grid;
+  gap: 6px;
+}
+
+.weekday-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 0;
+  border: 1px solid #e0e5ee;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.weekday-picker legend {
+  padding: 0 4px;
+  color: #667085;
+}
+
+.weekday-picker label {
+  display: flex;
+  align-items: center;
   gap: 6px;
 }
 

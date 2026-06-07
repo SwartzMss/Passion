@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc, Weekday};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -9,12 +9,86 @@ pub enum ReminderStatus {
     Expired,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum ReminderRepeatRule {
     #[default]
     Once,
+    Daily,
     CnWorkday,
+    Weekly(Vec<Weekday>),
+}
+
+impl ReminderRepeatRule {
+    pub fn as_str(&self) -> String {
+        match self {
+            Self::Once => "once".to_string(),
+            Self::Daily => "daily".to_string(),
+            Self::CnWorkday => "cn_workday".to_string(),
+            Self::Weekly(days) => {
+                let values = days
+                    .iter()
+                    .map(|day| day.number_from_monday().to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                format!("weekly:{values}")
+            }
+        }
+    }
+
+    pub fn from_str(value: &str) -> Result<Self, String> {
+        match value {
+            "once" => Ok(Self::Once),
+            "daily" => Ok(Self::Daily),
+            "cn_workday" => Ok(Self::CnWorkday),
+            weekly if weekly.starts_with("weekly:") => {
+                let raw_days = weekly.trim_start_matches("weekly:");
+                let mut days = Vec::new();
+                for raw_day in raw_days.split(',').filter(|part| !part.is_empty()) {
+                    let day = match raw_day {
+                        "1" => Weekday::Mon,
+                        "2" => Weekday::Tue,
+                        "3" => Weekday::Wed,
+                        "4" => Weekday::Thu,
+                        "5" => Weekday::Fri,
+                        "6" => Weekday::Sat,
+                        "7" => Weekday::Sun,
+                        other => return Err(format!("invalid weekly reminder day {other}")),
+                    };
+                    if !days.contains(&day) {
+                        days.push(day);
+                    }
+                }
+                if days.is_empty() {
+                    return Err("weekly reminder needs at least one weekday".to_string());
+                }
+                Ok(Self::Weekly(days))
+            }
+            other => Err(format!("invalid reminder repeat rule {other}")),
+        }
+    }
+
+    pub fn is_repeating(&self) -> bool {
+        !matches!(self, Self::Once)
+    }
+}
+
+impl Serialize for ReminderRepeatRule {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ReminderRepeatRule {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::from_str(&value).map_err(de::Error::custom)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -244,5 +318,22 @@ mod tests {
         .unwrap();
 
         assert_eq!(value.repeat_rule, ReminderRepeatRule::Once);
+    }
+
+    #[test]
+    fn reminder_repeat_rule_supports_daily_and_weekly_strings() {
+        let daily: ReminderRepeatRule = serde_json::from_value(json!("daily")).unwrap();
+        let weekly: ReminderRepeatRule = serde_json::from_value(json!("weekly:1,3,5")).unwrap();
+
+        assert_eq!(daily, ReminderRepeatRule::Daily);
+        assert_eq!(
+            weekly,
+            ReminderRepeatRule::Weekly(vec![
+                chrono::Weekday::Mon,
+                chrono::Weekday::Wed,
+                chrono::Weekday::Fri,
+            ])
+        );
+        assert_eq!(serde_json::to_value(weekly).unwrap(), json!("weekly:1,3,5"));
     }
 }
