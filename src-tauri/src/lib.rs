@@ -104,6 +104,7 @@ pub fn run() {
             commands::test_ai_connection,
             commands::ping_host,
             commands::check_port,
+            commands::inspect_port_occupancy,
             commands::download_file,
             commands::get_system_snapshot,
             commands::list_script_tasks,

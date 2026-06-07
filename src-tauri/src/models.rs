@@ -127,6 +127,29 @@ pub struct PortCheckResult {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PortOccupancyRequest {
+    pub port: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortOccupancyEntry {
+    pub protocol: String,
+    pub local_address: String,
+    pub state: String,
+    pub pid: u32,
+    pub process_name: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortOccupancyResult {
+    pub port: u16,
+    pub entries: Vec<PortOccupancyEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DownloadRequest {
     pub url: String,
     pub file_name: Option<String>,

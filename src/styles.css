@@ -341,6 +341,17 @@ nav .active {
   white-space: pre-wrap;
 }
 
+.port-occupancy-row {
+  display: grid;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid #e0e5ee;
+}
+
+.port-occupancy-row p {
+  margin: 0;
+}
+
 .translation-grid label,
 .inline-field {
   display: grid;

@@ -67,6 +67,23 @@ export interface PortCheckResult {
   error?: string | null;
 }
 
+export interface PortOccupancyRequest {
+  port: number;
+}
+
+export interface PortOccupancyEntry {
+  protocol: string;
+  localAddress: string;
+  state: string;
+  pid: number;
+  processName?: string | null;
+}
+
+export interface PortOccupancyResult {
+  port: number;
+  entries: PortOccupancyEntry[];
+}
+
 export interface DownloadRequest {
   url: string;
   fileName?: string | null;

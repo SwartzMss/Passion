@@ -1,6 +1,10 @@
 import { useState } from "react";
-import { checkPort, pingHost } from "../lib/api";
-import type { PingResult, PortCheckResult } from "../types";
+import { checkPort, inspectPortOccupancy, pingHost } from "../lib/api";
+import type {
+  PingResult,
+  PortCheckResult,
+  PortOccupancyResult,
+} from "../types";
 
 interface Props {
   onBack: () => void;
@@ -10,8 +14,11 @@ export function NetworkDiagnosticsPanel({ onBack }: Props) {
   const [pingHostValue, setPingHostValue] = useState("");
   const [portHost, setPortHost] = useState("127.0.0.1");
   const [portValue, setPortValue] = useState("80");
+  const [occupancyPort, setOccupancyPort] = useState("1420");
   const [pingResult, setPingResult] = useState<PingResult | null>(null);
   const [portResult, setPortResult] = useState<PortCheckResult | null>(null);
+  const [occupancyResult, setOccupancyResult] =
+    useState<PortOccupancyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
 
@@ -45,6 +52,23 @@ export function NetworkDiagnosticsPanel({ onBack }: Props) {
     setIsRunning(true);
     try {
       setPortResult(await checkPort({ host: portHost.trim(), port }));
+    } catch (err) {
+      setError(readError(err));
+    } finally {
+      setIsRunning(false);
+    }
+  }
+
+  async function runPortOccupancy() {
+    const port = Number(occupancyPort);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      setError("请输入 1 到 65535 之间的端口。");
+      return;
+    }
+    setError(null);
+    setIsRunning(true);
+    try {
+      setOccupancyResult(await inspectPortOccupancy({ port }));
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -117,6 +141,37 @@ export function NetworkDiagnosticsPanel({ onBack }: Props) {
                 {portResult.host}:{portResult.port} · {portResult.elapsedMs}ms
               </p>
               {portResult.error ? <p>{portResult.error}</p> : null}
+            </div>
+          ) : null}
+        </article>
+
+        <article className="diagnostics-card">
+          <h3>端口占用</h3>
+          <label className="field-label">
+            占用端口
+            <input
+              inputMode="numeric"
+              value={occupancyPort}
+              onChange={(event) => setOccupancyPort(event.target.value)}
+            />
+          </label>
+          <button onClick={runPortOccupancy} disabled={isRunning}>
+            查看占用
+          </button>
+          {occupancyResult ? (
+            <div className="result-box">
+              <strong>
+                {occupancyResult.entries.length > 0 ? "发现占用" : "未发现监听进程"}
+              </strong>
+              {occupancyResult.entries.map((entry) => (
+                <div className="port-occupancy-row" key={`${entry.pid}-${entry.localAddress}`}>
+                  <p>
+                    <strong>{entry.processName || "未知进程"}</strong>
+                  </p>
+                  <p className="muted">PID {entry.pid}</p>
+                  <p className="muted">{entry.localAddress}</p>
+                </div>
+              ))}
             </div>
           ) : null}
         </article>
