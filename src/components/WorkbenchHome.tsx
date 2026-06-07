@@ -3,6 +3,7 @@ interface Props {
   onOpenReminders: () => void;
   onAddReminder: () => void;
   onOpenTranslation: () => void;
+  onOpenNetworkDiagnostics: () => void;
   onOpenSettings: () => void;
 }
 
@@ -11,6 +12,7 @@ export function WorkbenchHome({
   onOpenReminders,
   onAddReminder,
   onOpenTranslation,
+  onOpenNetworkDiagnostics,
   onOpenSettings,
 }: Props) {
   return (
@@ -42,6 +44,16 @@ export function WorkbenchHome({
           </div>
           <div className="card-actions">
             <button onClick={onOpenTranslation}>开始翻译</button>
+          </div>
+        </article>
+
+        <article className="feature-card">
+          <div>
+            <h3>网络检测</h3>
+            <p className="muted">检测 IP/域名是否可达，或者端口是否开放。</p>
+          </div>
+          <div className="card-actions">
+            <button onClick={onOpenNetworkDiagnostics}>开始检测</button>
           </div>
         </article>
       </div>

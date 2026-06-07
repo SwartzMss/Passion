@@ -4,6 +4,7 @@ mod commands;
 mod db;
 mod error;
 mod models;
+mod network_diagnostics;
 mod notifications;
 mod reminders;
 mod scheduler;
@@ -85,6 +86,8 @@ pub fn run() {
             commands::update_ai_settings,
             commands::translate_text,
             commands::test_ai_connection,
+            commands::ping_host,
+            commands::check_port,
             greet,
         ])
         .run(tauri::generate_context!())

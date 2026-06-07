@@ -203,10 +203,59 @@ nav .active {
   gap: 16px;
 }
 
+.network-panel {
+  display: grid;
+  gap: 16px;
+}
+
 .translation-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.diagnostics-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #e0e5ee;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.diagnostics-card h3 {
+  margin: 0;
+}
+
+.field-label {
+  display: grid;
+  gap: 6px;
+}
+
+.result-box {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f6f7fb;
+}
+
+.result-box p {
+  margin: 0;
+}
+
+.result-box pre {
+  max-height: 180px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
 }
 
 .translation-grid label,
@@ -275,6 +324,7 @@ nav .active {
   }
 
   .feature-grid,
+  .diagnostics-grid,
   .translation-grid {
     grid-template-columns: 1fr;
   }

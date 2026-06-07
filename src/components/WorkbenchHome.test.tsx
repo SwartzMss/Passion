@@ -10,6 +10,7 @@ it("shows assistant feature cards", () => {
       onOpenReminders={() => {}}
       onAddReminder={() => {}}
       onOpenTranslation={() => {}}
+      onOpenNetworkDiagnostics={() => {}}
       onOpenSettings={() => {}}
     />,
   );
@@ -17,6 +18,7 @@ it("shows assistant feature cards", () => {
   expect(screen.getByText("提醒")).toBeInTheDocument();
   expect(screen.getByText("2 个待提醒")).toBeInTheDocument();
   expect(screen.getByText("翻译")).toBeInTheDocument();
+  expect(screen.getByText("网络检测")).toBeInTheDocument();
 });
 
 it("opens translation from the workbench", async () => {
@@ -28,6 +30,7 @@ it("opens translation from the workbench", async () => {
       onOpenReminders={() => {}}
       onAddReminder={() => {}}
       onOpenTranslation={onOpenTranslation}
+      onOpenNetworkDiagnostics={() => {}}
       onOpenSettings={() => {}}
     />,
   );
@@ -35,4 +38,23 @@ it("opens translation from the workbench", async () => {
   await user.click(screen.getByRole("button", { name: "开始翻译" }));
 
   expect(onOpenTranslation).toHaveBeenCalledOnce();
+});
+
+it("opens network diagnostics from the workbench", async () => {
+  const user = userEvent.setup();
+  const onOpenNetworkDiagnostics = vi.fn();
+  render(
+    <WorkbenchHome
+      pendingReminderCount={0}
+      onOpenReminders={() => {}}
+      onAddReminder={() => {}}
+      onOpenTranslation={() => {}}
+      onOpenNetworkDiagnostics={onOpenNetworkDiagnostics}
+      onOpenSettings={() => {}}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "开始检测" }));
+
+  expect(onOpenNetworkDiagnostics).toHaveBeenCalledOnce();
 });

@@ -2,7 +2,8 @@ use crate::ai_settings::AiSettingsRepository;
 use crate::app_state::AppState;
 use crate::error::{BackendError, ErrorPayload};
 use crate::models::{
-    AiSettings, NewReminder, Reminder, Settings, TranslationRequest, TranslationResult,
+    AiSettings, NewReminder, PingRequest, PingResult, PortCheckRequest, PortCheckResult, Reminder,
+    Settings, TranslationRequest, TranslationResult,
 };
 use crate::notifications;
 use crate::reminders::ReminderRepository;
@@ -156,6 +157,20 @@ pub async fn test_ai_connection(state: State<'_, AppState>) -> CommandResult<()>
         AiSettingsRepository::get(&conn).map_err(ErrorPayload::from)?
     };
     crate::translator::test_connection(&settings)
+        .await
+        .map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn ping_host(input: PingRequest) -> CommandResult<PingResult> {
+    crate::network_diagnostics::ping_host(input)
+        .await
+        .map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn check_port(input: PortCheckRequest) -> CommandResult<PortCheckResult> {
+    crate::network_diagnostics::check_port(input)
         .await
         .map_err(ErrorPayload::from)
 }

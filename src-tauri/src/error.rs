@@ -19,6 +19,8 @@ pub enum BackendError {
     Translation(String),
     #[error("AI provider request failed: {0}")]
     AiProvider(String),
+    #[error("{0}")]
+    NetworkDiagnostic(String),
     #[error("Window operation failed: {0}")]
     Window(String),
 }

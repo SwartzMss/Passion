@@ -40,6 +40,30 @@ export interface TranslationResult {
   translatedText: string;
 }
 
+export interface PingRequest {
+  host: string;
+}
+
+export interface PingResult {
+  host: string;
+  reachable: boolean;
+  summary: string;
+  rawOutput: string;
+}
+
+export interface PortCheckRequest {
+  host: string;
+  port: number;
+}
+
+export interface PortCheckResult {
+  host: string;
+  port: number;
+  open: boolean;
+  elapsedMs: number;
+  error?: string | null;
+}
+
 export interface BackendError {
   message: string;
 }

@@ -2,6 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AiSettings,
   NewReminder,
+  PingRequest,
+  PingResult,
+  PortCheckRequest,
+  PortCheckResult,
   Reminder,
   Settings,
   TranslationRequest,
@@ -55,4 +59,14 @@ export async function translateText(
   input: TranslationRequest,
 ): Promise<TranslationResult> {
   return invoke<TranslationResult>("translate_text", { input });
+}
+
+export async function pingHost(input: PingRequest): Promise<PingResult> {
+  return invoke<PingResult>("ping_host", { input });
+}
+
+export async function checkPort(
+  input: PortCheckRequest,
+): Promise<PortCheckResult> {
+  return invoke<PortCheckResult>("check_port", { input });
 }
