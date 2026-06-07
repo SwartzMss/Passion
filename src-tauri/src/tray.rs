@@ -20,6 +20,7 @@ pub fn setup(app: &AppHandle) -> BackendResult<()> {
 
     TrayIconBuilder::new()
         .menu(&menu)
+        .show_menu_on_left_click(false)
         .icon(icon.clone())
         .tooltip("Passion")
         .on_menu_event(|app, event| match event.id().as_ref() {
