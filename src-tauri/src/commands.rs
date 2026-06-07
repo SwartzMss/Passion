@@ -3,8 +3,8 @@ use crate::app_state::AppState;
 use crate::error::{BackendError, ErrorPayload};
 use crate::models::{
     AiSettings, DownloadRequest, DownloadResult, NewReminder, NewScriptTask, PingRequest,
-    PingResult, PortCheckRequest, PortCheckResult, Reminder, ScriptTask, Settings, SystemSnapshot,
-    TranslationRequest, TranslationResult,
+    PingResult, PortCheckRequest, PortCheckResult, PortOccupancyRequest, PortOccupancyResult,
+    Reminder, ScriptTask, Settings, SystemSnapshot, TranslationRequest, TranslationResult,
 };
 use crate::notifications;
 use crate::reminders::ReminderRepository;
@@ -173,6 +173,15 @@ pub async fn ping_host(input: PingRequest) -> CommandResult<PingResult> {
 #[tauri::command]
 pub async fn check_port(input: PortCheckRequest) -> CommandResult<PortCheckResult> {
     crate::network_diagnostics::check_port(input)
+        .await
+        .map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn inspect_port_occupancy(
+    input: PortOccupancyRequest,
+) -> CommandResult<PortOccupancyResult> {
+    crate::network_diagnostics::inspect_port_occupancy(input)
         .await
         .map_err(ErrorPayload::from)
 }

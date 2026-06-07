@@ -9,6 +9,8 @@ import type {
   PingResult,
   PortCheckRequest,
   PortCheckResult,
+  PortOccupancyRequest,
+  PortOccupancyResult,
   Reminder,
   Settings,
   ScriptTask,
@@ -74,6 +76,12 @@ export async function checkPort(
   input: PortCheckRequest,
 ): Promise<PortCheckResult> {
   return invoke<PortCheckResult>("check_port", { input });
+}
+
+export async function inspectPortOccupancy(
+  input: PortOccupancyRequest,
+): Promise<PortOccupancyResult> {
+  return invoke<PortOccupancyResult>("inspect_port_occupancy", { input });
 }
 
 export async function downloadFile(
