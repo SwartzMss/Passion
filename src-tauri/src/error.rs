@@ -21,6 +21,8 @@ pub enum BackendError {
     AiProvider(String),
     #[error("{0}")]
     NetworkDiagnostic(String),
+    #[error("{0}")]
+    Download(String),
     #[error("Window operation failed: {0}")]
     Window(String),
 }

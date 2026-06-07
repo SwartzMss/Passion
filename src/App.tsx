@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import "./styles.css";
 import { AddReminderDialog } from "./components/AddReminderDialog";
+import { DownloadPanel } from "./components/DownloadPanel";
 import { NetworkDiagnosticsPanel } from "./components/NetworkDiagnosticsPanel";
 import { ReminderList } from "./components/ReminderList";
 import { ReminderPopup } from "./components/ReminderPopup";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { SystemMonitorPanel } from "./components/SystemMonitorPanel";
 import { TranslationPanel } from "./components/TranslationPanel";
 import { WorkbenchHome } from "./components/WorkbenchHome";
 import {
@@ -16,7 +18,14 @@ import {
 import { onReminderTriggered } from "./lib/events";
 import type { NewReminder, Reminder } from "./types";
 
-type View = "home" | "reminders" | "translation" | "network" | "settings";
+type View =
+  | "home"
+  | "reminders"
+  | "translation"
+  | "network"
+  | "download"
+  | "system"
+  | "settings";
 
 export default function App() {
   const [view, setView] = useState<View>("home");
@@ -99,6 +108,18 @@ export default function App() {
             网络检测
           </button>
           <button
+            className={view === "download" ? "active" : ""}
+            onClick={() => setView("download")}
+          >
+            下载工具
+          </button>
+          <button
+            className={view === "system" ? "active" : ""}
+            onClick={() => setView("system")}
+          >
+            系统监控
+          </button>
+          <button
             className={view === "settings" ? "active" : ""}
             onClick={() => setView("settings")}
           >
@@ -126,6 +147,8 @@ export default function App() {
           }}
           onOpenTranslation={() => setView("translation")}
           onOpenNetworkDiagnostics={() => setView("network")}
+          onOpenDownloader={() => setView("download")}
+          onOpenSystemMonitor={() => setView("system")}
           onOpenSettings={() => setView("settings")}
         />
       ) : null}
@@ -146,6 +169,12 @@ export default function App() {
       ) : null}
       {view === "network" ? (
         <NetworkDiagnosticsPanel onBack={() => setView("home")} />
+      ) : null}
+      {view === "download" ? (
+        <DownloadPanel onBack={() => setView("home")} />
+      ) : null}
+      {view === "system" ? (
+        <SystemMonitorPanel onBack={() => setView("home")} />
       ) : null}
       {view === "settings" ? (
         <SettingsPanel

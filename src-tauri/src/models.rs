@@ -114,6 +114,34 @@ pub struct PortCheckResult {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadRequest {
+    pub url: String,
+    pub file_name: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadResult {
+    pub url: String,
+    pub file_name: String,
+    pub saved_path: String,
+    pub bytes: u64,
+    pub elapsed_ms: u128,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemSnapshot {
+    pub cpu_usage_percent: f32,
+    pub memory_used_bytes: u64,
+    pub memory_total_bytes: u64,
+    pub disk_used_bytes: u64,
+    pub disk_total_bytes: u64,
+    pub uptime_seconds: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

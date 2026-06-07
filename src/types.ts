@@ -64,6 +64,28 @@ export interface PortCheckResult {
   error?: string | null;
 }
 
+export interface DownloadRequest {
+  url: string;
+  fileName?: string | null;
+}
+
+export interface DownloadResult {
+  url: string;
+  fileName: string;
+  savedPath: string;
+  bytes: number;
+  elapsedMs: number;
+}
+
+export interface SystemSnapshot {
+  cpuUsagePercent: number;
+  memoryUsedBytes: number;
+  memoryTotalBytes: number;
+  diskUsedBytes: number;
+  diskTotalBytes: number;
+  uptimeSeconds: number;
+}
+
 export interface BackendError {
   message: string;
 }
