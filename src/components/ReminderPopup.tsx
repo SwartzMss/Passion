@@ -16,12 +16,14 @@ export function ReminderPopup({ reminder, onClose }: Props) {
         className="modal"
         role="dialog"
         aria-modal="true"
-        aria-label="Reminder triggered"
+        aria-label="提醒已触发"
       >
         <h2>{reminder.title}</h2>
         {reminder.notes ? <p>{reminder.notes}</p> : null}
-        <p className="muted">{new Date(reminder.remindAt).toLocaleString()}</p>
-        <button onClick={onClose}>I know</button>
+        <p className="muted">
+          {new Date(reminder.remindAt).toLocaleString("zh-CN")}
+        </p>
+        <button onClick={onClose}>知道了</button>
       </section>
     </div>
   );

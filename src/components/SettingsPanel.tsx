@@ -29,12 +29,12 @@ export function SettingsPanel() {
   }
 
   if (!settings) {
-    return <p>Loading settings...</p>;
+    return <p>正在加载设置...</p>;
   }
 
   return (
     <section className="settings-panel">
-      <h2>Settings</h2>
+      <h2>设置</h2>
       {error ? (
         <p className="error" role="alert">
           {error}
@@ -46,7 +46,7 @@ export function SettingsPanel() {
           checked={settings.launchOnStartup}
           onChange={(event) => patch({ launchOnStartup: event.target.checked })}
         />
-        Launch on startup
+        开机自启动
       </label>
       <label>
         <input
@@ -54,7 +54,7 @@ export function SettingsPanel() {
           checked={settings.minimizeToTray}
           onChange={(event) => patch({ minimizeToTray: event.target.checked })}
         />
-        Minimize to tray
+        最小化到托盘
       </label>
       <label>
         <input
@@ -64,10 +64,10 @@ export function SettingsPanel() {
             patch({ notificationEnabled: event.target.checked })
           }
         />
-        System notifications
+        系统通知
       </label>
       <button onClick={() => testNotification().catch((err) => setError(readError(err)))}>
-        Test notification
+        测试通知
       </button>
     </section>
   );
@@ -77,5 +77,5 @@ function readError(err: unknown) {
   if (typeof err === "object" && err && "message" in err) {
     return String((err as { message: string }).message);
   }
-  return "Operation failed.";
+  return "操作失败。";
 }

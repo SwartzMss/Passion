@@ -74,13 +74,13 @@ export default function App() {
             className={tab === "reminders" ? "active" : ""}
             onClick={() => setTab("reminders")}
           >
-            Reminders
+            提醒
           </button>
           <button
             className={tab === "settings" ? "active" : ""}
             onClick={() => setTab("settings")}
           >
-            Settings
+            设置
           </button>
         </nav>
       </header>
@@ -115,5 +115,5 @@ function readError(err: unknown) {
   if (typeof err === "object" && err && "message" in err) {
     return String((err as { message: string }).message);
   }
-  return "Operation failed.";
+  return "操作失败。";
 }

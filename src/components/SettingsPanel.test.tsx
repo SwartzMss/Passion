@@ -18,9 +18,9 @@ it("loads and updates settings", async () => {
   render(<SettingsPanel />);
 
   await waitFor(() =>
-    expect(screen.getByLabelText("Minimize to tray")).toBeChecked(),
+    expect(screen.getByLabelText("最小化到托盘")).toBeChecked(),
   );
-  await user.click(screen.getByLabelText("Launch on startup"));
+  await user.click(screen.getByLabelText("开机自启动"));
 
   const api = await import("../lib/api");
   expect(api.updateSettings).toHaveBeenCalledWith({
@@ -35,7 +35,7 @@ it("can send a test notification", async () => {
   render(<SettingsPanel />);
 
   await user.click(
-    await screen.findByRole("button", { name: "Test notification" }),
+    await screen.findByRole("button", { name: "测试通知" }),
   );
 
   const api = await import("../lib/api");

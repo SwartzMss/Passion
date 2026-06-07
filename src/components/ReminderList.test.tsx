@@ -26,7 +26,7 @@ it("shows empty state", () => {
     />,
   );
 
-  expect(screen.getByText("No reminders yet")).toBeInTheDocument();
+  expect(screen.getByText("还没有提醒")).toBeInTheDocument();
 });
 
 it("renders reminder actions", async () => {
@@ -42,8 +42,8 @@ it("renders reminder actions", async () => {
     />,
   );
 
-  await user.click(screen.getByRole("button", { name: "Disable Stand up" }));
-  await user.click(screen.getByRole("button", { name: "Delete Stand up" }));
+  await user.click(screen.getByRole("button", { name: "停用 Stand up" }));
+  await user.click(screen.getByRole("button", { name: "删除 Stand up" }));
 
   expect(onToggle).toHaveBeenCalledWith("1", false);
   expect(onDelete).toHaveBeenCalledWith("1");

@@ -7,9 +7,9 @@ it("rejects empty title", async () => {
   const user = userEvent.setup();
   render(<AddReminderDialog onCancel={() => {}} onSave={vi.fn()} />);
 
-  await user.click(screen.getByRole("button", { name: "Save" }));
+  await user.click(screen.getByRole("button", { name: "保存" }));
 
-  expect(screen.getByText("Title is required.")).toBeInTheDocument();
+  expect(screen.getByText("请输入提醒标题。")).toBeInTheDocument();
 });
 
 it("saves valid reminder", async () => {
@@ -17,9 +17,9 @@ it("saves valid reminder", async () => {
   const onSave = vi.fn();
   render(<AddReminderDialog onCancel={() => {}} onSave={onSave} />);
 
-  await user.type(screen.getByLabelText("Title"), "Pay rent");
-  await user.type(screen.getByLabelText("Date and time"), "2099-01-01T09:00");
-  await user.click(screen.getByRole("button", { name: "Save" }));
+  await user.type(screen.getByLabelText("标题"), "Pay rent");
+  await user.type(screen.getByLabelText("日期和时间"), "2099-01-01T09:00");
+  await user.click(screen.getByRole("button", { name: "保存" }));
 
   expect(onSave).toHaveBeenCalledWith({
     title: "Pay rent",
