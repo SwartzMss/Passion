@@ -10,6 +10,7 @@ mod notifications;
 mod reminders;
 mod scheduler;
 mod settings;
+mod system_monitor;
 mod translator;
 mod tray;
 
@@ -90,6 +91,7 @@ pub fn run() {
             commands::ping_host,
             commands::check_port,
             commands::download_file,
+            commands::get_system_snapshot,
             greet,
         ])
         .run(tauri::generate_context!())

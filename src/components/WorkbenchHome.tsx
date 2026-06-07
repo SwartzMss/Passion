@@ -5,6 +5,7 @@ interface Props {
   onOpenTranslation: () => void;
   onOpenNetworkDiagnostics: () => void;
   onOpenDownloader: () => void;
+  onOpenSystemMonitor: () => void;
   onOpenSettings: () => void;
 }
 
@@ -15,6 +16,7 @@ export function WorkbenchHome({
   onOpenTranslation,
   onOpenNetworkDiagnostics,
   onOpenDownloader,
+  onOpenSystemMonitor,
   onOpenSettings,
 }: Props) {
   return (
@@ -66,6 +68,16 @@ export function WorkbenchHome({
           </div>
           <div className="card-actions">
             <button onClick={onOpenDownloader}>开始下载</button>
+          </div>
+        </article>
+
+        <article className="feature-card">
+          <div>
+            <h3>系统监控</h3>
+            <p className="muted">查看 CPU、内存、磁盘和系统运行时长。</p>
+          </div>
+          <div className="card-actions">
+            <button onClick={onOpenSystemMonitor}>查看状态</button>
           </div>
         </article>
       </div>

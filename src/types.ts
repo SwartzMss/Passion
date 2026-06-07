@@ -77,6 +77,15 @@ export interface DownloadResult {
   elapsedMs: number;
 }
 
+export interface SystemSnapshot {
+  cpuUsagePercent: number;
+  memoryUsedBytes: number;
+  memoryTotalBytes: number;
+  diskUsedBytes: number;
+  diskTotalBytes: number;
+  uptimeSeconds: number;
+}
+
 export interface BackendError {
   message: string;
 }

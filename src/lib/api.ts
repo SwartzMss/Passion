@@ -10,6 +10,7 @@ import type {
   PortCheckResult,
   Reminder,
   Settings,
+  SystemSnapshot,
   TranslationRequest,
   TranslationResult,
 } from "../types";
@@ -77,4 +78,8 @@ export async function downloadFile(
   input: DownloadRequest,
 ): Promise<DownloadResult> {
   return invoke<DownloadResult>("download_file", { input });
+}
+
+export async function getSystemSnapshot(): Promise<SystemSnapshot> {
+  return invoke<SystemSnapshot>("get_system_snapshot");
 }
