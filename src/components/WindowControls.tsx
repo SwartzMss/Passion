@@ -1,17 +1,24 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { MouseEvent } from "react";
 
 export function WindowControls() {
   const appWindow = getCurrentWindow();
 
+  function startDragging(event: MouseEvent<HTMLDivElement>) {
+    event.preventDefault();
+    appWindow.startDragging().catch((err) => {
+      console.error("failed to start window dragging", err);
+    });
+  }
+
   return (
     <div className="window-frame">
-      <button
-        type="button"
+      <div
         className="window-titlebar"
-        onMouseDown={() => appWindow.startDragging()}
+        onMouseDown={startDragging}
       >
         <span className="window-title">Passion</span>
-      </button>
+      </div>
       <div className="window-controls">
         <button
           type="button"
