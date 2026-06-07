@@ -19,7 +19,7 @@ beforeEach(() => {
 });
 
 it("loads and shows a system snapshot", async () => {
-  render(<SystemMonitorPanel onBack={() => {}} />);
+  render(<SystemMonitorPanel />);
 
   expect(await screen.findByText("27.4%")).toBeInTheDocument();
   expect(screen.getByText("8.0 GB / 16.0 GB")).toBeInTheDocument();
@@ -29,7 +29,7 @@ it("loads and shows a system snapshot", async () => {
 
 it("refreshes the system snapshot on demand", async () => {
   const user = userEvent.setup();
-  render(<SystemMonitorPanel onBack={() => {}} />);
+  render(<SystemMonitorPanel />);
 
   await screen.findByText("27.4%");
   await user.click(screen.getByRole("button", { name: "刷新" }));

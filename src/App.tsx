@@ -97,7 +97,6 @@ export default function App() {
       <WindowControls />
       <div className="app-shell">
         <aside className="app-sidebar">
-          <div className="sidebar-brand">Passion</div>
           <nav aria-label="功能导航">
             {NAV_ITEMS.map((item) => (
               <button
@@ -135,13 +134,11 @@ export default function App() {
               onOpenDownloader={() => setView("download")}
               onOpenSystemMonitor={() => setView("system")}
               onOpenScriptTasks={() => setView("scripts")}
-              onOpenSettings={() => setView("settings")}
             />
           ) : null}
           {view === "reminders" ? (
             <ReminderList
               reminders={reminders}
-              onBack={() => setView("home")}
               onAdd={() => setShowAdd(true)}
               onToggle={changeEnabled}
               onDelete={remove}
@@ -150,25 +147,23 @@ export default function App() {
           {view === "translation" ? (
             <TranslationPanel
               defaultTargetLanguage={defaultTargetLanguage}
-              onBack={() => setView("home")}
               onOpenSettings={() => setView("settings")}
             />
           ) : null}
           {view === "network" ? (
-            <NetworkDiagnosticsPanel onBack={() => setView("home")} />
+            <NetworkDiagnosticsPanel />
           ) : null}
           {view === "download" ? (
-            <DownloadPanel onBack={() => setView("home")} />
+            <DownloadPanel />
           ) : null}
           {view === "system" ? (
-            <SystemMonitorPanel onBack={() => setView("home")} />
+            <SystemMonitorPanel />
           ) : null}
           {view === "scripts" ? (
-            <ScriptTasksPanel onBack={() => setView("home")} />
+            <ScriptTasksPanel />
           ) : null}
           {view === "settings" ? (
             <SettingsPanel
-              onBack={() => setView("home")}
               onAiSettingsLoaded={(settings) =>
                 setDefaultTargetLanguage(settings.defaultTargetLanguage)
               }

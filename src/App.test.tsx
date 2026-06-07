@@ -28,6 +28,7 @@ it("shows a left navigation without removing workbench search", async () => {
   await waitFor(() => expect(screen.getByRole("navigation")).toBeInTheDocument());
   const navigation = screen.getByRole("navigation");
 
+  expect(screen.getAllByText("Passion")).toHaveLength(1);
   expect(within(navigation).getByRole("button", { name: "工作台" })).toHaveAttribute(
     "aria-current",
     "page",
@@ -49,6 +50,9 @@ it("switches features from the left navigation", async () => {
     "page",
   );
   expect(screen.getByText("原文")).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "返回工作台" }),
+  ).not.toBeInTheDocument();
   expect(
     screen.queryByPlaceholderText("搜索功能，例如：端口、翻译、脚本、下载"),
   ).not.toBeInTheDocument();

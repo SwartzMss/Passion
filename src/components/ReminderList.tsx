@@ -2,7 +2,6 @@ import type { Reminder } from "../types";
 
 interface Props {
   reminders: Reminder[];
-  onBack: () => void;
   onAdd: () => void;
   onToggle: (id: string, enabled: boolean) => void;
   onDelete: (id: string) => void;
@@ -10,7 +9,6 @@ interface Props {
 
 export function ReminderList({
   reminders,
-  onBack,
   onAdd,
   onToggle,
   onDelete,
@@ -20,7 +18,6 @@ export function ReminderList({
       <section className="empty-state">
         <h2>还没有提醒</h2>
         <div className="actions">
-          <button onClick={onBack}>返回工作台</button>
           <button onClick={onAdd}>新增提醒</button>
         </div>
       </section>
@@ -32,7 +29,6 @@ export function ReminderList({
       <div className="section-header">
         <h2>提醒</h2>
         <div className="actions">
-          <button onClick={onBack}>返回工作台</button>
           <button onClick={onAdd}>新增提醒</button>
         </div>
       </div>

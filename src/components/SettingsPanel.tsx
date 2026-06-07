@@ -10,11 +10,10 @@ import {
 import type { AiSettings, Settings } from "../types";
 
 interface Props {
-  onBack: () => void;
   onAiSettingsLoaded?: (settings: AiSettings) => void;
 }
 
-export function SettingsPanel({ onBack, onAiSettingsLoaded }: Props) {
+export function SettingsPanel({ onAiSettingsLoaded }: Props) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +82,6 @@ export function SettingsPanel({ onBack, onAiSettingsLoaded }: Props) {
     <section className="settings-panel">
       <div className="section-header">
         <h2>设置</h2>
-        <button onClick={onBack}>返回工作台</button>
       </div>
       {error ? (
         <p className="error" role="alert">

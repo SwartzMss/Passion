@@ -2,11 +2,7 @@ import { useEffect, useState } from "react";
 import { getSystemSnapshot } from "../lib/api";
 import type { SystemSnapshot } from "../types";
 
-interface Props {
-  onBack: () => void;
-}
-
-export function SystemMonitorPanel({ onBack }: Props) {
+export function SystemMonitorPanel() {
   const [snapshot, setSnapshot] = useState<SystemSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,7 +34,6 @@ export function SystemMonitorPanel({ onBack }: Props) {
           <button onClick={refresh} disabled={isLoading}>
             {isLoading ? "刷新中..." : "刷新"}
           </button>
-          <button onClick={onBack}>返回工作台</button>
         </div>
       </div>
 

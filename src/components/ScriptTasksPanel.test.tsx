@@ -32,7 +32,7 @@ beforeEach(() => {
 });
 
 it("loads and shows script tasks", async () => {
-  render(<ScriptTasksPanel onBack={() => {}} />);
+  render(<ScriptTasksPanel />);
 
   expect(await screen.findByText("备份")).toBeInTheDocument();
   expect(screen.getByText("C:\\tasks\\backup.ps1")).toBeInTheDocument();
@@ -43,7 +43,7 @@ it("loads and shows script tasks", async () => {
 
 it("validates required fields before creating", async () => {
   const user = userEvent.setup();
-  render(<ScriptTasksPanel onBack={() => {}} />);
+  render(<ScriptTasksPanel />);
 
   await user.click(screen.getByRole("button", { name: "新增任务" }));
 
@@ -52,7 +52,7 @@ it("validates required fields before creating", async () => {
 
 it("creates a script task", async () => {
   const user = userEvent.setup();
-  render(<ScriptTasksPanel onBack={() => {}} />);
+  render(<ScriptTasksPanel />);
 
   await user.type(screen.getByLabelText("任务名"), "备份");
   await user.type(screen.getByLabelText("脚本路径"), "C:\\tasks\\backup.ps1");
@@ -71,7 +71,7 @@ it("creates a script task", async () => {
 
 it("runs, toggles, and deletes a script task", async () => {
   const user = userEvent.setup();
-  render(<ScriptTasksPanel onBack={() => {}} />);
+  render(<ScriptTasksPanel />);
 
   await screen.findByText("备份");
   await user.click(screen.getByRole("button", { name: "立即运行" }));

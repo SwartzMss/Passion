@@ -9,7 +9,6 @@ interface Props {
   onOpenDownloader: () => void;
   onOpenSystemMonitor: () => void;
   onOpenScriptTasks: () => void;
-  onOpenSettings: () => void;
 }
 
 export function WorkbenchHome({
@@ -21,7 +20,6 @@ export function WorkbenchHome({
   onOpenDownloader,
   onOpenSystemMonitor,
   onOpenScriptTasks,
-  onOpenSettings,
 }: Props) {
   const [query, setQuery] = useState("");
   const features = useMemo(
@@ -111,7 +109,6 @@ export function WorkbenchHome({
             placeholder="搜索功能，例如：端口、翻译、脚本、下载"
           />
         </label>
-        <button onClick={onOpenSettings}>设置</button>
       </div>
 
       {visibleFeatures.length > 0 ? (

@@ -2,11 +2,7 @@ import { useState } from "react";
 import { downloadFile } from "../lib/api";
 import type { DownloadResult } from "../types";
 
-interface Props {
-  onBack: () => void;
-}
-
-export function DownloadPanel({ onBack }: Props) {
+export function DownloadPanel() {
   const [url, setUrl] = useState("");
   const [fileName, setFileName] = useState("");
   const [result, setResult] = useState<DownloadResult | null>(null);
@@ -42,7 +38,6 @@ export function DownloadPanel({ onBack }: Props) {
           <h2>下载工具</h2>
           <p className="muted">输入 HTTP/HTTPS 地址，文件会保存到系统下载目录。</p>
         </div>
-        <button onClick={onBack}>返回工作台</button>
       </div>
 
       {error ? (
