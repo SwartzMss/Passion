@@ -10,6 +10,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -70,6 +71,52 @@ nav .active {
   padding: 32px;
   text-align: center;
   background: #ffffff;
+}
+
+.workbench {
+  display: grid;
+  gap: 18px;
+}
+
+.workbench-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid #e0e5ee;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.workbench-hero h2 {
+  margin: 0 0 6px;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.feature-card {
+  display: grid;
+  gap: 18px;
+  min-height: 150px;
+  padding: 18px;
+  border: 1px solid #e0e5ee;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.feature-card h3 {
+  margin: 0 0 8px;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .reminder-list {
@@ -141,16 +188,42 @@ nav .active {
 }
 
 .modal input,
+.settings-panel input,
+.settings-panel select,
+.translation-panel select,
+.translation-panel textarea,
 .modal textarea {
   border: 1px solid #cfd6e4;
   border-radius: 6px;
   padding: 8px;
 }
 
+.translation-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.translation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.translation-grid label,
+.inline-field {
+  display: grid;
+  gap: 6px;
+}
+
+.translation-panel textarea {
+  min-height: 240px;
+  resize: vertical;
+}
+
 .settings-panel {
   display: grid;
   gap: 14px;
-  max-width: 520px;
+  max-width: 720px;
   padding: 20px;
   border: 1px solid #e0e5ee;
   border-radius: 8px;
@@ -161,14 +234,33 @@ nav .active {
   margin: 0;
 }
 
+.settings-panel h3 {
+  margin: 0;
+}
+
 .settings-panel label {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
+.settings-panel .field-label {
+  display: grid;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.settings-divider {
+  height: 1px;
+  background: #e0e5ee;
+}
+
 .error {
   color: #b42318;
+}
+
+.success {
+  color: #067647;
 }
 
 @media (max-width: 720px) {
@@ -179,6 +271,11 @@ nav .active {
   }
 
   .reminder-row {
+    grid-template-columns: 1fr;
+  }
+
+  .feature-grid,
+  .translation-grid {
     grid-template-columns: 1fr;
   }
 }

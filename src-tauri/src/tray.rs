@@ -2,7 +2,7 @@ use crate::error::{BackendError, BackendResult};
 use crate::notifications;
 use tauri::menu::MenuBuilder;
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 const SHOW_ID: &str = "show_passion";
 const TEST_NOTIFICATION_ID: &str = "test_notification";

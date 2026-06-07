@@ -1,5 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { NewReminder, Reminder, Settings } from "../types";
+import type {
+  AiSettings,
+  NewReminder,
+  Reminder,
+  Settings,
+  TranslationRequest,
+  TranslationResult,
+} from "../types";
 
 export async function listReminders(): Promise<Reminder[]> {
   return invoke<Reminder[]>("list_reminders");
@@ -30,4 +37,22 @@ export async function updateSettings(settings: Settings): Promise<Settings> {
 
 export async function testNotification(): Promise<void> {
   return invoke<void>("test_notification");
+}
+
+export async function getAiSettings(): Promise<AiSettings> {
+  return invoke<AiSettings>("get_ai_settings");
+}
+
+export async function updateAiSettings(settings: AiSettings): Promise<AiSettings> {
+  return invoke<AiSettings>("update_ai_settings", { settings });
+}
+
+export async function testAiConnection(): Promise<void> {
+  return invoke<void>("test_ai_connection");
+}
+
+export async function translateText(
+  input: TranslationRequest,
+): Promise<TranslationResult> {
+  return invoke<TranslationResult>("translate_text", { input });
 }

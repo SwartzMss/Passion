@@ -1,6 +1,9 @@
+use crate::ai_settings::AiSettingsRepository;
 use crate::app_state::AppState;
 use crate::error::{BackendError, ErrorPayload};
-use crate::models::{NewReminder, Reminder, Settings};
+use crate::models::{
+    AiSettings, NewReminder, Reminder, Settings, TranslationRequest, TranslationResult,
+};
 use crate::notifications;
 use crate::reminders::ReminderRepository;
 use crate::settings::SettingsRepository;
@@ -101,6 +104,60 @@ pub async fn update_settings(
 #[tauri::command]
 pub async fn test_notification(app: AppHandle) -> CommandResult<()> {
     notifications::send_test_notification(&app).map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn get_ai_settings(state: State<'_, AppState>) -> CommandResult<AiSettings> {
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+    AiSettingsRepository::get(&conn).map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn update_ai_settings(
+    state: State<'_, AppState>,
+    settings: AiSettings,
+) -> CommandResult<AiSettings> {
+    crate::translator::validate_ai_settings(&settings).map_err(ErrorPayload::from)?;
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+    AiSettingsRepository::save(&conn, &settings).map_err(ErrorPayload::from)?;
+    Ok(settings)
+}
+
+#[tauri::command]
+pub async fn translate_text(
+    state: State<'_, AppState>,
+    input: TranslationRequest,
+) -> CommandResult<TranslationResult> {
+    let settings = {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        AiSettingsRepository::get(&conn).map_err(ErrorPayload::from)?
+    };
+    crate::translator::translate(&settings, &input)
+        .await
+        .map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn test_ai_connection(state: State<'_, AppState>) -> CommandResult<()> {
+    let settings = {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        AiSettingsRepository::get(&conn).map_err(ErrorPayload::from)?
+    };
+    crate::translator::test_connection(&settings)
+        .await
+        .map_err(ErrorPayload::from)
 }
 
 async fn schedule_reminder(app: AppHandle, state: AppState, reminder: Reminder) {

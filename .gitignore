@@ -26,3 +26,6 @@ target
 # Node and frontend build output
 node_modules/
 dist/
+
+# Superpowers brainstorming mockups
+.superpowers/

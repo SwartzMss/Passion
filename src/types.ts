@@ -24,6 +24,22 @@ export interface Settings {
   notificationEnabled: boolean;
 }
 
+export interface AiSettings {
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  defaultTargetLanguage: string;
+}
+
+export interface TranslationRequest {
+  text: string;
+  targetLanguage: string;
+}
+
+export interface TranslationResult {
+  translatedText: string;
+}
+
 export interface BackendError {
   message: string;
 }

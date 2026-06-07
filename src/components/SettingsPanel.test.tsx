@@ -9,7 +9,15 @@ vi.mock("../lib/api", () => ({
     minimizeToTray: true,
     notificationEnabled: true,
   })),
+  getAiSettings: vi.fn(async () => ({
+    baseUrl: "http://localhost:11434/v1",
+    model: "qwen2.5:7b",
+    apiKey: "",
+    defaultTargetLanguage: "中文",
+  })),
   updateSettings: vi.fn(async (settings) => settings),
+  updateAiSettings: vi.fn(async (settings) => settings),
+  testAiConnection: vi.fn(async () => undefined),
   testNotification: vi.fn(async () => undefined),
 }));
 
@@ -40,4 +48,32 @@ it("can send a test notification", async () => {
 
   const api = await import("../lib/api");
   expect(api.testNotification).toHaveBeenCalled();
+});
+
+it("loads and saves ai translation settings", async () => {
+  const user = userEvent.setup();
+  render(<SettingsPanel />);
+
+  const modelInput = await screen.findByLabelText("模型名称");
+  await user.clear(modelInput);
+  await user.type(modelInput, "deepseek-r1");
+  await user.click(screen.getByRole("button", { name: "保存 AI 设置" }));
+
+  const api = await import("../lib/api");
+  expect(api.updateAiSettings).toHaveBeenCalledWith({
+    baseUrl: "http://localhost:11434/v1",
+    model: "deepseek-r1",
+    apiKey: "",
+    defaultTargetLanguage: "中文",
+  });
+});
+
+it("can test ai connection", async () => {
+  const user = userEvent.setup();
+  render(<SettingsPanel />);
+
+  await user.click(await screen.findByRole("button", { name: "测试 AI 连接" }));
+
+  const api = await import("../lib/api");
+  expect(api.testAiConnection).toHaveBeenCalled();
 });
