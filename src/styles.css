@@ -6,6 +6,7 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
 }
 
 button,
@@ -36,32 +37,9 @@ button.primary-action {
 }
 
 main {
-  max-width: 980px;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 24px;
-}
-
-.app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.app-header h1 {
-  margin: 0;
-  font-size: 28px;
-}
-
-nav {
-  display: flex;
-  gap: 8px;
-}
-
-nav .active {
-  background: #172033;
-  color: #ffffff;
+  padding: 18px;
 }
 
 .section-header,
@@ -80,9 +58,13 @@ nav .active {
   background: #ffffff;
 }
 
+.empty-state .actions {
+  justify-content: center;
+}
+
 .workbench {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .workbench-searchbar {
@@ -121,15 +103,15 @@ nav .active {
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .feature-card {
   display: grid;
   align-content: space-between;
-  gap: 16px;
-  min-height: 158px;
-  padding: 18px;
+  gap: 14px;
+  min-height: 142px;
+  padding: 16px;
   border: 1px solid #e7ebf2;
   border-radius: 8px;
   background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
@@ -460,8 +442,12 @@ nav .active {
 }
 
 @media (max-width: 720px) {
-  .app-header,
   .section-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workbench-searchbar {
     align-items: stretch;
     flex-direction: column;
   }

@@ -21,6 +21,7 @@ it("shows empty state", () => {
   render(
     <ReminderList
       reminders={[]}
+      onBack={() => {}}
       onAdd={() => {}}
       onToggle={() => {}}
       onDelete={() => {}}
@@ -28,15 +29,18 @@ it("shows empty state", () => {
   );
 
   expect(screen.getByText("还没有提醒")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "返回工作台" })).toBeInTheDocument();
 });
 
 it("renders reminder actions", async () => {
   const user = userEvent.setup();
+  const onBack = vi.fn();
   const onToggle = vi.fn();
   const onDelete = vi.fn();
   render(
     <ReminderList
       reminders={[reminder]}
+      onBack={onBack}
       onAdd={() => {}}
       onToggle={onToggle}
       onDelete={onDelete}
@@ -45,9 +49,11 @@ it("renders reminder actions", async () => {
 
   expect(screen.getByText("中国法定工作日")).toBeInTheDocument();
 
+  await user.click(screen.getByRole("button", { name: "返回工作台" }));
   await user.click(screen.getByRole("button", { name: "停用 Stand up" }));
   await user.click(screen.getByRole("button", { name: "删除 Stand up" }));
 
+  expect(onBack).toHaveBeenCalled();
   expect(onToggle).toHaveBeenCalledWith("1", false);
   expect(onDelete).toHaveBeenCalledWith("1");
 });

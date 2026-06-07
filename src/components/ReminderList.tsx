@@ -2,17 +2,27 @@ import type { Reminder } from "../types";
 
 interface Props {
   reminders: Reminder[];
+  onBack: () => void;
   onAdd: () => void;
   onToggle: (id: string, enabled: boolean) => void;
   onDelete: (id: string) => void;
 }
 
-export function ReminderList({ reminders, onAdd, onToggle, onDelete }: Props) {
+export function ReminderList({
+  reminders,
+  onBack,
+  onAdd,
+  onToggle,
+  onDelete,
+}: Props) {
   if (reminders.length === 0) {
     return (
       <section className="empty-state">
         <h2>还没有提醒</h2>
-        <button onClick={onAdd}>新增提醒</button>
+        <div className="actions">
+          <button onClick={onBack}>返回工作台</button>
+          <button onClick={onAdd}>新增提醒</button>
+        </div>
       </section>
     );
   }
@@ -21,7 +31,10 @@ export function ReminderList({ reminders, onAdd, onToggle, onDelete }: Props) {
     <section className="reminder-list">
       <div className="section-header">
         <h2>提醒</h2>
-        <button onClick={onAdd}>新增提醒</button>
+        <div className="actions">
+          <button onClick={onBack}>返回工作台</button>
+          <button onClick={onAdd}>新增提醒</button>
+        </div>
       </div>
       {reminders.map((reminder) => (
         <article className="reminder-row" key={reminder.id}>

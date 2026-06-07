@@ -23,7 +23,7 @@ vi.mock("../lib/api", () => ({
 
 it("loads and updates settings", async () => {
   const user = userEvent.setup();
-  render(<SettingsPanel />);
+  render(<SettingsPanel onBack={() => {}} />);
 
   await waitFor(() =>
     expect(screen.getByLabelText("最小化到托盘")).toBeChecked(),
@@ -40,7 +40,7 @@ it("loads and updates settings", async () => {
 
 it("can send a test notification", async () => {
   const user = userEvent.setup();
-  render(<SettingsPanel />);
+  render(<SettingsPanel onBack={() => {}} />);
 
   await user.click(
     await screen.findByRole("button", { name: "测试通知" }),
@@ -52,7 +52,7 @@ it("can send a test notification", async () => {
 
 it("loads and saves ai translation settings", async () => {
   const user = userEvent.setup();
-  render(<SettingsPanel />);
+  render(<SettingsPanel onBack={() => {}} />);
 
   const modelInput = await screen.findByLabelText("模型名称");
   await user.clear(modelInput);
@@ -70,10 +70,20 @@ it("loads and saves ai translation settings", async () => {
 
 it("can test ai connection", async () => {
   const user = userEvent.setup();
-  render(<SettingsPanel />);
+  render(<SettingsPanel onBack={() => {}} />);
 
   await user.click(await screen.findByRole("button", { name: "测试 AI 连接" }));
 
   const api = await import("../lib/api");
   expect(api.testAiConnection).toHaveBeenCalled();
+});
+
+it("can return to the workbench", async () => {
+  const user = userEvent.setup();
+  const onBack = vi.fn();
+  render(<SettingsPanel onBack={onBack} />);
+
+  await user.click(await screen.findByRole("button", { name: "返回工作台" }));
+
+  expect(onBack).toHaveBeenCalled();
 });

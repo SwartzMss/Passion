@@ -82,60 +82,6 @@ export default function App() {
 
   return (
     <main>
-      <header className="app-header">
-        <h1>Passion</h1>
-        <nav>
-          <button
-            className={view === "home" ? "active" : ""}
-            onClick={() => setView("home")}
-          >
-            工作台
-          </button>
-          <button
-            className={view === "reminders" ? "active" : ""}
-            onClick={() => setView("reminders")}
-          >
-            提醒
-          </button>
-          <button
-            className={view === "translation" ? "active" : ""}
-            onClick={() => setView("translation")}
-          >
-            翻译
-          </button>
-          <button
-            className={view === "network" ? "active" : ""}
-            onClick={() => setView("network")}
-          >
-            网络检测
-          </button>
-          <button
-            className={view === "download" ? "active" : ""}
-            onClick={() => setView("download")}
-          >
-            下载工具
-          </button>
-          <button
-            className={view === "system" ? "active" : ""}
-            onClick={() => setView("system")}
-          >
-            系统监控
-          </button>
-          <button
-            className={view === "scripts" ? "active" : ""}
-            onClick={() => setView("scripts")}
-          >
-            脚本任务
-          </button>
-          <button
-            className={view === "settings" ? "active" : ""}
-            onClick={() => setView("settings")}
-          >
-            设置
-          </button>
-        </nav>
-      </header>
-
       {error ? (
         <p className="error" role="alert">
           {error}
@@ -164,6 +110,7 @@ export default function App() {
       {view === "reminders" ? (
         <ReminderList
           reminders={reminders}
+          onBack={() => setView("home")}
           onAdd={() => setShowAdd(true)}
           onToggle={changeEnabled}
           onDelete={remove}
@@ -190,6 +137,7 @@ export default function App() {
       ) : null}
       {view === "settings" ? (
         <SettingsPanel
+          onBack={() => setView("home")}
           onAiSettingsLoaded={(settings) =>
             setDefaultTargetLanguage(settings.defaultTargetLanguage)
           }
