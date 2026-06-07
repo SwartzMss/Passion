@@ -55,45 +55,58 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
 
   return (
     <div className="modal-backdrop">
-      <form className="modal" onSubmit={submit}>
-        <h2>新增提醒</h2>
+      <form className="modal reminder-modal" onSubmit={submit}>
+        <div className="modal-title">
+          <p className="eyebrow">提醒信息</p>
+          <h2>新增提醒</h2>
+        </div>
         {error ? <p className="error">{error}</p> : null}
-        <label>
-          标题
-          <input value={title} onChange={(event) => setTitle(event.target.value)} />
-        </label>
-        <label>
-          备注
-          <textarea
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-          />
-        </label>
-        <label>
-          日期和时间
-          <input
-            type="datetime-local"
-            value={remindAt}
-            onChange={(event) => setRemindAt(event.target.value)}
-          />
-        </label>
-        <label>
-          重复规则
-          <select
-            value={repeatRule}
-            onChange={(event) => setRepeatRule(event.target.value)}
-          >
-            <option value="once">单次提醒</option>
-            <option value="daily">每天</option>
-            <option value="weekly">每周</option>
-            <option value="cn_workday">中国法定工作日</option>
-          </select>
-        </label>
+        <div className="modal-field-grid">
+          <label className="wide-field">
+            标题
+            <input
+              placeholder="例如：每周例会提醒"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+            />
+          </label>
+          <label>
+            日期和时间
+            <input
+              type="datetime-local"
+              value={remindAt}
+              onChange={(event) => setRemindAt(event.target.value)}
+            />
+          </label>
+          <label>
+            重复规则
+            <select
+              value={repeatRule}
+              onChange={(event) => setRepeatRule(event.target.value)}
+            >
+              <option value="once">单次提醒</option>
+              <option value="daily">每天</option>
+              <option value="weekly">每周</option>
+              <option value="cn_workday">中国法定工作日</option>
+            </select>
+          </label>
+          <label className="wide-field">
+            备注
+            <textarea
+              placeholder="可选，写一点上下文"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+            />
+          </label>
+        </div>
         {repeatRule === "weekly" ? (
           <fieldset className="weekday-picker">
             <legend>选择周几</legend>
             {WEEKDAYS.map((day) => (
-              <label key={day.value}>
+              <label
+                className={weeklyDays.includes(day.value) ? "selected" : ""}
+                key={day.value}
+              >
                 <input
                   type="checkbox"
                   checked={weeklyDays.includes(day.value)}
@@ -104,11 +117,13 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
             ))}
           </fieldset>
         ) : null}
-        <div className="actions">
+        <div className="modal-actions">
           <button type="button" onClick={onCancel}>
             取消
           </button>
-          <button type="submit">保存</button>
+          <button className="primary-action" type="submit">
+            保存
+          </button>
         </div>
       </form>
     </div>

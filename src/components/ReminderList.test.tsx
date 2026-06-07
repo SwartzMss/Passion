@@ -17,6 +17,17 @@ const reminder: Reminder = {
   triggeredAt: null,
 };
 
+const completedReminder: Reminder = {
+  ...reminder,
+  id: "2",
+  title: "Done task",
+  notes: "Already handled",
+  enabled: false,
+  status: "triggered",
+  repeatRule: "once",
+  triggeredAt: new Date().toISOString(),
+};
+
 it("shows empty state", () => {
   render(
     <ReminderList
@@ -31,7 +42,46 @@ it("shows empty state", () => {
   expect(screen.queryByRole("button", { name: "返回工作台" })).not.toBeInTheDocument();
 });
 
-it("renders reminder actions", async () => {
+it("filters reminders between current and completed views", async () => {
+  const user = userEvent.setup();
+  render(
+    <ReminderList
+      reminders={[reminder, completedReminder]}
+      onAdd={() => {}}
+      onToggle={() => {}}
+      onDelete={() => {}}
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: "Stand up" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Done task" })).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "已完成提醒 1" }));
+
+  expect(screen.getByRole("button", { name: "Done task" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Stand up" })).not.toBeInTheDocument();
+});
+
+it("searches reminders and shows the selected reminder detail", async () => {
+  const user = userEvent.setup();
+  render(
+    <ReminderList
+      reminders={[reminder, { ...reminder, id: "3", title: "Pay rent", notes: "Housing" }]}
+      onAdd={() => {}}
+      onToggle={() => {}}
+      onDelete={() => {}}
+    />,
+  );
+
+  await user.type(screen.getByPlaceholderText("搜索提醒名称、备注或规则"), "rent");
+  await user.click(screen.getByRole("button", { name: "Pay rent" }));
+
+  expect(screen.queryByRole("button", { name: "Stand up" })).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Pay rent" })).toBeInTheDocument();
+  expect(screen.getByText("Housing")).toBeInTheDocument();
+});
+
+it("renders reminder actions from detail panel", async () => {
   const user = userEvent.setup();
   const onToggle = vi.fn();
   const onDelete = vi.fn();
@@ -44,7 +94,7 @@ it("renders reminder actions", async () => {
     />,
   );
 
-  expect(screen.getByText("中国法定工作日")).toBeInTheDocument();
+  expect(screen.getAllByText("中国法定工作日").length).toBeGreaterThan(0);
 
   await user.click(screen.getByRole("button", { name: "停用 Stand up" }));
   await user.click(screen.getByRole("button", { name: "删除 Stand up" }));
