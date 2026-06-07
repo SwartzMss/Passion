@@ -15,16 +15,16 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!title.trim()) {
-      setError("Title is required.");
+      setError("请输入提醒标题。");
       return;
     }
     if (!remindAt) {
-      setError("Date and time is required.");
+      setError("请选择提醒时间。");
       return;
     }
     const date = new Date(remindAt);
     if (date.getTime() <= Date.now()) {
-      setError("Reminder time must be in the future.");
+      setError("提醒时间必须晚于当前时间。");
       return;
     }
     onSave({
@@ -37,21 +37,21 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
   return (
     <div className="modal-backdrop">
       <form className="modal" onSubmit={submit}>
-        <h2>Add reminder</h2>
+        <h2>新增提醒</h2>
         {error ? <p className="error">{error}</p> : null}
         <label>
-          Title
+          标题
           <input value={title} onChange={(event) => setTitle(event.target.value)} />
         </label>
         <label>
-          Notes
+          备注
           <textarea
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
           />
         </label>
         <label>
-          Date and time
+          日期和时间
           <input
             type="datetime-local"
             value={remindAt}
@@ -60,9 +60,9 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
         </label>
         <div className="actions">
           <button type="button" onClick={onCancel}>
-            Cancel
+            取消
           </button>
-          <button type="submit">Save</button>
+          <button type="submit">保存</button>
         </div>
       </form>
     </div>

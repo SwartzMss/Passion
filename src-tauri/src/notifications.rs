@@ -8,7 +8,7 @@ pub fn send_reminder_notification(app: &AppHandle, reminder: &Reminder) -> Backe
         .notes
         .as_deref()
         .filter(|notes| !notes.is_empty())
-        .unwrap_or("Your reminder is due.");
+        .unwrap_or("你的提醒时间到了。");
 
     app.notification()
         .builder()
@@ -22,7 +22,7 @@ pub fn send_test_notification(app: &AppHandle) -> BackendResult<()> {
     app.notification()
         .builder()
         .title("Passion")
-        .body("Notifications are working.")
+        .body("系统通知可以正常使用。")
         .show()
         .map_err(|err| BackendError::Notification(err.to_string()))
 }

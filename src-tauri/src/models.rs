@@ -49,6 +49,71 @@ impl Default for Settings {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiSettings {
+    pub base_url: String,
+    pub model: String,
+    pub api_key: String,
+    pub default_target_language: String,
+}
+
+impl Default for AiSettings {
+    fn default() -> Self {
+        Self {
+            base_url: "http://localhost:11434/v1".to_string(),
+            model: "qwen2.5:7b".to_string(),
+            api_key: String::new(),
+            default_target_language: "中文".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranslationRequest {
+    pub text: String,
+    pub target_language: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranslationResult {
+    pub translated_text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PingRequest {
+    pub host: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PingResult {
+    pub host: String,
+    pub reachable: bool,
+    pub summary: String,
+    pub raw_output: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortCheckRequest {
+    pub host: String,
+    pub port: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortCheckResult {
+    pub host: String,
+    pub port: u16,
+    pub open: bool,
+    pub elapsed_ms: u128,
+    pub error: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -61,6 +126,16 @@ mod tests {
         assert!(!settings.launch_on_startup);
         assert!(settings.minimize_to_tray);
         assert!(settings.notification_enabled);
+    }
+
+    #[test]
+    fn ai_settings_default_targets_local_compatible_endpoint() {
+        let settings = AiSettings::default();
+
+        assert_eq!(settings.base_url, "http://localhost:11434/v1");
+        assert_eq!(settings.model, "qwen2.5:7b");
+        assert_eq!(settings.api_key, "");
+        assert_eq!(settings.default_target_language, "中文");
     }
 
     #[test]

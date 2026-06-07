@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import "./styles.css";
 import { AddReminderDialog } from "./components/AddReminderDialog";
+import { NetworkDiagnosticsPanel } from "./components/NetworkDiagnosticsPanel";
 import { ReminderList } from "./components/ReminderList";
 import { ReminderPopup } from "./components/ReminderPopup";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { TranslationPanel } from "./components/TranslationPanel";
+import { WorkbenchHome } from "./components/WorkbenchHome";
 import {
   createReminder,
   deleteReminder,
@@ -13,14 +16,15 @@ import {
 import { onReminderTriggered } from "./lib/events";
 import type { NewReminder, Reminder } from "./types";
 
-type Tab = "reminders" | "settings";
+type View = "home" | "reminders" | "translation" | "network" | "settings";
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>("reminders");
+  const [view, setView] = useState<View>("home");
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [popup, setPopup] = useState<Reminder | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [defaultTargetLanguage, setDefaultTargetLanguage] = useState("中文");
 
   async function refresh() {
     setReminders(await listReminders());
@@ -71,16 +75,34 @@ export default function App() {
         <h1>Passion</h1>
         <nav>
           <button
-            className={tab === "reminders" ? "active" : ""}
-            onClick={() => setTab("reminders")}
+            className={view === "home" ? "active" : ""}
+            onClick={() => setView("home")}
           >
-            Reminders
+            工作台
           </button>
           <button
-            className={tab === "settings" ? "active" : ""}
-            onClick={() => setTab("settings")}
+            className={view === "reminders" ? "active" : ""}
+            onClick={() => setView("reminders")}
           >
-            Settings
+            提醒
+          </button>
+          <button
+            className={view === "translation" ? "active" : ""}
+            onClick={() => setView("translation")}
+          >
+            翻译
+          </button>
+          <button
+            className={view === "network" ? "active" : ""}
+            onClick={() => setView("network")}
+          >
+            网络检测
+          </button>
+          <button
+            className={view === "settings" ? "active" : ""}
+            onClick={() => setView("settings")}
+          >
+            设置
           </button>
         </nav>
       </header>
@@ -90,16 +112,48 @@ export default function App() {
           {error}
         </p>
       ) : null}
-      {tab === "reminders" ? (
+      {view === "home" ? (
+        <WorkbenchHome
+          pendingReminderCount={
+            reminders.filter(
+              (reminder) => reminder.enabled && reminder.status === "pending",
+            ).length
+          }
+          onOpenReminders={() => setView("reminders")}
+          onAddReminder={() => {
+            setView("reminders");
+            setShowAdd(true);
+          }}
+          onOpenTranslation={() => setView("translation")}
+          onOpenNetworkDiagnostics={() => setView("network")}
+          onOpenSettings={() => setView("settings")}
+        />
+      ) : null}
+      {view === "reminders" ? (
         <ReminderList
           reminders={reminders}
           onAdd={() => setShowAdd(true)}
           onToggle={changeEnabled}
           onDelete={remove}
         />
-      ) : (
-        <SettingsPanel />
-      )}
+      ) : null}
+      {view === "translation" ? (
+        <TranslationPanel
+          defaultTargetLanguage={defaultTargetLanguage}
+          onBack={() => setView("home")}
+          onOpenSettings={() => setView("settings")}
+        />
+      ) : null}
+      {view === "network" ? (
+        <NetworkDiagnosticsPanel onBack={() => setView("home")} />
+      ) : null}
+      {view === "settings" ? (
+        <SettingsPanel
+          onAiSettingsLoaded={(settings) =>
+            setDefaultTargetLanguage(settings.defaultTargetLanguage)
+          }
+        />
+      ) : null}
       {showAdd ? (
         <AddReminderDialog
           onCancel={() => setShowAdd(false)}
@@ -115,5 +169,5 @@ function readError(err: unknown) {
   if (typeof err === "object" && err && "message" in err) {
     return String((err as { message: string }).message);
   }
-  return "Operation failed.";
+  return "操作失败。";
 }

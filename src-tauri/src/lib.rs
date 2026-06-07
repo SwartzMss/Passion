@@ -1,12 +1,15 @@
+mod ai_settings;
 mod app_state;
 mod commands;
 mod db;
 mod error;
 mod models;
+mod network_diagnostics;
 mod notifications;
 mod reminders;
 mod scheduler;
 mod settings;
+mod translator;
 mod tray;
 
 use app_state::AppState;
@@ -79,6 +82,12 @@ pub fn run() {
             commands::get_settings,
             commands::update_settings,
             commands::test_notification,
+            commands::get_ai_settings,
+            commands::update_ai_settings,
+            commands::translate_text,
+            commands::test_ai_connection,
+            commands::ping_host,
+            commands::check_port,
             greet,
         ])
         .run(tauri::generate_context!())

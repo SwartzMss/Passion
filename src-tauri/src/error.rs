@@ -15,6 +15,12 @@ pub enum BackendError {
     Notification(String),
     #[error("Startup setting update failed: {0}")]
     Startup(String),
+    #[error("{0}")]
+    Translation(String),
+    #[error("AI provider request failed: {0}")]
+    AiProvider(String),
+    #[error("{0}")]
+    NetworkDiagnostic(String),
     #[error("Window operation failed: {0}")]
     Window(String),
 }

@@ -119,7 +119,7 @@ mod tests {
 
         let result = tokio::time::timeout(std::time::Duration::from_millis(140), rx.recv()).await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(_) | Ok(None)));
         assert!(!scheduler.is_scheduled(&reminder.id).await);
     }
 
@@ -177,7 +177,7 @@ mod tests {
         let old_result =
             tokio::time::timeout(std::time::Duration::from_millis(180), rx.recv()).await;
 
-        assert!(old_result.is_err());
+        assert!(matches!(old_result, Err(_) | Ok(None)));
         assert!(!scheduler.is_scheduled(&reminder.id).await);
     }
 

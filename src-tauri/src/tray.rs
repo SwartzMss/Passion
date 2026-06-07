@@ -2,7 +2,7 @@ use crate::error::{BackendError, BackendResult};
 use crate::notifications;
 use tauri::menu::MenuBuilder;
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 const SHOW_ID: &str = "show_passion";
 const TEST_NOTIFICATION_ID: &str = "test_notification";
@@ -10,10 +10,10 @@ const EXIT_ID: &str = "exit";
 
 pub fn setup(app: &AppHandle) -> BackendResult<()> {
     let menu = MenuBuilder::new(app)
-        .text(SHOW_ID, "Show Passion")
-        .text(TEST_NOTIFICATION_ID, "Test Notification")
+        .text(SHOW_ID, "显示 Passion")
+        .text(TEST_NOTIFICATION_ID, "测试通知")
         .separator()
-        .text(EXIT_ID, "Exit")
+        .text(EXIT_ID, "退出")
         .build()
         .map_err(|err| BackendError::Window(err.to_string()))?;
 
