@@ -5,7 +5,7 @@ import { WindowControls } from "./WindowControls";
 
 const minimize = vi.fn();
 const hide = vi.fn();
-const startDragging = vi.fn();
+const startDragging = vi.fn(async () => undefined);
 
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
