@@ -11,6 +11,7 @@ it("shows assistant feature cards", () => {
       onAddReminder={() => {}}
       onOpenTranslation={() => {}}
       onOpenNetworkDiagnostics={() => {}}
+      onOpenDownloader={() => {}}
       onOpenSettings={() => {}}
     />,
   );
@@ -19,6 +20,7 @@ it("shows assistant feature cards", () => {
   expect(screen.getByText("2 个待提醒")).toBeInTheDocument();
   expect(screen.getByText("翻译")).toBeInTheDocument();
   expect(screen.getByText("网络检测")).toBeInTheDocument();
+  expect(screen.getByText("下载工具")).toBeInTheDocument();
 });
 
 it("opens translation from the workbench", async () => {
@@ -31,6 +33,7 @@ it("opens translation from the workbench", async () => {
       onAddReminder={() => {}}
       onOpenTranslation={onOpenTranslation}
       onOpenNetworkDiagnostics={() => {}}
+      onOpenDownloader={() => {}}
       onOpenSettings={() => {}}
     />,
   );
@@ -50,6 +53,7 @@ it("opens network diagnostics from the workbench", async () => {
       onAddReminder={() => {}}
       onOpenTranslation={() => {}}
       onOpenNetworkDiagnostics={onOpenNetworkDiagnostics}
+      onOpenDownloader={() => {}}
       onOpenSettings={() => {}}
     />,
   );
@@ -57,4 +61,24 @@ it("opens network diagnostics from the workbench", async () => {
   await user.click(screen.getByRole("button", { name: "开始检测" }));
 
   expect(onOpenNetworkDiagnostics).toHaveBeenCalledOnce();
+});
+
+it("opens downloader from the workbench", async () => {
+  const user = userEvent.setup();
+  const onOpenDownloader = vi.fn();
+  render(
+    <WorkbenchHome
+      pendingReminderCount={0}
+      onOpenReminders={() => {}}
+      onAddReminder={() => {}}
+      onOpenTranslation={() => {}}
+      onOpenNetworkDiagnostics={() => {}}
+      onOpenDownloader={onOpenDownloader}
+      onOpenSettings={() => {}}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "开始下载" }));
+
+  expect(onOpenDownloader).toHaveBeenCalledOnce();
 });

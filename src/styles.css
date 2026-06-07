@@ -208,6 +208,20 @@ nav .active {
   gap: 16px;
 }
 
+.download-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.download-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #e0e5ee;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
 .translation-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

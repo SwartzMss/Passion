@@ -2,6 +2,7 @@ mod ai_settings;
 mod app_state;
 mod commands;
 mod db;
+mod downloader;
 mod error;
 mod models;
 mod network_diagnostics;
@@ -88,6 +89,7 @@ pub fn run() {
             commands::test_ai_connection,
             commands::ping_host,
             commands::check_port,
+            commands::download_file,
             greet,
         ])
         .run(tauri::generate_context!())

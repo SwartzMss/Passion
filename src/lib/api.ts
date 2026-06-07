@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AiSettings,
+  DownloadRequest,
+  DownloadResult,
   NewReminder,
   PingRequest,
   PingResult,
@@ -69,4 +71,10 @@ export async function checkPort(
   input: PortCheckRequest,
 ): Promise<PortCheckResult> {
   return invoke<PortCheckResult>("check_port", { input });
+}
+
+export async function downloadFile(
+  input: DownloadRequest,
+): Promise<DownloadResult> {
+  return invoke<DownloadResult>("download_file", { input });
 }

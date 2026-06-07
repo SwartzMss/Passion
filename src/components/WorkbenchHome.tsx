@@ -4,6 +4,7 @@ interface Props {
   onAddReminder: () => void;
   onOpenTranslation: () => void;
   onOpenNetworkDiagnostics: () => void;
+  onOpenDownloader: () => void;
   onOpenSettings: () => void;
 }
 
@@ -13,6 +14,7 @@ export function WorkbenchHome({
   onAddReminder,
   onOpenTranslation,
   onOpenNetworkDiagnostics,
+  onOpenDownloader,
   onOpenSettings,
 }: Props) {
   return (
@@ -54,6 +56,16 @@ export function WorkbenchHome({
           </div>
           <div className="card-actions">
             <button onClick={onOpenNetworkDiagnostics}>开始检测</button>
+          </div>
+        </article>
+
+        <article className="feature-card">
+          <div>
+            <h3>下载工具</h3>
+            <p className="muted">下载 HTTP/HTTPS 文件，保存到系统下载目录。</p>
+          </div>
+          <div className="card-actions">
+            <button onClick={onOpenDownloader}>开始下载</button>
           </div>
         </article>
       </div>
