@@ -33,7 +33,7 @@ vi.mock("../lib/api", () => ({
 
 it("rejects empty ping host", async () => {
   const user = userEvent.setup();
-  render(<NetworkDiagnosticsPanel onBack={() => {}} />);
+  render(<NetworkDiagnosticsPanel />);
 
   await user.click(screen.getByRole("button", { name: "Ping" }));
 
@@ -42,7 +42,7 @@ it("rejects empty ping host", async () => {
 
 it("runs ping and shows result", async () => {
   const user = userEvent.setup();
-  render(<NetworkDiagnosticsPanel onBack={() => {}} />);
+  render(<NetworkDiagnosticsPanel />);
 
   await user.type(screen.getByLabelText("Ping 目标"), "127.0.0.1");
   await user.click(screen.getByRole("button", { name: "Ping" }));
@@ -54,7 +54,7 @@ it("runs ping and shows result", async () => {
 
 it("checks a tcp port and shows result", async () => {
   const user = userEvent.setup();
-  render(<NetworkDiagnosticsPanel onBack={() => {}} />);
+  render(<NetworkDiagnosticsPanel />);
 
   await user.clear(screen.getByLabelText("Port"));
   await user.type(screen.getByLabelText("Port"), "80");
@@ -67,7 +67,7 @@ it("checks a tcp port and shows result", async () => {
 
 it("inspects port occupancy and shows process details", async () => {
   const user = userEvent.setup();
-  render(<NetworkDiagnosticsPanel onBack={() => {}} />);
+  render(<NetworkDiagnosticsPanel />);
 
   await user.clear(screen.getByLabelText("占用端口"));
   await user.type(screen.getByLabelText("占用端口"), "1420");

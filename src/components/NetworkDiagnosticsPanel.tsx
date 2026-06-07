@@ -6,11 +6,7 @@ import type {
   PortOccupancyResult,
 } from "../types";
 
-interface Props {
-  onBack: () => void;
-}
-
-export function NetworkDiagnosticsPanel({ onBack }: Props) {
+export function NetworkDiagnosticsPanel() {
   const [pingHostValue, setPingHostValue] = useState("");
   const [portHost, setPortHost] = useState("127.0.0.1");
   const [portValue, setPortValue] = useState("80");
@@ -83,7 +79,6 @@ export function NetworkDiagnosticsPanel({ onBack }: Props) {
           <h2>网络检测</h2>
           <p className="muted">检查 IP/域名是否可达，或检测 TCP 端口是否开放。</p>
         </div>
-        <button onClick={onBack}>返回工作台</button>
       </div>
 
       {error ? (

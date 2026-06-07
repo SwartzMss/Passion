@@ -14,7 +14,6 @@ it("rejects empty source text", async () => {
   render(
     <TranslationPanel
       defaultTargetLanguage="中文"
-      onBack={() => {}}
       onOpenSettings={() => {}}
     />,
   );
@@ -29,7 +28,6 @@ it("translates text and displays the result", async () => {
   render(
     <TranslationPanel
       defaultTargetLanguage="中文"
-      onBack={() => {}}
       onOpenSettings={() => {}}
     />,
   );

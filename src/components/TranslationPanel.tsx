@@ -3,7 +3,6 @@ import { translateText } from "../lib/api";
 
 interface Props {
   defaultTargetLanguage: string;
-  onBack: () => void;
   onOpenSettings: () => void;
 }
 
@@ -11,7 +10,6 @@ const TARGET_LANGUAGES = ["中文", "English", "日本語", "한국어", "Franç
 
 export function TranslationPanel({
   defaultTargetLanguage,
-  onBack,
   onOpenSettings,
 }: Props) {
   const [sourceText, setSourceText] = useState("");
@@ -54,7 +52,6 @@ export function TranslationPanel({
           <p className="muted">通过 OpenAI 兼容接口调用本地或云端模型。</p>
         </div>
         <div className="actions">
-          <button onClick={onBack}>返回工作台</button>
           <button onClick={onOpenSettings}>AI 设置</button>
         </div>
       </div>

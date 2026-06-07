@@ -15,7 +15,7 @@ vi.mock("../lib/api", () => ({
 
 it("rejects empty download url", async () => {
   const user = userEvent.setup();
-  render(<DownloadPanel onBack={() => {}} />);
+  render(<DownloadPanel />);
 
   await user.click(screen.getByRole("button", { name: "开始下载" }));
 
@@ -24,7 +24,7 @@ it("rejects empty download url", async () => {
 
 it("downloads a file and shows saved path", async () => {
   const user = userEvent.setup();
-  render(<DownloadPanel onBack={() => {}} />);
+  render(<DownloadPanel />);
 
   await user.type(screen.getByLabelText("下载地址"), "https://example.com/file.zip");
   await user.click(screen.getByRole("button", { name: "开始下载" }));

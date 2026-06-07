@@ -8,11 +8,7 @@ import {
 } from "../lib/api";
 import type { ScriptTask } from "../types";
 
-interface Props {
-  onBack: () => void;
-}
-
-export function ScriptTasksPanel({ onBack }: Props) {
+export function ScriptTasksPanel() {
   const [tasks, setTasks] = useState<ScriptTask[]>([]);
   const [name, setName] = useState("");
   const [scriptPath, setScriptPath] = useState("");
@@ -105,7 +101,6 @@ export function ScriptTasksPanel({ onBack }: Props) {
           <h2>脚本任务</h2>
           <p className="muted">按固定间隔执行本机脚本，应用运行时生效。</p>
         </div>
-        <button onClick={onBack}>返回工作台</button>
       </div>
 
       {error ? (
