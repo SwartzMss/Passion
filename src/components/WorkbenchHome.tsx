@@ -1,3 +1,5 @@
+import { useMemo, useState } from "react";
+
 interface Props {
   pendingReminderCount: number;
   onOpenReminders: () => void;
@@ -21,78 +23,125 @@ export function WorkbenchHome({
   onOpenScriptTasks,
   onOpenSettings,
 }: Props) {
+  const [query, setQuery] = useState("");
+  const features = useMemo(
+    () => [
+      {
+        id: "reminders",
+        label: "提醒",
+        title: "提醒",
+        description: `${pendingReminderCount} 个待提醒，支持单次和中国法定工作日提醒。`,
+        keywords: "提醒 工作日 通知 日程 日历",
+        actions: [
+          { label: "查看提醒", onClick: onOpenReminders, primary: true },
+          { label: "新增提醒", onClick: onAddReminder },
+        ],
+      },
+      {
+        id: "translation",
+        label: "AI",
+        title: "翻译",
+        description: "使用 OpenAI 兼容接口或本地模型进行文本翻译。",
+        keywords: "翻译 AI OpenAI 模型 本地模型 语言",
+        actions: [{ label: "开始翻译", onClick: onOpenTranslation, primary: true }],
+      },
+      {
+        id: "network",
+        label: "网络",
+        title: "网络检测",
+        description: "Ping、端口连通性和端口占用进程查看。",
+        keywords: "网络 ping 端口 检测 占用 pid 进程",
+        actions: [
+          { label: "开始检测", onClick: onOpenNetworkDiagnostics, primary: true },
+        ],
+      },
+      {
+        id: "download",
+        label: "工具",
+        title: "下载工具",
+        description: "下载 HTTP/HTTPS 文件，保存到系统下载目录。",
+        keywords: "下载 http https 文件 保存",
+        actions: [{ label: "开始下载", onClick: onOpenDownloader, primary: true }],
+      },
+      {
+        id: "system",
+        label: "系统",
+        title: "系统监控",
+        description: "查看 CPU、内存、磁盘和系统运行时长。",
+        keywords: "系统 监控 cpu 内存 磁盘 运行时长",
+        actions: [{ label: "查看状态", onClick: onOpenSystemMonitor, primary: true }],
+      },
+      {
+        id: "scripts",
+        label: "自动化",
+        title: "脚本任务",
+        description: "定期执行本机脚本，并查看最近一次输出。",
+        keywords: "脚本 定时 自动化 powershell bat cmd exe",
+        actions: [{ label: "管理任务", onClick: onOpenScriptTasks, primary: true }],
+      },
+    ],
+    [
+      pendingReminderCount,
+      onOpenReminders,
+      onAddReminder,
+      onOpenTranslation,
+      onOpenNetworkDiagnostics,
+      onOpenDownloader,
+      onOpenSystemMonitor,
+      onOpenScriptTasks,
+    ],
+  );
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleFeatures = normalizedQuery
+    ? features.filter((feature) =>
+        `${feature.label} ${feature.title} ${feature.description} ${feature.keywords}`
+          .toLowerCase()
+          .includes(normalizedQuery),
+      )
+    : features;
+
   return (
     <section className="workbench">
-      <div className="workbench-hero">
-        <div>
-          <h2>工作台</h2>
-          <p className="muted">管理提醒，也可以用本地或兼容模型进行翻译。</p>
-        </div>
+      <div className="workbench-searchbar">
+        <label className="feature-search">
+          <span className="sr-only">搜索功能</span>
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索功能，例如：端口、翻译、脚本、下载"
+          />
+        </label>
         <button onClick={onOpenSettings}>设置</button>
       </div>
 
-      <div className="feature-grid">
-        <article className="feature-card">
-          <div>
-            <h3>提醒</h3>
-            <p className="muted">{pendingReminderCount} 个待提醒</p>
-          </div>
-          <div className="card-actions">
-            <button onClick={onOpenReminders}>查看提醒</button>
-            <button onClick={onAddReminder}>新增提醒</button>
-          </div>
-        </article>
-
-        <article className="feature-card">
-          <div>
-            <h3>翻译</h3>
-            <p className="muted">支持 OpenAI 兼容接口和本地部署模型。</p>
-          </div>
-          <div className="card-actions">
-            <button onClick={onOpenTranslation}>开始翻译</button>
-          </div>
-        </article>
-
-        <article className="feature-card">
-          <div>
-            <h3>网络检测</h3>
-            <p className="muted">检测 IP/域名是否可达，或者端口是否开放。</p>
-          </div>
-          <div className="card-actions">
-            <button onClick={onOpenNetworkDiagnostics}>开始检测</button>
-          </div>
-        </article>
-
-        <article className="feature-card">
-          <div>
-            <h3>下载工具</h3>
-            <p className="muted">下载 HTTP/HTTPS 文件，保存到系统下载目录。</p>
-          </div>
-          <div className="card-actions">
-            <button onClick={onOpenDownloader}>开始下载</button>
-          </div>
-        </article>
-
-        <article className="feature-card">
-          <div>
-            <h3>系统监控</h3>
-            <p className="muted">查看 CPU、内存、磁盘和系统运行时长。</p>
-          </div>
-          <div className="card-actions">
-            <button onClick={onOpenSystemMonitor}>查看状态</button>
-          </div>
-        </article>
-
-        <article className="feature-card">
-          <div>
-            <h3>脚本任务</h3>
-            <p className="muted">定期执行本机脚本，并查看最近一次输出。</p>
-          </div>
-          <div className="card-actions">
-            <button onClick={onOpenScriptTasks}>管理任务</button>
-          </div>
-        </article>
-      </div>
+      {visibleFeatures.length > 0 ? (
+        <div className="feature-grid">
+          {visibleFeatures.map((feature) => (
+            <article className="feature-card" key={feature.id}>
+              <div className="feature-card-top">
+                <span className="feature-badge">{feature.label}</span>
+              </div>
+              <div>
+                <h3>{feature.title}</h3>
+                <p className="muted">{feature.description}</p>
+              </div>
+              <div className="card-actions">
+                {feature.actions.map((action) => (
+                  <button
+                    className={action.primary ? "primary-action" : ""}
+                    key={action.label}
+                    onClick={action.onClick}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state">没有找到相关功能</div>
+      )}
     </section>
   );
 }

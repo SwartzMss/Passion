@@ -18,13 +18,13 @@ it("shows assistant feature cards", () => {
     />,
   );
 
-  expect(screen.getByText("提醒")).toBeInTheDocument();
-  expect(screen.getByText("2 个待提醒")).toBeInTheDocument();
-  expect(screen.getByText("翻译")).toBeInTheDocument();
-  expect(screen.getByText("网络检测")).toBeInTheDocument();
-  expect(screen.getByText("下载工具")).toBeInTheDocument();
-  expect(screen.getByText("系统监控")).toBeInTheDocument();
-  expect(screen.getByText("脚本任务")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "提醒" })).toBeInTheDocument();
+  expect(screen.getByText(/2 个待提醒/)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "翻译" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "网络检测" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "下载工具" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "系统监控" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "脚本任务" })).toBeInTheDocument();
 });
 
 it("opens translation from the workbench", async () => {
@@ -135,4 +135,48 @@ it("opens script tasks from the workbench", async () => {
   await user.click(screen.getByRole("button", { name: "管理任务" }));
 
   expect(onOpenScriptTasks).toHaveBeenCalledOnce();
+});
+
+it("filters feature cards by search keyword", async () => {
+  const user = userEvent.setup();
+  render(
+    <WorkbenchHome
+      pendingReminderCount={0}
+      onOpenReminders={() => {}}
+      onAddReminder={() => {}}
+      onOpenTranslation={() => {}}
+      onOpenNetworkDiagnostics={() => {}}
+      onOpenDownloader={() => {}}
+      onOpenSystemMonitor={() => {}}
+      onOpenScriptTasks={() => {}}
+      onOpenSettings={() => {}}
+    />,
+  );
+
+  await user.type(screen.getByLabelText("搜索功能"), "端口");
+
+  expect(screen.getByRole("heading", { name: "网络检测" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "翻译" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "脚本任务" })).not.toBeInTheDocument();
+});
+
+it("shows empty search state when no feature matches", async () => {
+  const user = userEvent.setup();
+  render(
+    <WorkbenchHome
+      pendingReminderCount={0}
+      onOpenReminders={() => {}}
+      onAddReminder={() => {}}
+      onOpenTranslation={() => {}}
+      onOpenNetworkDiagnostics={() => {}}
+      onOpenDownloader={() => {}}
+      onOpenSystemMonitor={() => {}}
+      onOpenScriptTasks={() => {}}
+      onOpenSettings={() => {}}
+    />,
+  );
+
+  await user.type(screen.getByLabelText("搜索功能"), "不存在");
+
+  expect(screen.getByText("没有找到相关功能")).toBeInTheDocument();
 });
