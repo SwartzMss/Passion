@@ -13,9 +13,13 @@
     "windows": [
       {
         "title": "Passion",
-        "width": 980,
-        "height": 680,
-        "resizable": true
+        "width": 760,
+        "height": 640,
+        "minWidth": 640,
+        "minHeight": 520,
+        "resizable": true,
+        "maximizable": false,
+        "decorations": false
       }
     ],
     "security": {

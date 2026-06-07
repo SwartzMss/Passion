@@ -45,3 +45,53 @@ it("saves China legal workday reminders", async () => {
     }),
   );
 });
+
+it("saves daily reminders", async () => {
+  const user = userEvent.setup();
+  const onSave = vi.fn();
+  render(<AddReminderDialog onCancel={() => {}} onSave={onSave} />);
+
+  await user.type(screen.getByLabelText("标题"), "Daily standup");
+  await user.type(screen.getByLabelText("日期和时间"), "2099-01-01T09:00");
+  await user.selectOptions(screen.getByLabelText("重复规则"), "daily");
+  await user.click(screen.getByRole("button", { name: "保存" }));
+
+  expect(onSave).toHaveBeenCalledWith(
+    expect.objectContaining({
+      repeatRule: "daily",
+    }),
+  );
+});
+
+it("saves weekly reminders with selected weekdays", async () => {
+  const user = userEvent.setup();
+  const onSave = vi.fn();
+  render(<AddReminderDialog onCancel={() => {}} onSave={onSave} />);
+
+  await user.type(screen.getByLabelText("标题"), "Team sync");
+  await user.type(screen.getByLabelText("日期和时间"), "2099-01-01T09:00");
+  await user.selectOptions(screen.getByLabelText("重复规则"), "weekly");
+  await user.click(screen.getByLabelText("周一"));
+  await user.click(screen.getByLabelText("周三"));
+  await user.click(screen.getByRole("button", { name: "保存" }));
+
+  expect(onSave).toHaveBeenCalledWith(
+    expect.objectContaining({
+      repeatRule: "weekly:1,3",
+    }),
+  );
+});
+
+it("requires at least one weekday for weekly reminders", async () => {
+  const user = userEvent.setup();
+  const onSave = vi.fn();
+  render(<AddReminderDialog onCancel={() => {}} onSave={onSave} />);
+
+  await user.type(screen.getByLabelText("标题"), "Team sync");
+  await user.type(screen.getByLabelText("日期和时间"), "2099-01-01T09:00");
+  await user.selectOptions(screen.getByLabelText("重复规则"), "weekly");
+  await user.click(screen.getByRole("button", { name: "保存" }));
+
+  expect(screen.getByText("请选择至少一个星期几。")).toBeInTheDocument();
+  expect(onSave).not.toHaveBeenCalled();
+});

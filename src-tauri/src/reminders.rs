@@ -33,41 +33,34 @@ impl ReminderStatus {
 }
 
 impl ReminderRepeatRule {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            ReminderRepeatRule::Once => "once",
-            ReminderRepeatRule::CnWorkday => "cn_workday",
-        }
-    }
-
     fn from_db(value: &str) -> BackendResult<Self> {
-        match value {
-            "once" => Ok(Self::Once),
-            "cn_workday" => Ok(Self::CnWorkday),
-            other => Err(BackendError::Database(format!(
-                "invalid reminder repeat rule {other}"
-            ))),
-        }
+        Self::from_str(value).map_err(BackendError::Database)
     }
 }
 
 impl ReminderRepository {
     pub fn create(conn: &Connection, input: NewReminder) -> BackendResult<Reminder> {
+        Self::create_at(conn, input, Utc::now())
+    }
+
+    pub fn create_at(
+        conn: &Connection,
+        input: NewReminder,
+        now: DateTime<Utc>,
+    ) -> BackendResult<Reminder> {
         let title = input.title.trim().to_string();
         if title.is_empty() {
             return Err(BackendError::EmptyTitle);
         }
-        let remind_at = match input.repeat_rule {
-            ReminderRepeatRule::Once => input.remind_at,
-            ReminderRepeatRule::CnWorkday => {
-                next_cn_workday_remind_at(input.remind_at, Utc::now())?
-            }
+        let remind_at = if input.repeat_rule.is_repeating() {
+            next_repeating_remind_at(&input.repeat_rule, input.remind_at, now)?
+        } else {
+            input.remind_at
         };
-        if remind_at <= Utc::now() {
+        if remind_at <= now {
             return Err(BackendError::ReminderTimeInPast);
         }
 
-        let now = Utc::now();
         let reminder = Reminder {
             id: Uuid::new_v4().to_string(),
             title,
@@ -204,8 +197,9 @@ impl ReminderRepository {
         )?;
         due.into_iter()
             .map(|reminder| {
-                if reminder.repeat_rule == ReminderRepeatRule::CnWorkday {
-                    let next = next_cn_workday_remind_at(reminder.remind_at, now)?;
+                if reminder.repeat_rule.is_repeating() {
+                    let next =
+                        next_repeating_remind_at(&reminder.repeat_rule, reminder.remind_at, now)?;
                     Self::reschedule_repeating(conn, &reminder.id, next, now)
                 } else {
                     Self::mark_status(conn, &reminder.id, ReminderStatus::Expired, now)
@@ -219,10 +213,10 @@ impl ReminderRepository {
         reminder: &Reminder,
         when: DateTime<Utc>,
     ) -> BackendResult<Option<Reminder>> {
-        if reminder.repeat_rule != ReminderRepeatRule::CnWorkday {
+        if !reminder.repeat_rule.is_repeating() {
             return Ok(None);
         }
-        let next = next_cn_workday_remind_at(reminder.remind_at, when)?;
+        let next = next_repeating_remind_at(&reminder.repeat_rule, reminder.remind_at, when)?;
         Self::reschedule_repeating(conn, &reminder.id, next, when).map(Some)
     }
 
@@ -307,6 +301,61 @@ impl ReminderRepository {
                 .transpose()?,
         })
     }
+}
+
+pub fn next_repeating_remind_at(
+    rule: &ReminderRepeatRule,
+    requested: DateTime<Utc>,
+    now: DateTime<Utc>,
+) -> BackendResult<DateTime<Utc>> {
+    match rule {
+        ReminderRepeatRule::Once => Ok(requested),
+        ReminderRepeatRule::CnWorkday => next_cn_workday_remind_at(requested, now),
+        ReminderRepeatRule::Daily => next_local_day_match(requested, now, |_| true),
+        ReminderRepeatRule::Weekly(days) => {
+            next_local_day_match(requested, now, |date| days.contains(&date.weekday()))
+        }
+    }
+}
+
+fn next_local_day_match<F>(
+    requested: DateTime<Utc>,
+    now: DateTime<Utc>,
+    matches_day: F,
+) -> BackendResult<DateTime<Utc>>
+where
+    F: Fn(chrono::NaiveDate) -> bool,
+{
+    let china = FixedOffset::east_opt(8 * 3600)
+        .ok_or_else(|| BackendError::Database("invalid China timezone offset".to_string()))?;
+    let requested_cn = requested.with_timezone(&china);
+    let time = requested_cn.time();
+    let mut date = requested_cn.date_naive();
+
+    for _ in 0..400 {
+        let candidate = china
+            .with_ymd_and_hms(
+                date.year(),
+                date.month(),
+                date.day(),
+                time.hour(),
+                time.minute(),
+                time.second(),
+            )
+            .single()
+            .ok_or_else(|| BackendError::Database("invalid reminder local time".to_string()))?
+            .with_timezone(&Utc);
+        if candidate > now && matches_day(date) {
+            return Ok(candidate);
+        }
+        date = date
+            .checked_add_signed(Duration::days(1))
+            .ok_or_else(|| BackendError::Database("invalid reminder next date".to_string()))?;
+    }
+
+    Err(BackendError::Database(
+        "could not find next repeating reminder time".to_string(),
+    ))
 }
 
 pub fn next_cn_workday_remind_at(
@@ -693,6 +742,38 @@ mod tests {
 
         assert_eq!(next.status, ReminderStatus::Pending);
         assert_eq!(next.remind_at, china_time(2026, 2, 24, 9, 0));
+    }
+
+    #[test]
+    fn create_daily_reminder_moves_past_time_to_tomorrow() {
+        let conn = db::test_connection();
+        let input = NewReminder {
+            title: "Daily".to_string(),
+            notes: None,
+            remind_at: china_time(2026, 6, 1, 9, 0),
+            repeat_rule: ReminderRepeatRule::Daily,
+        };
+
+        let reminder =
+            ReminderRepository::create_at(&conn, input, china_time(2026, 6, 1, 10, 0)).unwrap();
+
+        assert_eq!(reminder.remind_at, china_time(2026, 6, 2, 9, 0));
+    }
+
+    #[test]
+    fn create_weekly_reminder_uses_selected_weekdays() {
+        let conn = db::test_connection();
+        let input = NewReminder {
+            title: "Weekly".to_string(),
+            notes: None,
+            remind_at: china_time(2026, 6, 1, 9, 0),
+            repeat_rule: ReminderRepeatRule::Weekly(vec![chrono::Weekday::Wed]),
+        };
+
+        let reminder =
+            ReminderRepository::create_at(&conn, input, china_time(2026, 6, 1, 10, 0)).unwrap();
+
+        assert_eq!(reminder.remind_at, china_time(2026, 6, 3, 9, 0));
     }
 
     fn insert_raw(
