@@ -134,7 +134,6 @@ export default function App() {
               onOpenDownloader={() => setView("download")}
               onOpenSystemMonitor={() => setView("system")}
               onOpenScriptTasks={() => setView("scripts")}
-              onOpenSettings={() => setView("settings")}
             />
           ) : null}
           {view === "reminders" ? (

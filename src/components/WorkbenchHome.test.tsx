@@ -14,10 +14,10 @@ it("shows assistant feature cards", () => {
       onOpenDownloader={() => {}}
       onOpenSystemMonitor={() => {}}
       onOpenScriptTasks={() => {}}
-      onOpenSettings={() => {}}
     />,
   );
 
+  expect(screen.queryByRole("button", { name: "设置" })).not.toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "提醒" })).toBeInTheDocument();
   expect(screen.getByText(/2 个待提醒/)).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "翻译" })).toBeInTheDocument();
@@ -40,7 +40,6 @@ it("opens translation from the workbench", async () => {
       onOpenDownloader={() => {}}
       onOpenSystemMonitor={() => {}}
       onOpenScriptTasks={() => {}}
-      onOpenSettings={() => {}}
     />,
   );
 
@@ -62,7 +61,6 @@ it("opens network diagnostics from the workbench", async () => {
       onOpenDownloader={() => {}}
       onOpenSystemMonitor={() => {}}
       onOpenScriptTasks={() => {}}
-      onOpenSettings={() => {}}
     />,
   );
 
@@ -84,7 +82,6 @@ it("opens downloader from the workbench", async () => {
       onOpenDownloader={onOpenDownloader}
       onOpenSystemMonitor={() => {}}
       onOpenScriptTasks={() => {}}
-      onOpenSettings={() => {}}
     />,
   );
 
@@ -106,7 +103,6 @@ it("opens system monitor from the workbench", async () => {
       onOpenDownloader={() => {}}
       onOpenSystemMonitor={onOpenSystemMonitor}
       onOpenScriptTasks={() => {}}
-      onOpenSettings={() => {}}
     />,
   );
 
@@ -128,7 +124,6 @@ it("opens script tasks from the workbench", async () => {
       onOpenDownloader={() => {}}
       onOpenSystemMonitor={() => {}}
       onOpenScriptTasks={onOpenScriptTasks}
-      onOpenSettings={() => {}}
     />,
   );
 
@@ -149,7 +144,6 @@ it("filters feature cards by search keyword", async () => {
       onOpenDownloader={() => {}}
       onOpenSystemMonitor={() => {}}
       onOpenScriptTasks={() => {}}
-      onOpenSettings={() => {}}
     />,
   );
 
@@ -172,7 +166,6 @@ it("shows empty search state when no feature matches", async () => {
       onOpenDownloader={() => {}}
       onOpenSystemMonitor={() => {}}
       onOpenScriptTasks={() => {}}
-      onOpenSettings={() => {}}
     />,
   );
 
