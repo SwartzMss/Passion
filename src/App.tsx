@@ -30,6 +30,17 @@ type View =
   | "scripts"
   | "settings";
 
+const NAV_ITEMS: Array<{ view: View; label: string }> = [
+  { view: "home", label: "工作台" },
+  { view: "reminders", label: "提醒" },
+  { view: "translation", label: "翻译" },
+  { view: "network", label: "网络检测" },
+  { view: "download", label: "下载工具" },
+  { view: "system", label: "系统监控" },
+  { view: "scripts", label: "脚本任务" },
+  { view: "settings", label: "设置" },
+];
+
 export default function App() {
   const [view, setView] = useState<View>("home");
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -84,76 +95,94 @@ export default function App() {
   return (
     <>
       <WindowControls />
-      <main>
-        {error ? (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        ) : null}
-        {view === "home" ? (
-          <WorkbenchHome
-            pendingReminderCount={
-              reminders.filter(
-                (reminder) => reminder.enabled && reminder.status === "pending",
-              ).length
-            }
-            onOpenReminders={() => setView("reminders")}
-            onAddReminder={() => {
-              setView("reminders");
-              setShowAdd(true);
-            }}
-            onOpenTranslation={() => setView("translation")}
-            onOpenNetworkDiagnostics={() => setView("network")}
-            onOpenDownloader={() => setView("download")}
-            onOpenSystemMonitor={() => setView("system")}
-            onOpenScriptTasks={() => setView("scripts")}
-            onOpenSettings={() => setView("settings")}
-          />
-        ) : null}
-        {view === "reminders" ? (
-          <ReminderList
-            reminders={reminders}
-            onBack={() => setView("home")}
-            onAdd={() => setShowAdd(true)}
-            onToggle={changeEnabled}
-            onDelete={remove}
-          />
-        ) : null}
-        {view === "translation" ? (
-          <TranslationPanel
-            defaultTargetLanguage={defaultTargetLanguage}
-            onBack={() => setView("home")}
-            onOpenSettings={() => setView("settings")}
-          />
-        ) : null}
-        {view === "network" ? (
-          <NetworkDiagnosticsPanel onBack={() => setView("home")} />
-        ) : null}
-        {view === "download" ? (
-          <DownloadPanel onBack={() => setView("home")} />
-        ) : null}
-        {view === "system" ? (
-          <SystemMonitorPanel onBack={() => setView("home")} />
-        ) : null}
-        {view === "scripts" ? (
-          <ScriptTasksPanel onBack={() => setView("home")} />
-        ) : null}
-        {view === "settings" ? (
-          <SettingsPanel
-            onBack={() => setView("home")}
-            onAiSettingsLoaded={(settings) =>
-              setDefaultTargetLanguage(settings.defaultTargetLanguage)
-            }
-          />
-        ) : null}
-        {showAdd ? (
-          <AddReminderDialog
-            onCancel={() => setShowAdd(false)}
-            onSave={saveReminder}
-          />
-        ) : null}
-        <ReminderPopup reminder={popup} onClose={() => setPopup(null)} />
-      </main>
+      <div className="app-shell">
+        <aside className="app-sidebar">
+          <div className="sidebar-brand">Passion</div>
+          <nav aria-label="功能导航">
+            {NAV_ITEMS.map((item) => (
+              <button
+                aria-current={view === item.view ? "page" : undefined}
+                className={view === item.view ? "active" : ""}
+                key={item.view}
+                onClick={() => setView(item.view)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </aside>
+        <main>
+          {error ? (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {view === "home" ? (
+            <WorkbenchHome
+              pendingReminderCount={
+                reminders.filter(
+                  (reminder) =>
+                    reminder.enabled && reminder.status === "pending",
+                ).length
+              }
+              onOpenReminders={() => setView("reminders")}
+              onAddReminder={() => {
+                setView("reminders");
+                setShowAdd(true);
+              }}
+              onOpenTranslation={() => setView("translation")}
+              onOpenNetworkDiagnostics={() => setView("network")}
+              onOpenDownloader={() => setView("download")}
+              onOpenSystemMonitor={() => setView("system")}
+              onOpenScriptTasks={() => setView("scripts")}
+              onOpenSettings={() => setView("settings")}
+            />
+          ) : null}
+          {view === "reminders" ? (
+            <ReminderList
+              reminders={reminders}
+              onBack={() => setView("home")}
+              onAdd={() => setShowAdd(true)}
+              onToggle={changeEnabled}
+              onDelete={remove}
+            />
+          ) : null}
+          {view === "translation" ? (
+            <TranslationPanel
+              defaultTargetLanguage={defaultTargetLanguage}
+              onBack={() => setView("home")}
+              onOpenSettings={() => setView("settings")}
+            />
+          ) : null}
+          {view === "network" ? (
+            <NetworkDiagnosticsPanel onBack={() => setView("home")} />
+          ) : null}
+          {view === "download" ? (
+            <DownloadPanel onBack={() => setView("home")} />
+          ) : null}
+          {view === "system" ? (
+            <SystemMonitorPanel onBack={() => setView("home")} />
+          ) : null}
+          {view === "scripts" ? (
+            <ScriptTasksPanel onBack={() => setView("home")} />
+          ) : null}
+          {view === "settings" ? (
+            <SettingsPanel
+              onBack={() => setView("home")}
+              onAiSettingsLoaded={(settings) =>
+                setDefaultTargetLanguage(settings.defaultTargetLanguage)
+              }
+            />
+          ) : null}
+          {showAdd ? (
+            <AddReminderDialog
+              onCancel={() => setShowAdd(false)}
+              onSave={saveReminder}
+            />
+          ) : null}
+          <ReminderPopup reminder={popup} onClose={() => setPopup(null)} />
+        </main>
+      </div>
     </>
   );
 }
