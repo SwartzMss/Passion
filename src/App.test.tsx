@@ -54,7 +54,7 @@ it("shows a left navigation without removing workbench search", async () => {
   );
   expect(within(navigation).getByRole("button", { name: "提醒" })).toBeInTheDocument();
   expect(within(navigation).getByRole("button", { name: "翻译" })).toBeInTheDocument();
-  expect(screen.getByPlaceholderText("搜索功能，例如：端口、翻译、脚本、下载")).toBeInTheDocument();
+  expect(screen.getByPlaceholderText("搜索状态，例如：提醒、脚本、运行")).toBeInTheDocument();
 });
 
 it("switches features from the left navigation", async () => {
@@ -73,6 +73,6 @@ it("switches features from the left navigation", async () => {
     screen.queryByRole("button", { name: "返回工作台" }),
   ).not.toBeInTheDocument();
   expect(
-    screen.queryByPlaceholderText("搜索功能，例如：端口、翻译、脚本、下载"),
+    screen.queryByPlaceholderText("搜索状态，例如：提醒、脚本、运行"),
   ).not.toBeInTheDocument();
 });

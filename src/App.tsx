@@ -140,16 +140,6 @@ export default function App() {
                 ).length
               }
               totalScriptTaskCount={scriptTasks.length}
-              onOpenReminders={() => setView("reminders")}
-              onAddReminder={() => {
-                setView("reminders");
-                setShowAdd(true);
-              }}
-              onOpenTranslation={() => setView("translation")}
-              onOpenNetworkDiagnostics={() => setView("network")}
-              onOpenDownloader={() => setView("download")}
-              onOpenSystemMonitor={() => setView("system")}
-              onOpenScriptTasks={() => setView("scripts")}
             />
           ) : null}
           {view === "reminders" ? (
