@@ -14,11 +14,12 @@ import { WorkbenchHome } from "./components/WorkbenchHome";
 import {
   createReminder,
   deleteReminder,
+  listScriptTasks,
   listReminders,
   toggleReminder,
 } from "./lib/api";
 import { onReminderTriggered } from "./lib/events";
-import type { NewReminder, Reminder } from "./types";
+import type { NewReminder, Reminder, ScriptTask } from "./types";
 
 type View =
   | "home"
@@ -44,6 +45,7 @@ const NAV_ITEMS: Array<{ view: View; label: string }> = [
 export default function App() {
   const [view, setView] = useState<View>("home");
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [scriptTasks, setScriptTasks] = useState<ScriptTask[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [popup, setPopup] = useState<Reminder | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +55,13 @@ export default function App() {
     setReminders(await listReminders());
   }
 
+  async function refreshScriptTasks() {
+    setScriptTasks(await listScriptTasks());
+  }
+
   useEffect(() => {
     refresh().catch((err) => setError(readError(err)));
+    refreshScriptTasks().catch((err) => setError(readError(err)));
     const unlisten = onReminderTriggered((reminder) => {
       setPopup(reminder);
       refresh().catch((err) => setError(readError(err)));
@@ -124,6 +131,15 @@ export default function App() {
                     reminder.enabled && reminder.status === "pending",
                 ).length
               }
+              enabledScriptTaskCount={
+                scriptTasks.filter((task) => task.enabled).length
+              }
+              runningScriptTaskCount={
+                scriptTasks.filter(
+                  (task) => task.lastStartedAt && !task.lastFinishedAt,
+                ).length
+              }
+              totalScriptTaskCount={scriptTasks.length}
               onOpenReminders={() => setView("reminders")}
               onAddReminder={() => {
                 setView("reminders");

@@ -7,6 +7,9 @@ it("shows assistant feature cards", () => {
   render(
     <WorkbenchHome
       pendingReminderCount={2}
+      enabledScriptTaskCount={1}
+      runningScriptTaskCount={1}
+      totalScriptTaskCount={3}
       onOpenReminders={() => {}}
       onAddReminder={() => {}}
       onOpenTranslation={() => {}}
@@ -18,6 +21,11 @@ it("shows assistant feature cards", () => {
   );
 
   expect(screen.queryByRole("button", { name: "设置" })).not.toBeInTheDocument();
+  expect(screen.getByText("待提醒")).toBeInTheDocument();
+  expect(screen.getByText("2")).toBeInTheDocument();
+  expect(screen.getByText("启用脚本")).toBeInTheDocument();
+  expect(screen.getByText("1 / 3")).toBeInTheDocument();
+  expect(screen.getByText("运行中任务")).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "提醒" })).toBeInTheDocument();
   expect(screen.getByText(/2 个待提醒/)).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "翻译" })).toBeInTheDocument();
@@ -33,6 +41,9 @@ it("opens translation from the workbench", async () => {
   render(
     <WorkbenchHome
       pendingReminderCount={0}
+      enabledScriptTaskCount={0}
+      runningScriptTaskCount={0}
+      totalScriptTaskCount={0}
       onOpenReminders={() => {}}
       onAddReminder={() => {}}
       onOpenTranslation={onOpenTranslation}
@@ -54,6 +65,9 @@ it("opens network diagnostics from the workbench", async () => {
   render(
     <WorkbenchHome
       pendingReminderCount={0}
+      enabledScriptTaskCount={0}
+      runningScriptTaskCount={0}
+      totalScriptTaskCount={0}
       onOpenReminders={() => {}}
       onAddReminder={() => {}}
       onOpenTranslation={() => {}}
@@ -75,6 +89,9 @@ it("opens downloader from the workbench", async () => {
   render(
     <WorkbenchHome
       pendingReminderCount={0}
+      enabledScriptTaskCount={0}
+      runningScriptTaskCount={0}
+      totalScriptTaskCount={0}
       onOpenReminders={() => {}}
       onAddReminder={() => {}}
       onOpenTranslation={() => {}}
@@ -96,6 +113,9 @@ it("opens system monitor from the workbench", async () => {
   render(
     <WorkbenchHome
       pendingReminderCount={0}
+      enabledScriptTaskCount={0}
+      runningScriptTaskCount={0}
+      totalScriptTaskCount={0}
       onOpenReminders={() => {}}
       onAddReminder={() => {}}
       onOpenTranslation={() => {}}
@@ -117,6 +137,9 @@ it("opens script tasks from the workbench", async () => {
   render(
     <WorkbenchHome
       pendingReminderCount={0}
+      enabledScriptTaskCount={0}
+      runningScriptTaskCount={0}
+      totalScriptTaskCount={0}
       onOpenReminders={() => {}}
       onAddReminder={() => {}}
       onOpenTranslation={() => {}}
@@ -137,6 +160,9 @@ it("filters feature cards by search keyword", async () => {
   render(
     <WorkbenchHome
       pendingReminderCount={0}
+      enabledScriptTaskCount={0}
+      runningScriptTaskCount={0}
+      totalScriptTaskCount={0}
       onOpenReminders={() => {}}
       onAddReminder={() => {}}
       onOpenTranslation={() => {}}
@@ -159,6 +185,9 @@ it("shows empty search state when no feature matches", async () => {
   render(
     <WorkbenchHome
       pendingReminderCount={0}
+      enabledScriptTaskCount={0}
+      runningScriptTaskCount={0}
+      totalScriptTaskCount={0}
       onOpenReminders={() => {}}
       onAddReminder={() => {}}
       onOpenTranslation={() => {}}

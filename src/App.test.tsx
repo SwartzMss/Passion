@@ -5,6 +5,23 @@ import App from "./App";
 
 vi.mock("./lib/api", () => ({
   listReminders: vi.fn(async () => []),
+  listScriptTasks: vi.fn(async () => [
+    {
+      id: "script-1",
+      name: "Backup",
+      scriptPath: "C:\\tasks\\backup.ps1",
+      intervalMinutes: 15,
+      enabled: true,
+      lastStartedAt: "2026-06-11T10:00:00.000Z",
+      lastFinishedAt: null,
+      lastExitCode: null,
+      lastStdout: null,
+      lastStderr: null,
+      lastError: null,
+      createdAt: "2026-06-11T09:00:00.000Z",
+      updatedAt: "2026-06-11T09:00:00.000Z",
+    },
+  ]),
   createReminder: vi.fn(),
   deleteReminder: vi.fn(),
   toggleReminder: vi.fn(),
@@ -29,6 +46,8 @@ it("shows a left navigation without removing workbench search", async () => {
   const navigation = screen.getByRole("navigation");
 
   expect(screen.getAllByText("Passion")).toHaveLength(1);
+  await waitFor(() => expect(screen.getByText("1 / 1")).toBeInTheDocument());
+  expect(screen.getByText("运行中任务")).toBeInTheDocument();
   expect(within(navigation).getByRole("button", { name: "工作台" })).toHaveAttribute(
     "aria-current",
     "page",
