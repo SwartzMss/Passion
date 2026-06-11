@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { ReminderList } from "./ReminderList";
@@ -101,4 +101,19 @@ it("renders reminder actions from detail panel", async () => {
 
   expect(onToggle).toHaveBeenCalledWith("1", false);
   expect(onDelete).toHaveBeenCalledWith("1");
+});
+
+it("keeps status out of compact reminder rows", () => {
+  render(
+    <ReminderList
+      reminders={[reminder]}
+      onAdd={() => {}}
+      onToggle={() => {}}
+      onDelete={() => {}}
+    />,
+  );
+
+  const list = screen.getByLabelText("提醒列表");
+  expect(within(list).queryByText("待提醒")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("提醒详情")).toHaveTextContent("待提醒");
 });

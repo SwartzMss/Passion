@@ -135,11 +135,10 @@ export function ReminderList({
               >
                 <span>
                   <strong>{reminder.title}</strong>
-                  <span>{formatTime(reminder.remindAt)}</span>
-                </span>
-                <span className="muted">{repeatRuleLabel(reminder.repeatRule)}</span>
-                <span className={`status status-${reminder.status}`}>
-                  {statusLabel(reminder.status)}
+                  <span>
+                    {formatTime(reminder.remindAt)} ·{" "}
+                    {repeatRuleLabel(reminder.repeatRule)}
+                  </span>
                 </span>
               </button>
             ))}
