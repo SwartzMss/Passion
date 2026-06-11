@@ -11,7 +11,7 @@ use crate::reminders::ReminderRepository;
 use crate::script_tasks::ScriptTaskRepository;
 use crate::settings::SettingsRepository;
 use chrono::Utc;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 type CommandResult<T> = Result<T, ErrorPayload>;
 
@@ -362,10 +362,7 @@ async fn dispatch_triggered_reminder(
             eprintln!("failed to send reminder notification: {err}");
         }
     }
-    if let Err(err) = notifications::show_main_window(&app) {
-        eprintln!("failed to show main window for reminder: {err}");
-    }
-    if let Err(err) = app.emit("reminder_triggered", reminder.clone()) {
+    if let Err(err) = emit_reminder_triggered_if_main_window_visible(&app, &reminder) {
         eprintln!("failed to emit reminder_triggered event: {err}");
     }
     if let Some(next) = reschedule_repeating_reminder(&state, &reminder)? {
@@ -375,6 +372,23 @@ async fn dispatch_triggered_reminder(
     }
 
     Ok(())
+}
+
+fn emit_reminder_triggered_if_main_window_visible(
+    app: &AppHandle,
+    reminder: &Reminder,
+) -> crate::error::BackendResult<()> {
+    let Some(window) = app.get_webview_window("main") else {
+        return Ok(());
+    };
+    if !window
+        .is_visible()
+        .map_err(|err| BackendError::Window(err.to_string()))?
+    {
+        return Ok(());
+    }
+    app.emit("reminder_triggered", reminder.clone())
+        .map_err(|err| BackendError::Window(err.to_string()))
 }
 
 fn reschedule_repeating_reminder(
