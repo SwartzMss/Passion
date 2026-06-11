@@ -196,6 +196,32 @@ main {
   font-size: 12px;
 }
 
+.tool-results {
+  display: grid;
+  gap: 8px;
+}
+
+.tool-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e5e9f2;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px 14px;
+}
+
+.tool-result h3,
+.tool-result p {
+  margin: 0;
+}
+
+.tool-result p {
+  margin-top: 5px;
+  color: #667085;
+}
+
 .workbench-searchbar {
   display: flex;
   align-items: center;
@@ -846,6 +872,11 @@ main {
   }
 
   .workbench-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .tool-result {
+    align-items: stretch;
     grid-template-columns: 1fr;
   }
 
