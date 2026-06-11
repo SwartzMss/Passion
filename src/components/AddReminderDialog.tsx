@@ -10,9 +10,11 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [remindAt, setRemindAt] = useState("");
+  const [repeatTime, setRepeatTime] = useState("");
   const [repeatRule, setRepeatRule] = useState("once");
   const [weeklyDays, setWeeklyDays] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const isRepeating = repeatRule !== "once";
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -20,11 +22,14 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
       setError("请输入提醒标题。");
       return;
     }
-    if (!remindAt) {
+    const timeValue = isRepeating ? repeatTime : remindAt;
+    if (!timeValue) {
       setError("请选择提醒时间。");
       return;
     }
-    const date = new Date(remindAt);
+    const date = isRepeating
+      ? nextDateFromTime(repeatTime)
+      : new Date(remindAt);
     if (date.getTime() <= Date.now()) {
       setError("提醒时间必须晚于当前时间。");
       return;
@@ -70,14 +75,25 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
               onChange={(event) => setTitle(event.target.value)}
             />
           </label>
-          <label>
-            日期和时间
-            <input
-              type="datetime-local"
-              value={remindAt}
-              onChange={(event) => setRemindAt(event.target.value)}
-            />
-          </label>
+          {isRepeating ? (
+            <label>
+              提醒时间
+              <input
+                type="time"
+                value={repeatTime}
+                onChange={(event) => setRepeatTime(event.target.value)}
+              />
+            </label>
+          ) : (
+            <label>
+              日期和时间
+              <input
+                type="datetime-local"
+                value={remindAt}
+                onChange={(event) => setRemindAt(event.target.value)}
+              />
+            </label>
+          )}
           <label>
             重复规则
             <select
@@ -139,3 +155,13 @@ const WEEKDAYS = [
   { value: 6, label: "周六" },
   { value: 7, label: "周日" },
 ];
+
+function nextDateFromTime(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  if (date.getTime() <= Date.now()) {
+    date.setDate(date.getDate() + 1);
+  }
+  return date;
+}
