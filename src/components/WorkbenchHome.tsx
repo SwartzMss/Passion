@@ -5,13 +5,6 @@ interface Props {
   enabledScriptTaskCount: number;
   runningScriptTaskCount: number;
   totalScriptTaskCount: number;
-  onOpenReminders: () => void;
-  onAddReminder: () => void;
-  onOpenTranslation: () => void;
-  onOpenNetworkDiagnostics: () => void;
-  onOpenDownloader: () => void;
-  onOpenSystemMonitor: () => void;
-  onOpenScriptTasks: () => void;
 }
 
 export function WorkbenchHome({
@@ -19,158 +12,65 @@ export function WorkbenchHome({
   enabledScriptTaskCount,
   runningScriptTaskCount,
   totalScriptTaskCount,
-  onOpenReminders,
-  onAddReminder,
-  onOpenTranslation,
-  onOpenNetworkDiagnostics,
-  onOpenDownloader,
-  onOpenSystemMonitor,
-  onOpenScriptTasks,
 }: Props) {
   const [query, setQuery] = useState("");
-  const features = useMemo(
+  const summaries = useMemo(
     () => [
       {
-        id: "reminders",
-        label: "提醒",
-        title: "提醒",
-        description: `${pendingReminderCount} 个待提醒，支持单次和中国法定工作日提醒。`,
-        keywords: "提醒 工作日 通知 日程 日历",
-        actions: [
-          { label: "查看提醒", onClick: onOpenReminders, primary: true },
-          { label: "新增提醒", onClick: onAddReminder },
-        ],
+        label: "待提醒",
+        value: String(pendingReminderCount),
+        description: "当前启用且等待触发的提醒",
+        keywords: "提醒 待提醒 通知 日程",
       },
       {
-        id: "translation",
-        label: "AI",
-        title: "翻译",
-        description: "使用 OpenAI 兼容接口或本地模型进行文本翻译。",
-        keywords: "翻译 AI OpenAI 模型 本地模型 语言",
-        actions: [{ label: "开始翻译", onClick: onOpenTranslation, primary: true }],
+        label: "启用脚本",
+        value: `${enabledScriptTaskCount} / ${totalScriptTaskCount}`,
+        description: "后台定期任务启用情况",
+        keywords: "脚本 任务 自动化 启用",
       },
       {
-        id: "network",
-        label: "网络",
-        title: "网络检测",
-        description: "Ping、端口连通性和端口占用进程查看。",
-        keywords: "网络 ping 端口 检测 占用 pid 进程",
-        actions: [
-          { label: "开始检测", onClick: onOpenNetworkDiagnostics, primary: true },
-        ],
-      },
-      {
-        id: "download",
-        label: "工具",
-        title: "下载工具",
-        description: "下载 HTTP/HTTPS 文件，保存到系统下载目录。",
-        keywords: "下载 http https 文件 保存",
-        actions: [{ label: "开始下载", onClick: onOpenDownloader, primary: true }],
-      },
-      {
-        id: "system",
-        label: "系统",
-        title: "系统监控",
-        description: "查看 CPU、内存、磁盘和系统运行时长。",
-        keywords: "系统 监控 cpu 内存 磁盘 运行时长",
-        actions: [{ label: "查看状态", onClick: onOpenSystemMonitor, primary: true }],
-      },
-      {
-        id: "scripts",
-        label: "自动化",
-        title: "脚本任务",
-        description: "定期执行本机脚本，并查看最近一次输出。",
-        keywords: "脚本 定时 自动化 powershell bat cmd exe",
-        actions: [{ label: "管理任务", onClick: onOpenScriptTasks, primary: true }],
+        label: "运行中任务",
+        value: String(runningScriptTaskCount),
+        description: "已启动但尚未结束的脚本",
+        keywords: "运行中 脚本 任务 后台",
       },
     ],
-    [
-      pendingReminderCount,
-      onOpenReminders,
-      onAddReminder,
-      onOpenTranslation,
-      onOpenNetworkDiagnostics,
-      onOpenDownloader,
-      onOpenSystemMonitor,
-      onOpenScriptTasks,
-    ],
+    [enabledScriptTaskCount, pendingReminderCount, runningScriptTaskCount, totalScriptTaskCount],
   );
   const normalizedQuery = query.trim().toLowerCase();
-  const summaries = [
-    {
-      label: "待提醒",
-      value: String(pendingReminderCount),
-      description: "当前启用且等待触发的提醒",
-    },
-    {
-      label: "启用脚本",
-      value: `${enabledScriptTaskCount} / ${totalScriptTaskCount}`,
-      description: "后台定期任务启用情况",
-    },
-    {
-      label: "运行中任务",
-      value: String(runningScriptTaskCount),
-      description: "已启动但尚未结束的脚本",
-    },
-  ];
-  const visibleFeatures = normalizedQuery
-    ? features.filter((feature) =>
-        `${feature.label} ${feature.title} ${feature.description} ${feature.keywords}`
+  const visibleSummaries = normalizedQuery
+    ? summaries.filter((item) =>
+        `${item.label} ${item.value} ${item.description} ${item.keywords}`
           .toLowerCase()
           .includes(normalizedQuery),
       )
-    : features;
+    : summaries;
 
   return (
     <section className="workbench">
-      <div className="workbench-summary" aria-label="工作台摘要">
-        {summaries.map((item) => (
-          <article className="summary-card" key={item.label}>
-            <span>{item.label}</span>
-            <strong>{item.value}</strong>
-            <p>{item.description}</p>
-          </article>
-        ))}
-      </div>
-
       <div className="workbench-searchbar">
         <label className="feature-search">
-          <span className="sr-only">搜索功能</span>
+          <span className="sr-only">搜索状态</span>
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索功能，例如：端口、翻译、脚本、下载"
+            placeholder="搜索状态，例如：提醒、脚本、运行"
           />
         </label>
       </div>
 
-      {visibleFeatures.length > 0 ? (
-        <div className="feature-grid">
-          {visibleFeatures.map((feature) => (
-            <article className="feature-card" key={feature.id}>
-              <div className="feature-card-top">
-                <span className="feature-badge">{feature.label}</span>
-              </div>
-              <div>
-                <h3>{feature.title}</h3>
-                <p className="muted">{feature.description}</p>
-              </div>
-              <div className="card-actions">
-                {feature.actions.map((action) => (
-                  <button
-                    className={action.primary ? "primary-action" : ""}
-                    key={action.label}
-                    onClick={action.onClick}
-                  >
-                    {action.label}
-                  </button>
-                ))}
-              </div>
+      {visibleSummaries.length > 0 ? (
+        <div className="workbench-summary" aria-label="工作台摘要">
+          {visibleSummaries.map((item) => (
+            <article className="summary-card" key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+              <p>{item.description}</p>
             </article>
           ))}
         </div>
       ) : (
-        <div className="empty-state">没有找到相关功能</div>
+        <div className="empty-state">没有找到相关状态</div>
       )}
     </section>
   );
