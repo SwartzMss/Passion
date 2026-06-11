@@ -28,7 +28,7 @@ const completedReminder: Reminder = {
   triggeredAt: new Date().toISOString(),
 };
 
-it("shows empty state", () => {
+it("shows the reminder workspace when empty", () => {
   render(
     <ReminderList
       reminders={[]}
@@ -38,7 +38,13 @@ it("shows empty state", () => {
     />,
   );
 
-  expect(screen.getByText("还没有提醒")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "当前提醒 0" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "已完成提醒 0" })).toBeInTheDocument();
+  expect(screen.getByPlaceholderText("搜索提醒名称、备注或规则")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "新增提醒" })).toBeInTheDocument();
+  expect(screen.getByText("当前没有提醒。")).toBeInTheDocument();
+  expect(screen.getByText("左侧列表没有可显示的提醒。")).toBeInTheDocument();
+  expect(screen.queryByText("还没有提醒")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "返回工作台" })).not.toBeInTheDocument();
 });
 

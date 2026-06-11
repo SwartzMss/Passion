@@ -50,6 +50,11 @@ export function ReminderList({
     visibleReminders.find((reminder) => reminder.id === selectedId) ??
     visibleReminders[0] ??
     null;
+  const emptyListMessage = query.trim()
+    ? "没有找到匹配的提醒。"
+    : activeFilter === "current"
+      ? "当前没有提醒。"
+      : "还没有已完成提醒。";
 
   useEffect(() => {
     setSelectedId((current) => {
@@ -60,28 +65,9 @@ export function ReminderList({
     });
   }, [visibleReminders]);
 
-  if (reminders.length === 0) {
-    return (
-      <section className="reminder-panel empty-reminder-panel">
-        <div>
-          <p className="eyebrow">提醒</p>
-          <h2>还没有提醒</h2>
-          <p className="muted">新增一个提醒后，这里会显示当前和已完成记录。</p>
-        </div>
-        <button className="primary-action" onClick={onAdd}>
-          新增提醒
-        </button>
-      </section>
-    );
-  }
-
   return (
     <section className="reminder-panel">
       <aside className="reminder-filters" aria-label="提醒筛选">
-        <div>
-          <p className="eyebrow">提醒</p>
-          <h2>提醒</h2>
-        </div>
         <button
           aria-label={`当前提醒 ${currentReminders.length}`}
           className={activeFilter === "current" ? "active" : ""}
@@ -120,7 +106,7 @@ export function ReminderList({
           <div className="reminder-list" aria-label="提醒列表">
             {visibleReminders.length === 0 ? (
               <div className="reminder-list-empty">
-                没有找到匹配的提醒。
+                {emptyListMessage}
               </div>
             ) : null}
             {visibleReminders.map((reminder) => (
