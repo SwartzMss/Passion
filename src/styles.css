@@ -164,6 +164,38 @@ main {
   gap: 14px;
 }
 
+.workbench-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summary-card {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #e5e9f2;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.summary-card span {
+  color: #667085;
+  font-size: 12px;
+}
+
+.summary-card strong {
+  color: #172033;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.summary-card p {
+  margin: 0;
+  color: #667085;
+  font-size: 12px;
+}
+
 .workbench-searchbar {
   display: flex;
   align-items: center;
@@ -811,6 +843,10 @@ main {
   .workbench-searchbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .workbench-summary {
+    grid-template-columns: 1fr;
   }
 
   .reminder-panel,

@@ -2,6 +2,9 @@ import { useMemo, useState } from "react";
 
 interface Props {
   pendingReminderCount: number;
+  enabledScriptTaskCount: number;
+  runningScriptTaskCount: number;
+  totalScriptTaskCount: number;
   onOpenReminders: () => void;
   onAddReminder: () => void;
   onOpenTranslation: () => void;
@@ -13,6 +16,9 @@ interface Props {
 
 export function WorkbenchHome({
   pendingReminderCount,
+  enabledScriptTaskCount,
+  runningScriptTaskCount,
+  totalScriptTaskCount,
   onOpenReminders,
   onAddReminder,
   onOpenTranslation,
@@ -90,6 +96,23 @@ export function WorkbenchHome({
     ],
   );
   const normalizedQuery = query.trim().toLowerCase();
+  const summaries = [
+    {
+      label: "待提醒",
+      value: String(pendingReminderCount),
+      description: "当前启用且等待触发的提醒",
+    },
+    {
+      label: "启用脚本",
+      value: `${enabledScriptTaskCount} / ${totalScriptTaskCount}`,
+      description: "后台定期任务启用情况",
+    },
+    {
+      label: "运行中任务",
+      value: String(runningScriptTaskCount),
+      description: "已启动但尚未结束的脚本",
+    },
+  ];
   const visibleFeatures = normalizedQuery
     ? features.filter((feature) =>
         `${feature.label} ${feature.title} ${feature.description} ${feature.keywords}`
@@ -100,6 +123,16 @@ export function WorkbenchHome({
 
   return (
     <section className="workbench">
+      <div className="workbench-summary" aria-label="工作台摘要">
+        {summaries.map((item) => (
+          <article className="summary-card" key={item.label}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            <p>{item.description}</p>
+          </article>
+        ))}
+      </div>
+
       <div className="workbench-searchbar">
         <label className="feature-search">
           <span className="sr-only">搜索功能</span>
