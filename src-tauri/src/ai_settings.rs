@@ -11,8 +11,6 @@ impl AiSettingsRepository {
             base_url: read_string(conn, "ai_base_url")?.unwrap_or(defaults.base_url),
             model: read_string(conn, "ai_model")?.unwrap_or(defaults.model),
             api_key: read_string(conn, "ai_api_key")?.unwrap_or(defaults.api_key),
-            default_target_language: read_string(conn, "ai_default_target_language")?
-                .unwrap_or(defaults.default_target_language),
         })
     }
 
@@ -20,11 +18,6 @@ impl AiSettingsRepository {
         write_string(conn, "ai_base_url", settings.base_url.trim())?;
         write_string(conn, "ai_model", settings.model.trim())?;
         write_string(conn, "ai_api_key", settings.api_key.as_str())?;
-        write_string(
-            conn,
-            "ai_default_target_language",
-            settings.default_target_language.trim(),
-        )?;
         Ok(())
     }
 }
@@ -68,7 +61,6 @@ mod tests {
             base_url: "http://localhost:1234/v1".to_string(),
             model: "local-model".to_string(),
             api_key: "secret".to_string(),
-            default_target_language: "English".to_string(),
         };
 
         AiSettingsRepository::save(&conn, &settings).unwrap();

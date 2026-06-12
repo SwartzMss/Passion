@@ -49,7 +49,6 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false);
   const [popup, setPopup] = useState<Reminder | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [defaultTargetLanguage, setDefaultTargetLanguage] = useState("中文");
 
   async function refresh() {
     setReminders(await listReminders());
@@ -161,10 +160,7 @@ export default function App() {
             />
           ) : null}
           {view === "translation" ? (
-            <TranslationPanel
-              defaultTargetLanguage={defaultTargetLanguage}
-              onOpenSettings={() => setView("settings")}
-            />
+            <TranslationPanel onOpenSettings={() => setView("settings")} />
           ) : null}
           {view === "network" ? (
             <NetworkDiagnosticsPanel />
@@ -179,11 +175,7 @@ export default function App() {
             <ScriptTasksPanel />
           ) : null}
           {view === "settings" ? (
-            <SettingsPanel
-              onAiSettingsLoaded={(settings) =>
-                setDefaultTargetLanguage(settings.defaultTargetLanguage)
-              }
-            />
+            <SettingsPanel />
           ) : null}
           {showAdd ? (
             <AddReminderDialog

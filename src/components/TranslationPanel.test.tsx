@@ -13,7 +13,6 @@ it("rejects empty source text", async () => {
   const user = userEvent.setup();
   render(
     <TranslationPanel
-      defaultTargetLanguage="中文"
       onOpenSettings={() => {}}
     />,
   );
@@ -23,11 +22,22 @@ it("rejects empty source text", async () => {
   expect(screen.getByText("请输入要翻译的内容。")).toBeInTheDocument();
 });
 
+it("uses the default target language without showing a language selector", () => {
+  const { container } = render(
+    <TranslationPanel
+      onOpenSettings={() => {}}
+    />,
+  );
+
+  expect(screen.queryByLabelText("目标语言")).not.toBeInTheDocument();
+  expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  expect(container.querySelector(".translation-stack")).toBeInTheDocument();
+});
+
 it("translates text and displays the result", async () => {
   const user = userEvent.setup();
   render(
     <TranslationPanel
-      defaultTargetLanguage="中文"
       onOpenSettings={() => {}}
     />,
   );
@@ -39,6 +49,5 @@ it("translates text and displays the result", async () => {
   const api = await import("../lib/api");
   expect(api.translateText).toHaveBeenCalledWith({
     text: "Hello world",
-    targetLanguage: "中文",
   });
 });

@@ -2,18 +2,11 @@ import { useState } from "react";
 import { translateText } from "../lib/api";
 
 interface Props {
-  defaultTargetLanguage: string;
   onOpenSettings: () => void;
 }
 
-const TARGET_LANGUAGES = ["中文", "English", "日本語", "한국어", "Français", "Deutsch"];
-
-export function TranslationPanel({
-  defaultTargetLanguage,
-  onOpenSettings,
-}: Props) {
+export function TranslationPanel({ onOpenSettings }: Props) {
   const [sourceText, setSourceText] = useState("");
-  const [targetLanguage, setTargetLanguage] = useState(defaultTargetLanguage);
   const [translatedText, setTranslatedText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
@@ -28,7 +21,6 @@ export function TranslationPanel({
     try {
       const result = await translateText({
         text: sourceText,
-        targetLanguage,
       });
       setTranslatedText(result.translatedText);
     } catch (err) {
@@ -62,41 +54,38 @@ export function TranslationPanel({
         </p>
       ) : null}
 
-      <div className="translation-grid">
-        <label>
-          原文
+      <div className="translation-stack">
+        <section className="translation-card" aria-label="原文输入">
+          <div className="translation-card-header">
+            <label htmlFor="translation-source">原文</label>
+            <button onClick={submit} disabled={isTranslating}>
+              {isTranslating ? "翻译中..." : "翻译"}
+            </button>
+          </div>
           <textarea
+            id="translation-source"
             value={sourceText}
             onChange={(event) => setSourceText(event.target.value)}
-            rows={12}
+            rows={9}
+            placeholder="粘贴或输入要翻译的内容"
           />
-        </label>
-        <label>
-          译文
-          <textarea readOnly value={translatedText} rows={12} />
-        </label>
-      </div>
+        </section>
 
-      <div className="actions">
-        <label className="inline-field">
-          目标语言
-          <select
-            value={targetLanguage}
-            onChange={(event) => setTargetLanguage(event.target.value)}
-          >
-            {TARGET_LANGUAGES.map((language) => (
-              <option key={language} value={language}>
-                {language}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button onClick={submit} disabled={isTranslating}>
-          {isTranslating ? "翻译中..." : "翻译"}
-        </button>
-        <button onClick={copyResult} disabled={!translatedText}>
-          复制译文
-        </button>
+        <section className="translation-card" aria-label="译文结果">
+          <div className="translation-card-header">
+            <label htmlFor="translation-result">译文</label>
+            <button onClick={copyResult} disabled={!translatedText}>
+              复制译文
+            </button>
+          </div>
+          <textarea
+            id="translation-result"
+            readOnly
+            value={translatedText}
+            rows={9}
+            placeholder="翻译结果会显示在这里"
+          />
+        </section>
       </div>
     </section>
   );
