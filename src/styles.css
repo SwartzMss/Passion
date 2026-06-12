@@ -4,6 +4,11 @@
   background: #f6f7fb;
 }
 
+html,
+body {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -104,6 +109,7 @@ button.primary-action {
   display: grid;
   grid-template-columns: 152px minmax(0, 1fr);
   gap: 16px;
+  box-sizing: border-box;
   max-width: 940px;
   margin: 0 auto;
   padding: 8px 18px 18px;
