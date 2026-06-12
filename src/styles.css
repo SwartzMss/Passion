@@ -196,6 +196,32 @@ main {
   font-size: 12px;
 }
 
+.tool-results {
+  display: grid;
+  gap: 8px;
+}
+
+.tool-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e5e9f2;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px 14px;
+}
+
+.tool-result h3,
+.tool-result p {
+  margin: 0;
+}
+
+.tool-result p {
+  margin-top: 5px;
+  color: #667085;
+}
+
 .workbench-searchbar {
   display: flex;
   align-items: center;
@@ -285,19 +311,9 @@ main {
 
 .reminder-panel {
   display: grid;
-  grid-template-columns: 132px minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 14px;
   min-height: 460px;
-}
-
-.empty-reminder-panel {
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  min-height: 220px;
-  border: 1px dashed #b9c3d4;
-  border-radius: 8px;
-  padding: 28px;
-  background: #ffffff;
 }
 
 .eyebrow {
@@ -312,10 +328,6 @@ main {
   gap: 8px;
   border-right: 1px solid #e5e9f2;
   padding-right: 12px;
-}
-
-.reminder-filters h2 {
-  margin: 0 0 10px;
 }
 
 .reminder-filters button {
@@ -355,18 +367,24 @@ main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
+  min-width: 0;
 }
 
 .reminder-toolbar input {
+  min-width: 0;
   border: 1px solid #d8deea;
   border-radius: 8px;
   background: #ffffff;
   padding: 11px 13px;
 }
 
+.reminder-toolbar .primary-action {
+  white-space: nowrap;
+}
+
 .reminder-content {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(220px, 280px);
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 260px);
   gap: 12px;
   min-width: 0;
 }
@@ -375,6 +393,10 @@ main {
   display: grid;
   align-content: start;
   gap: 8px;
+  min-width: 0;
+}
+
+.reminder-detail {
   min-width: 0;
 }
 
@@ -817,6 +839,12 @@ main {
   color: #067647;
 }
 
+@media (max-width: 860px) {
+  .reminder-content {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 720px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -849,15 +877,15 @@ main {
     grid-template-columns: 1fr;
   }
 
-  .reminder-panel,
-  .empty-reminder-panel,
-  .reminder-content,
-  .modal-field-grid {
+  .tool-result {
+    align-items: stretch;
     grid-template-columns: 1fr;
   }
 
-  .empty-reminder-panel {
-    align-items: stretch;
+  .reminder-panel,
+  .reminder-content,
+  .modal-field-grid {
+    grid-template-columns: 1fr;
   }
 
   .reminder-filters {
