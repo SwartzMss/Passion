@@ -9,11 +9,7 @@ import {
 } from "../lib/api";
 import type { AiSettings, Settings } from "../types";
 
-interface Props {
-  onAiSettingsLoaded?: (settings: AiSettings) => void;
-}
-
-export function SettingsPanel({ onAiSettingsLoaded }: Props) {
+export function SettingsPanel() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,10 +20,7 @@ export function SettingsPanel({ onAiSettingsLoaded }: Props) {
       .then(setSettings)
       .catch((err) => setError(readError(err)));
     getAiSettings()
-      .then((settings) => {
-        setAiSettings(settings);
-        onAiSettingsLoaded?.(settings);
-      })
+      .then(setAiSettings)
       .catch((err) => setError(readError(err)));
   }, []);
 
@@ -56,7 +49,6 @@ export function SettingsPanel({ onAiSettingsLoaded }: Props) {
     try {
       const saved = await updateAiSettings(aiSettings);
       setAiSettings(saved);
-      onAiSettingsLoaded?.(saved);
       setAiMessage("AI 设置已保存。");
     } catch (err) {
       setError(readError(err));
@@ -147,25 +139,6 @@ export function SettingsPanel({ onAiSettingsLoaded }: Props) {
             setAiSettings({ ...aiSettings, apiKey: event.target.value })
           }
         />
-      </label>
-      <label className="field-label">
-        默认目标语言
-        <select
-          value={aiSettings.defaultTargetLanguage}
-          onChange={(event) =>
-            setAiSettings({
-              ...aiSettings,
-              defaultTargetLanguage: event.target.value,
-            })
-          }
-        >
-          <option value="中文">中文</option>
-          <option value="English">English</option>
-          <option value="日本語">日本語</option>
-          <option value="한국어">한국어</option>
-          <option value="Français">Français</option>
-          <option value="Deutsch">Deutsch</option>
-        </select>
       </label>
       <div className="actions">
         <button onClick={checkAiConnection}>测试 AI 连接</button>

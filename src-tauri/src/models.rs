@@ -140,7 +140,6 @@ pub struct AiSettings {
     pub base_url: String,
     pub model: String,
     pub api_key: String,
-    pub default_target_language: String,
 }
 
 impl Default for AiSettings {
@@ -149,7 +148,6 @@ impl Default for AiSettings {
             base_url: "http://localhost:11434/v1".to_string(),
             model: "qwen2.5:7b".to_string(),
             api_key: String::new(),
-            default_target_language: "中文".to_string(),
         }
     }
 }
@@ -158,7 +156,6 @@ impl Default for AiSettings {
 #[serde(rename_all = "camelCase")]
 pub struct TranslationRequest {
     pub text: String,
-    pub target_language: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -255,7 +252,10 @@ pub struct SystemSnapshot {
 pub struct NewScriptTask {
     pub name: String,
     pub script_path: String,
-    pub interval_minutes: u32,
+    pub schedule_type: String,
+    pub interval_minutes: Option<u32>,
+    pub time_of_day: Option<String>,
+    pub weekdays: Option<Vec<u8>>,
     pub enabled: bool,
 }
 
@@ -265,7 +265,10 @@ pub struct ScriptTask {
     pub id: String,
     pub name: String,
     pub script_path: String,
+    pub schedule_type: String,
     pub interval_minutes: u32,
+    pub time_of_day: Option<String>,
+    pub weekdays: Option<Vec<u8>>,
     pub enabled: bool,
     pub last_started_at: Option<DateTime<Utc>>,
     pub last_finished_at: Option<DateTime<Utc>>,
@@ -298,7 +301,6 @@ mod tests {
         assert_eq!(settings.base_url, "http://localhost:11434/v1");
         assert_eq!(settings.model, "qwen2.5:7b");
         assert_eq!(settings.api_key, "");
-        assert_eq!(settings.default_target_language, "中文");
     }
 
     #[test]

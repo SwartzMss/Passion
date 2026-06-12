@@ -8,25 +8,29 @@ use uuid::Uuid;
 
 pub struct ScriptTaskRepository;
 
-const LAST_STARTED_AT_COLUMN_INDEX: usize = 5;
-const LAST_FINISHED_AT_COLUMN_INDEX: usize = 6;
-const CREATED_AT_COLUMN_INDEX: usize = 11;
-const UPDATED_AT_COLUMN_INDEX: usize = 12;
+const LAST_STARTED_AT_COLUMN_INDEX: usize = 8;
+const LAST_FINISHED_AT_COLUMN_INDEX: usize = 9;
+const CREATED_AT_COLUMN_INDEX: usize = 14;
+const UPDATED_AT_COLUMN_INDEX: usize = 15;
+const DEFAULT_INTERVAL_MINUTES: u32 = 15;
 
 impl ScriptTaskRepository {
     pub fn create(conn: &Connection, input: NewScriptTask) -> BackendResult<ScriptTask> {
         let name = input.name.trim().to_string();
         let script_path = input.script_path.trim().to_string();
+        let schedule = normalize_schedule(&input)?;
         validate_name(&name)?;
         validate_script_path(&script_path)?;
-        validate_interval(input.interval_minutes)?;
 
         let now = Utc::now();
         let task = ScriptTask {
             id: Uuid::new_v4().to_string(),
             name,
             script_path,
-            interval_minutes: input.interval_minutes,
+            schedule_type: schedule.schedule_type,
+            interval_minutes: schedule.interval_minutes,
+            time_of_day: schedule.time_of_day,
+            weekdays: schedule.weekdays,
             enabled: input.enabled,
             last_started_at: None,
             last_finished_at: None,
@@ -38,17 +42,21 @@ impl ScriptTaskRepository {
             updated_at: now,
         };
 
+        let weekdays = weekdays_to_string(task.weekdays.as_deref());
         conn.execute(
             "INSERT INTO script_tasks (
-                id, name, script_path, interval_minutes, enabled,
+                id, name, script_path, schedule_type, interval_minutes, time_of_day, weekdays, enabled,
                 last_started_at, last_finished_at, last_exit_code, last_stdout, last_stderr,
                 last_error, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, NULL, NULL, NULL, NULL, NULL, NULL, ?6, ?7)",
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, NULL, NULL, NULL, NULL, NULL, ?9, ?10)",
             params![
-                task.id,
-                task.name,
-                task.script_path,
+                &task.id,
+                &task.name,
+                &task.script_path,
+                &task.schedule_type,
                 task.interval_minutes,
+                &task.time_of_day,
+                weekdays,
                 task.enabled,
                 task.created_at.timestamp_millis(),
                 task.updated_at.timestamp_millis(),
@@ -155,7 +163,19 @@ impl ScriptTaskRepository {
             id: row.get("id")?,
             name: row.get("name")?,
             script_path: row.get("script_path")?,
+            schedule_type: row.get("schedule_type")?,
             interval_minutes: row.get("interval_minutes")?,
+            time_of_day: row.get("time_of_day")?,
+            weekdays: parse_weekdays(row.get::<_, Option<String>>("weekdays")?.as_deref())
+                .map_err(|err| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        row.as_ref()
+                            .column_index("weekdays")
+                            .unwrap_or(UPDATED_AT_COLUMN_INDEX),
+                        rusqlite::types::Type::Text,
+                        Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, err)),
+                    )
+                })?,
             enabled: row.get("enabled")?,
             last_started_at: optional_millis_to_datetime(
                 row.get("last_started_at")?,
@@ -205,6 +225,105 @@ fn validate_interval(interval_minutes: u32) -> BackendResult<()> {
     Ok(())
 }
 
+struct NormalizedSchedule {
+    schedule_type: String,
+    interval_minutes: u32,
+    time_of_day: Option<String>,
+    weekdays: Option<Vec<u8>>,
+}
+
+fn normalize_schedule(input: &NewScriptTask) -> BackendResult<NormalizedSchedule> {
+    match input.schedule_type.as_str() {
+        "interval" => {
+            let interval_minutes = input.interval_minutes.unwrap_or(0);
+            validate_interval(interval_minutes)?;
+            Ok(NormalizedSchedule {
+                schedule_type: "interval".to_string(),
+                interval_minutes,
+                time_of_day: None,
+                weekdays: None,
+            })
+        }
+        "daily" => Ok(NormalizedSchedule {
+            schedule_type: "daily".to_string(),
+            interval_minutes: input.interval_minutes.unwrap_or(DEFAULT_INTERVAL_MINUTES),
+            time_of_day: Some(validate_time_of_day(input.time_of_day.as_deref())?),
+            weekdays: None,
+        }),
+        "weekly" => {
+            let weekdays = validate_weekdays(input.weekdays.as_deref())?;
+            Ok(NormalizedSchedule {
+                schedule_type: "weekly".to_string(),
+                interval_minutes: input.interval_minutes.unwrap_or(DEFAULT_INTERVAL_MINUTES),
+                time_of_day: Some(validate_time_of_day(input.time_of_day.as_deref())?),
+                weekdays: Some(weekdays),
+            })
+        }
+        _ => Err(BackendError::ScriptTask(
+            "执行方式必须是每隔一段时间、每天或每周。".to_string(),
+        )),
+    }
+}
+
+fn validate_time_of_day(value: Option<&str>) -> BackendResult<String> {
+    let value = value.unwrap_or("").trim();
+    let Some((hour, minute)) = value.split_once(':') else {
+        return Err(BackendError::ScriptTask(
+            "执行时间格式必须是 HH:mm。".to_string(),
+        ));
+    };
+    let hour = hour
+        .parse::<u8>()
+        .map_err(|_| BackendError::ScriptTask("执行时间格式必须是 HH:mm。".to_string()))?;
+    let minute = minute
+        .parse::<u8>()
+        .map_err(|_| BackendError::ScriptTask("执行时间格式必须是 HH:mm。".to_string()))?;
+    if hour > 23 || minute > 59 {
+        return Err(BackendError::ScriptTask(
+            "执行时间格式必须是 HH:mm。".to_string(),
+        ));
+    }
+    Ok(format!("{hour:02}:{minute:02}"))
+}
+
+fn validate_weekdays(value: Option<&[u8]>) -> BackendResult<Vec<u8>> {
+    let mut weekdays = value.unwrap_or(&[]).to_vec();
+    weekdays.sort_unstable();
+    weekdays.dedup();
+    if weekdays.is_empty() {
+        return Err(BackendError::ScriptTask(
+            "每周执行至少选择一天。".to_string(),
+        ));
+    }
+    if weekdays.iter().any(|weekday| !(1..=7).contains(weekday)) {
+        return Err(BackendError::ScriptTask(
+            "每周执行日期必须在周一到周日之间。".to_string(),
+        ));
+    }
+    Ok(weekdays)
+}
+
+fn weekdays_to_string(weekdays: Option<&[u8]>) -> Option<String> {
+    weekdays.map(|days| days.iter().map(u8::to_string).collect::<Vec<_>>().join(","))
+}
+
+fn parse_weekdays(value: Option<&str>) -> Result<Option<Vec<u8>>, String> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.trim().is_empty() {
+        return Ok(None);
+    }
+    value
+        .split(',')
+        .map(|part| {
+            part.parse::<u8>()
+                .map_err(|_| format!("invalid script task weekday {part}"))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
+}
+
 fn script_task_not_found() -> BackendError {
     BackendError::ScriptTask("脚本任务不存在。".to_string())
 }
@@ -249,7 +368,10 @@ mod tests {
             NewScriptTask {
                 name: "  Backup  ".to_string(),
                 script_path: "  C:\\tools\\backup.ps1  ".to_string(),
-                interval_minutes: 15,
+                schedule_type: "interval".to_string(),
+                interval_minutes: Some(15),
+                time_of_day: None,
+                weekdays: None,
                 enabled: true,
             },
         )
@@ -258,6 +380,9 @@ mod tests {
         assert_eq!(task.name, "Backup");
         assert_eq!(task.script_path, "C:\\tools\\backup.ps1");
         assert_eq!(task.interval_minutes, 15);
+        assert_eq!(task.schedule_type, "interval");
+        assert_eq!(task.time_of_day, None);
+        assert_eq!(task.weekdays, None);
         assert!(task.enabled);
         assert!(task.last_started_at.is_none());
 
@@ -274,7 +399,10 @@ mod tests {
                 NewScriptTask {
                     name: " ".to_string(),
                     script_path: "C:\\tools\\a.ps1".to_string(),
-                    interval_minutes: 1,
+                    schedule_type: "interval".to_string(),
+                    interval_minutes: Some(1),
+                    time_of_day: None,
+                    weekdays: None,
                     enabled: true,
                 },
                 "任务名不能为空。",
@@ -283,7 +411,10 @@ mod tests {
                 NewScriptTask {
                     name: "A".to_string(),
                     script_path: " ".to_string(),
-                    interval_minutes: 1,
+                    schedule_type: "interval".to_string(),
+                    interval_minutes: Some(1),
+                    time_of_day: None,
+                    weekdays: None,
                     enabled: true,
                 },
                 "脚本路径不能为空。",
@@ -292,7 +423,10 @@ mod tests {
                 NewScriptTask {
                     name: "A".to_string(),
                     script_path: "C:\\tools\\a.txt".to_string(),
-                    interval_minutes: 1,
+                    schedule_type: "interval".to_string(),
+                    interval_minutes: Some(1),
+                    time_of_day: None,
+                    weekdays: None,
                     enabled: true,
                 },
                 "仅支持 .ps1、.bat、.cmd、.exe。",
@@ -301,7 +435,10 @@ mod tests {
                 NewScriptTask {
                     name: "A".to_string(),
                     script_path: "C:\\tools\\a.ps1".to_string(),
-                    interval_minutes: 0,
+                    schedule_type: "interval".to_string(),
+                    interval_minutes: Some(0),
+                    time_of_day: None,
+                    weekdays: None,
                     enabled: true,
                 },
                 "执行间隔必须大于 0。",
@@ -315,6 +452,43 @@ mod tests {
     }
 
     #[test]
+    fn create_accepts_daily_and_weekly_script_tasks() {
+        let conn = db::test_connection();
+
+        let daily = ScriptTaskRepository::create(
+            &conn,
+            NewScriptTask {
+                name: "Daily".to_string(),
+                script_path: "C:\\tools\\daily.ps1".to_string(),
+                schedule_type: "daily".to_string(),
+                interval_minutes: None,
+                time_of_day: Some("09:30".to_string()),
+                weekdays: None,
+                enabled: true,
+            },
+        )
+        .unwrap();
+        assert_eq!(daily.schedule_type, "daily");
+        assert_eq!(daily.time_of_day, Some("09:30".to_string()));
+
+        let weekly = ScriptTaskRepository::create(
+            &conn,
+            NewScriptTask {
+                name: "Weekly".to_string(),
+                script_path: "C:\\tools\\weekly.ps1".to_string(),
+                schedule_type: "weekly".to_string(),
+                interval_minutes: None,
+                time_of_day: Some("18:00".to_string()),
+                weekdays: Some(vec![1, 5]),
+                enabled: true,
+            },
+        )
+        .unwrap();
+        assert_eq!(weekly.schedule_type, "weekly");
+        assert_eq!(weekly.weekdays, Some(vec![1, 5]));
+    }
+
+    #[test]
     fn set_enabled_and_delete_round_trip() {
         let conn = db::test_connection();
         let task = ScriptTaskRepository::create(
@@ -322,7 +496,10 @@ mod tests {
             NewScriptTask {
                 name: "Backup".to_string(),
                 script_path: "C:\\tools\\backup.cmd".to_string(),
-                interval_minutes: 10,
+                schedule_type: "interval".to_string(),
+                interval_minutes: Some(10),
+                time_of_day: None,
+                weekdays: None,
                 enabled: false,
             },
         )
@@ -352,7 +529,10 @@ mod tests {
             NewScriptTask {
                 name: "Backup".to_string(),
                 script_path: "C:\\tools\\backup.exe".to_string(),
-                interval_minutes: 10,
+                schedule_type: "interval".to_string(),
+                interval_minutes: Some(10),
+                time_of_day: None,
+                weekdays: None,
                 enabled: true,
             },
         )

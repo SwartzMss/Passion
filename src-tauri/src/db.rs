@@ -38,7 +38,10 @@ pub fn migrate(conn: &Connection) -> BackendResult<()> {
             id TEXT PRIMARY KEY NOT NULL,
             name TEXT NOT NULL,
             script_path TEXT NOT NULL,
+            schedule_type TEXT NOT NULL DEFAULT 'interval' CHECK (schedule_type IN ('interval', 'daily', 'weekly')),
             interval_minutes INTEGER NOT NULL,
+            time_of_day TEXT,
+            weekdays TEXT,
             enabled INTEGER NOT NULL,
             last_started_at INTEGER,
             last_finished_at INTEGER,
@@ -62,6 +65,24 @@ pub fn migrate(conn: &Connection) -> BackendResult<()> {
         "ALTER TABLE reminders ADD COLUMN repeat_rule TEXT NOT NULL DEFAULT 'once' CHECK (repeat_rule IN ('once', 'daily', 'cn_workday') OR repeat_rule GLOB 'weekly:[1-7]*')",
     )?;
     relax_reminder_repeat_rule_check(conn)?;
+    add_column_if_missing(
+        conn,
+        "script_tasks",
+        "schedule_type",
+        "ALTER TABLE script_tasks ADD COLUMN schedule_type TEXT NOT NULL DEFAULT 'interval' CHECK (schedule_type IN ('interval', 'daily', 'weekly'))",
+    )?;
+    add_column_if_missing(
+        conn,
+        "script_tasks",
+        "time_of_day",
+        "ALTER TABLE script_tasks ADD COLUMN time_of_day TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "script_tasks",
+        "weekdays",
+        "ALTER TABLE script_tasks ADD COLUMN weekdays TEXT",
+    )?;
     Ok(())
 }
 
@@ -157,6 +178,30 @@ mod tests {
         conn.execute(
             "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, repeat_rule, created_at, updated_at, triggered_at)
              VALUES ('2', 'Weekly', NULL, 1, 1, 'pending', 'weekly:1,3', 1, 1, NULL)",
+            [],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn migrate_adds_script_task_schedule_columns() {
+        let conn = Connection::open_in_memory().unwrap();
+
+        migrate(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO script_tasks (
+                id, name, script_path, schedule_type, interval_minutes, time_of_day, weekdays, enabled,
+                created_at, updated_at
+             ) VALUES ('1', 'Daily', 'C:\\tools\\daily.ps1', 'daily', 15, '09:30', NULL, 1, 1, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO script_tasks (
+                id, name, script_path, schedule_type, interval_minutes, time_of_day, weekdays, enabled,
+                created_at, updated_at
+             ) VALUES ('2', 'Weekly', 'C:\\tools\\weekly.ps1', 'weekly', 15, '18:00', '1,5', 1, 1, 1)",
             [],
         )
         .unwrap();

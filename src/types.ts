@@ -35,12 +35,10 @@ export interface AiSettings {
   baseUrl: string;
   model: string;
   apiKey: string;
-  defaultTargetLanguage: string;
 }
 
 export interface TranslationRequest {
   text: string;
-  targetLanguage: string;
 }
 
 export interface TranslationResult {
@@ -110,10 +108,15 @@ export interface SystemSnapshot {
   uptimeSeconds: number;
 }
 
+export type ScriptTaskScheduleType = "interval" | "daily" | "weekly";
+
 export interface NewScriptTask {
   name: string;
   scriptPath: string;
-  intervalMinutes: number;
+  scheduleType: ScriptTaskScheduleType;
+  intervalMinutes?: number | null;
+  timeOfDay?: string | null;
+  weekdays?: number[] | null;
   enabled: boolean;
 }
 
@@ -121,7 +124,10 @@ export interface ScriptTask {
   id: string;
   name: string;
   scriptPath: string;
+  scheduleType: ScriptTaskScheduleType;
   intervalMinutes: number;
+  timeOfDay?: string | null;
+  weekdays?: number[] | null;
   enabled: boolean;
   lastStartedAt?: string | null;
   lastFinishedAt?: string | null;

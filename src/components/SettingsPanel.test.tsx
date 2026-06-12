@@ -13,7 +13,6 @@ vi.mock("../lib/api", () => ({
     baseUrl: "http://localhost:11434/v1",
     model: "qwen2.5:7b",
     apiKey: "",
-    defaultTargetLanguage: "中文",
   })),
   updateSettings: vi.fn(async (settings) => settings),
   updateAiSettings: vi.fn(async (settings) => settings),
@@ -64,7 +63,6 @@ it("loads and saves ai translation settings", async () => {
     baseUrl: "http://localhost:11434/v1",
     model: "deepseek-r1",
     apiKey: "",
-    defaultTargetLanguage: "中文",
   });
 });
 

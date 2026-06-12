@@ -26,7 +26,7 @@ export function WindowControls() {
           title="最小化"
           onClick={() => appWindow.minimize()}
         >
-          -
+          <span aria-hidden="true">−</span>
         </button>
         <button
           type="button"
@@ -34,7 +34,7 @@ export function WindowControls() {
           title="关闭"
           onClick={() => appWindow.hide()}
         >
-          x
+          <span aria-hidden="true">×</span>
         </button>
       </div>
     </div>

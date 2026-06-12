@@ -12,9 +12,6 @@ pub fn validate_translation_request(input: &TranslationRequest) -> BackendResult
             "请输入要翻译的内容。".to_string(),
         ));
     }
-    if input.target_language.trim().is_empty() {
-        return Err(BackendError::Translation("请选择目标语言。".to_string()));
-    }
     Ok(())
 }
 
@@ -64,7 +61,6 @@ pub async fn test_connection(settings: &AiSettings) -> BackendResult<()> {
     validate_ai_settings(settings)?;
     let input = TranslationRequest {
         text: "hello".to_string(),
-        target_language: settings.default_target_language.clone(),
     };
     validate_translation_request(&input)?;
     let body = send_chat_completion(settings, build_messages(&input)).await?;
@@ -75,11 +71,11 @@ fn build_messages(input: &TranslationRequest) -> Vec<ChatMessage> {
     vec![
         ChatMessage {
             role: "system".to_string(),
-            content: "你是专业翻译助手。请保留原意、格式、换行、列表、代码块和专有名词。如果原文已经是目标语言，返回原文。只输出译文，不解释。".to_string(),
+            content: "你是专业中英互译助手。自动判断用户输入的主要语言：如果主要是中文，翻译成自然、准确的英文；如果主要不是中文，翻译成自然、准确的中文。处理中英混合文本时，按主要语义输出另一种语言，并保留必要的专有名词、代码、URL、数字、格式、换行、列表和 Markdown。只输出译文，不解释。".to_string(),
         },
         ChatMessage {
             role: "user".to_string(),
-            content: format!("请翻译成{}：\n\n{}", input.target_language, input.text),
+            content: format!("请进行中英互译：\n\n{}", input.text),
         },
     ]
 }
@@ -170,10 +166,22 @@ mod tests {
     fn validate_translation_request_rejects_empty_text() {
         let err = validate_translation_request(&TranslationRequest {
             text: "  ".to_string(),
-            target_language: "中文".to_string(),
         })
         .unwrap_err();
 
         assert!(err.to_string().contains("请输入要翻译的内容"));
+    }
+
+    #[test]
+    fn build_messages_requests_automatic_chinese_english_translation() {
+        let messages = build_messages(&TranslationRequest {
+            text: "Hello world".to_string(),
+        });
+
+        assert!(messages[0].content.contains("自动判断用户输入的主要语言"));
+        assert!(messages[0].content.contains("主要是中文"));
+        assert!(messages[0].content.contains("主要不是中文"));
+        assert!(messages[1].content.contains("请进行中英互译"));
+        assert!(messages[1].content.contains("Hello world"));
     }
 }
