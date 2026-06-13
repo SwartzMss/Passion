@@ -27,6 +27,13 @@ export async function createReminder(input: NewReminder): Promise<Reminder> {
   return invoke<Reminder>("create_reminder", { input });
 }
 
+export async function updateReminder(
+  id: string,
+  input: NewReminder,
+): Promise<Reminder> {
+  return invoke<Reminder>("update_reminder", { id, input });
+}
+
 export async function toggleReminder(
   id: string,
   enabled: boolean,

@@ -1,18 +1,23 @@
 import { type FormEvent, useState } from "react";
-import type { NewReminder, ReminderRepeatRule } from "../types";
+import type { NewReminder, Reminder, ReminderRepeatRule } from "../types";
 
 interface Props {
+  reminder?: Reminder | null;
   onCancel: () => void;
   onSave: (input: NewReminder) => void;
 }
 
-export function AddReminderDialog({ onCancel, onSave }: Props) {
-  const [title, setTitle] = useState("");
-  const [notes, setNotes] = useState("");
-  const [remindAt, setRemindAt] = useState("");
-  const [repeatTime, setRepeatTime] = useState("");
-  const [repeatRule, setRepeatRule] = useState("once");
-  const [weeklyDays, setWeeklyDays] = useState<number[]>([]);
+export function AddReminderDialog({ reminder, onCancel, onSave }: Props) {
+  const initialRepeatRule = parseRepeatRule(reminder?.repeatRule);
+  const [title, setTitle] = useState(reminder?.title ?? "");
+  const [remindAt, setRemindAt] = useState(
+    reminder ? toDatetimeLocalValue(reminder.remindAt) : "",
+  );
+  const [repeatTime, setRepeatTime] = useState(
+    reminder ? toTimeValue(reminder.remindAt) : "",
+  );
+  const [priority, setPriority] = useState(reminder?.priority ?? "medium");
+  const [repeatRule, setRepeatRule] = useState(initialRepeatRule.kind);
   const [error, setError] = useState<string | null>(null);
   const isRepeating = repeatRule !== "once";
 
@@ -34,28 +39,13 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
       setError("提醒时间必须晚于当前时间。");
       return;
     }
-    if (repeatRule === "weekly" && weeklyDays.length === 0) {
-      setError("请选择至少一个星期几。");
-      return;
-    }
-    const resolvedRepeatRule: ReminderRepeatRule =
-      repeatRule === "weekly"
-        ? `weekly:${[...weeklyDays].sort((a, b) => a - b).join(",")}`
-        : (repeatRule as ReminderRepeatRule);
     onSave({
       title: title.trim(),
-      notes: notes.trim() || null,
+      notes: null,
       remindAt: date.toISOString(),
-      repeatRule: resolvedRepeatRule,
+      priority,
+      repeatRule: repeatRule as ReminderRepeatRule,
     });
-  }
-
-  function toggleWeeklyDay(day: number) {
-    setWeeklyDays((current) =>
-      current.includes(day)
-        ? current.filter((value) => value !== day)
-        : [...current, day],
-    );
   }
 
   return (
@@ -63,14 +53,14 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
       <form className="modal reminder-modal" onSubmit={submit}>
         <div className="modal-title">
           <p className="eyebrow">提醒信息</p>
-          <h2>新增提醒</h2>
+          <h2>{reminder ? "编辑提醒" : "新增提醒"}</h2>
         </div>
         {error ? <p className="error">{error}</p> : null}
         <div className="modal-field-grid">
           <label className="wide-field">
             标题
             <input
-              placeholder="例如：每周例会提醒"
+              placeholder="例如：喝水提醒"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
             />
@@ -102,37 +92,23 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
             >
               <option value="once">单次提醒</option>
               <option value="daily">每天</option>
-              <option value="weekly">每周</option>
               <option value="cn_workday">中国法定工作日</option>
             </select>
           </label>
-          <label className="wide-field">
-            备注
-            <textarea
-              placeholder="可选，写一点上下文"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-            />
+          <label>
+            优先级
+            <select
+              value={priority}
+              onChange={(event) =>
+                setPriority(event.target.value as "low" | "medium" | "high")
+              }
+            >
+              <option value="low">低</option>
+              <option value="medium">中</option>
+              <option value="high">高</option>
+            </select>
           </label>
         </div>
-        {repeatRule === "weekly" ? (
-          <fieldset className="weekday-picker">
-            <legend>选择周几</legend>
-            {WEEKDAYS.map((day) => (
-              <label
-                className={weeklyDays.includes(day.value) ? "selected" : ""}
-                key={day.value}
-              >
-                <input
-                  type="checkbox"
-                  checked={weeklyDays.includes(day.value)}
-                  onChange={() => toggleWeeklyDay(day.value)}
-                />
-                {day.label}
-              </label>
-            ))}
-          </fieldset>
-        ) : null}
         <div className="modal-actions">
           <button type="button" onClick={onCancel}>
             取消
@@ -146,16 +122,6 @@ export function AddReminderDialog({ onCancel, onSave }: Props) {
   );
 }
 
-const WEEKDAYS = [
-  { value: 1, label: "周一" },
-  { value: 2, label: "周二" },
-  { value: 3, label: "周三" },
-  { value: 4, label: "周四" },
-  { value: 5, label: "周五" },
-  { value: 6, label: "周六" },
-  { value: 7, label: "周日" },
-];
-
 function nextDateFromTime(value: string) {
   const [hours, minutes] = value.split(":").map(Number);
   const date = new Date();
@@ -164,4 +130,27 @@ function nextDateFromTime(value: string) {
     date.setDate(date.getDate() + 1);
   }
   return date;
+}
+
+function parseRepeatRule(rule?: ReminderRepeatRule) {
+  if (!rule) {
+    return { kind: "once" };
+  }
+  if (rule.startsWith("weekly:")) {
+    return { kind: "daily" };
+  }
+  return { kind: rule };
+}
+
+function toDatetimeLocalValue(value: string) {
+  const date = new Date(value);
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
+function toTimeValue(value: string) {
+  const date = new Date(value);
+  return `${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`;
 }

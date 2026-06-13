@@ -11,17 +11,31 @@ use crate::reminders::ReminderRepository;
 use crate::script_tasks::ScriptTaskRepository;
 use crate::settings::SettingsRepository;
 use chrono::Utc;
-use tauri::{AppHandle, Emitter, Manager, State};
+use std::path::PathBuf;
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 type CommandResult<T> = Result<T, ErrorPayload>;
 
 #[tauri::command]
 pub async fn list_reminders(state: State<'_, AppState>) -> CommandResult<Vec<Reminder>> {
+    list_reminders_after_reconciling_due(state.inner()).map_err(ErrorPayload::from)
+}
+
+fn list_reminders_after_reconciling_due(
+    state: &AppState,
+) -> crate::error::BackendResult<Vec<Reminder>> {
     let conn = state
         .conn
         .lock()
         .map_err(|err| BackendError::Database(err.to_string()))?;
-    ReminderRepository::list(&conn).map_err(ErrorPayload::from)
+    let expired = ReminderRepository::mark_due_pending_as_expired(&conn, Utc::now())?;
+    if !expired.is_empty() {
+        crate::app_log::info(
+            state.log_path.as_path(),
+            format!("list_reminders reconciled expired={}", expired.len()),
+        );
+    }
+    ReminderRepository::list(&conn)
 }
 
 #[tauri::command]
@@ -37,8 +51,43 @@ pub async fn create_reminder(
             .map_err(|err| BackendError::Database(err.to_string()))?;
         ReminderRepository::create(&conn, input).map_err(ErrorPayload::from)?
     };
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!(
+            "create_reminder id={} title={} remind_at={}",
+            reminder.id, reminder.title, reminder.remind_at
+        ),
+    );
 
     schedule_reminder(app, state.inner().clone(), reminder.clone()).await;
+    Ok(reminder)
+}
+
+#[tauri::command]
+pub async fn update_reminder(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    input: NewReminder,
+) -> CommandResult<Reminder> {
+    let reminder = {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        ReminderRepository::update(&conn, &id, input).map_err(ErrorPayload::from)?
+    };
+    state.scheduler.cancel(&id).await;
+    if reminder.enabled && reminder.status == crate::models::ReminderStatus::Pending {
+        schedule_reminder(app, state.inner().clone(), reminder.clone()).await;
+    }
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!(
+            "update_reminder id={} title={} remind_at={}",
+            reminder.id, reminder.title, reminder.remind_at
+        ),
+    );
     Ok(reminder)
 }
 
@@ -62,6 +111,10 @@ pub async fn toggle_reminder(
     } else {
         state.scheduler.cancel(&id).await;
     }
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!("toggle_reminder id={} enabled={}", id, enabled),
+    );
 
     Ok(reminder)
 }
@@ -76,6 +129,7 @@ pub async fn delete_reminder(state: State<'_, AppState>, id: String) -> CommandR
         ReminderRepository::delete(&conn, &id).map_err(ErrorPayload::from)?;
     }
     state.scheduler.cancel(&id).await;
+    crate::app_log::info(state.log_path.as_path(), format!("delete_reminder id={id}"));
     Ok(())
 }
 
@@ -291,11 +345,24 @@ pub async fn run_script_task_now(
 }
 
 async fn schedule_reminder(app: AppHandle, state: AppState, reminder: Reminder) {
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!(
+            "schedule_reminder id={} title={} remind_at={} status={} enabled={}",
+            reminder.id,
+            reminder.title,
+            reminder.remind_at,
+            reminder.status.as_str(),
+            reminder.enabled
+        ),
+    );
     let app_for_callback = app.clone();
     let state_for_callback = state.clone();
+    let log_path = state.log_path.clone();
     let scheduler = state.scheduler.clone();
     scheduler
         .schedule(reminder, move |id| {
+            crate::app_log::info(log_path.as_path(), format!("reminder_timer_fired id={id}"));
             let app = app_for_callback.clone();
             let state = state_for_callback.clone();
             tauri::async_runtime::spawn(async move {
@@ -353,19 +420,51 @@ async fn dispatch_triggered_reminder(
     state: AppState,
     id: String,
 ) -> crate::error::BackendResult<()> {
-    let Some((reminder, settings)) = mark_reminder_triggered_and_load_settings(&state, &id)? else {
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!("dispatch_triggered_reminder id={id}"),
+    );
+    let Some(reminder) = mark_reminder_triggered(&state, &id)? else {
+        crate::app_log::warn(
+            state.log_path.as_path(),
+            format!("dispatch_triggered_reminder skipped id={id} reason=not_due_pending_enabled"),
+        );
         return Ok(());
     };
 
-    if settings.notification_enabled {
-        if let Err(err) = notifications::send_reminder_notification(&app, &reminder) {
-            eprintln!("failed to send reminder notification: {err}");
-        }
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!("dispatch_triggered_reminder marked id={}", reminder.id),
+    );
+    if let Err(err) = show_reminder_window(&app, &reminder) {
+        crate::app_log::error(
+            state.log_path.as_path(),
+            format!("show_reminder_window failed id={} error={err}", reminder.id),
+        );
     }
-    if let Err(err) = emit_reminder_triggered_if_main_window_visible(&app, &reminder) {
+    if let Err(err) = emit_reminder_triggered(&app, &reminder) {
         eprintln!("failed to emit reminder_triggered event: {err}");
+        crate::app_log::error(
+            state.log_path.as_path(),
+            format!(
+                "emit reminder_triggered failed id={} error={err}",
+                reminder.id
+            ),
+        );
+    } else {
+        crate::app_log::info(
+            state.log_path.as_path(),
+            format!("emit reminder_triggered ok id={}", reminder.id),
+        );
     }
     if let Some(next) = reschedule_repeating_reminder(&state, &reminder)? {
+        crate::app_log::info(
+            state.log_path.as_path(),
+            format!(
+                "reschedule_repeating_reminder previous_id={} next_at={}",
+                reminder.id, next.remind_at
+            ),
+        );
         std::thread::spawn(move || {
             tauri::async_runtime::block_on(schedule_reminder(app, state, next));
         });
@@ -374,21 +473,46 @@ async fn dispatch_triggered_reminder(
     Ok(())
 }
 
-fn emit_reminder_triggered_if_main_window_visible(
+fn emit_reminder_triggered(
     app: &AppHandle,
     reminder: &Reminder,
 ) -> crate::error::BackendResult<()> {
-    let Some(window) = app.get_webview_window("main") else {
-        return Ok(());
-    };
-    if !window
-        .is_visible()
-        .map_err(|err| BackendError::Window(err.to_string()))?
-    {
-        return Ok(());
-    }
     app.emit("reminder_triggered", reminder.clone())
         .map_err(|err| BackendError::Window(err.to_string()))
+}
+
+fn show_reminder_window(app: &AppHandle, reminder: &Reminder) -> crate::error::BackendResult<()> {
+    let label = reminder_window_label(&reminder.id);
+    if let Some(window) = app.get_webview_window(&label) {
+        window
+            .close()
+            .map_err(|err| BackendError::Window(err.to_string()))?;
+    }
+    WebviewWindowBuilder::new(
+        app,
+        label,
+        WebviewUrl::App(reminder_window_path(&reminder.id)),
+    )
+    .title("提醒")
+    .inner_size(380.0, 190.0)
+    .resizable(false)
+    .decorations(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .transparent(true)
+    .focused(true)
+    .center()
+    .build()
+    .map_err(|err| BackendError::Window(err.to_string()))?;
+    Ok(())
+}
+
+fn reminder_window_label(id: &str) -> String {
+    format!("reminder-{id}")
+}
+
+fn reminder_window_path(id: &str) -> PathBuf {
+    format!("index.html?reminderId={id}").into()
 }
 
 fn reschedule_repeating_reminder(
@@ -402,10 +526,10 @@ fn reschedule_repeating_reminder(
     ReminderRepository::reschedule_after_trigger(&conn, reminder, Utc::now())
 }
 
-fn mark_reminder_triggered_and_load_settings(
+fn mark_reminder_triggered(
     state: &AppState,
     id: &str,
-) -> crate::error::BackendResult<Option<(Reminder, Settings)>> {
+) -> crate::error::BackendResult<Option<Reminder>> {
     let conn = state
         .conn
         .lock()
@@ -415,8 +539,7 @@ fn mark_reminder_triggered_and_load_settings(
     else {
         return Ok(None);
     };
-    let settings = SettingsRepository::get(&conn)?;
-    Ok(Some((reminder, settings)))
+    Ok(Some(reminder))
 }
 
 fn save_settings_and_get_previous(
@@ -447,12 +570,12 @@ fn rollback_settings(state: &AppState, previous: &Settings) {
 mod tests {
     use super::*;
     use crate::db;
-    use crate::models::{NewReminder, ReminderRepeatRule, ReminderStatus};
+    use crate::models::{NewReminder, ReminderPriority, ReminderRepeatRule, ReminderStatus};
     use crate::scheduler::Scheduler;
     use chrono::{Duration, Utc};
 
     #[test]
-    fn trigger_dispatch_marks_reminder_and_loads_settings() {
+    fn trigger_dispatch_marks_reminder_without_native_notification_settings() {
         let conn = db::test_connection();
         let reminder = insert_raw(&conn, "Stretch", -5, true, ReminderStatus::Pending);
         SettingsRepository::save(
@@ -466,16 +589,32 @@ mod tests {
         .unwrap();
         let state = AppState::new(conn, Scheduler::default());
 
-        let (triggered, settings) = mark_reminder_triggered_and_load_settings(&state, &reminder)
-            .unwrap()
-            .unwrap();
+        let triggered = mark_reminder_triggered(&state, &reminder).unwrap().unwrap();
 
         assert_eq!(triggered.id, reminder);
         assert_eq!(triggered.status, ReminderStatus::Triggered);
         assert!(triggered.triggered_at.is_some());
-        assert!(settings.launch_on_startup);
-        assert!(!settings.minimize_to_tray);
-        assert!(!settings.notification_enabled);
+    }
+
+    #[test]
+    fn listing_reminders_reconciles_due_pending_reminders() {
+        let conn = db::test_connection();
+        let due = insert_raw(&conn, "Missed", -5, true, ReminderStatus::Pending);
+        let future = insert_raw(&conn, "Future", 5, true, ReminderStatus::Pending);
+        let state = AppState::new(conn, Scheduler::default());
+
+        let reminders = list_reminders_after_reconciling_due(&state).unwrap();
+
+        let due = reminders
+            .iter()
+            .find(|reminder| reminder.id == due)
+            .expect("due reminder should be listed");
+        let future = reminders
+            .iter()
+            .find(|reminder| reminder.id == future)
+            .expect("future reminder should be listed");
+        assert_ne!(due.status, ReminderStatus::Pending);
+        assert_eq!(future.status, ReminderStatus::Pending);
     }
 
     #[test]
@@ -487,15 +626,30 @@ mod tests {
                 title: "Stretch".to_string(),
                 notes: None,
                 remind_at: Utc::now() + Duration::minutes(5),
+                priority: ReminderPriority::Medium,
                 repeat_rule: ReminderRepeatRule::Once,
             },
         )
         .unwrap();
         let state = AppState::new(conn, Scheduler::default());
 
-        let result = mark_reminder_triggered_and_load_settings(&state, &reminder.id).unwrap();
+        let result = mark_reminder_triggered(&state, &reminder.id).unwrap();
 
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn reminder_window_uses_stable_label_and_query_url() {
+        let id = "8d9b3616-f4d9-4a49-a096-a7c2c9c13f70";
+
+        assert_eq!(
+            reminder_window_label(id),
+            "reminder-8d9b3616-f4d9-4a49-a096-a7c2c9c13f70"
+        );
+        assert_eq!(
+            reminder_window_path(id),
+            PathBuf::from("index.html?reminderId=8d9b3616-f4d9-4a49-a096-a7c2c9c13f70")
+        );
     }
 
     #[test]

@@ -1,22 +1,6 @@
 use crate::error::{BackendError, BackendResult};
-use crate::models::Reminder;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_notification::NotificationExt;
-
-pub fn send_reminder_notification(app: &AppHandle, reminder: &Reminder) -> BackendResult<()> {
-    let body = reminder
-        .notes
-        .as_deref()
-        .filter(|notes| !notes.is_empty())
-        .unwrap_or("你的提醒时间到了。");
-
-    app.notification()
-        .builder()
-        .title(reminder.title.as_str())
-        .body(body)
-        .show()
-        .map_err(|err| BackendError::Notification(err.to_string()))
-}
 
 pub fn send_test_notification(app: &AppHandle) -> BackendResult<()> {
     app.notification()

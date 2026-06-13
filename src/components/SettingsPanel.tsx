@@ -13,7 +13,10 @@ export function SettingsPanel() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [aiMessage, setAiMessage] = useState<string | null>(null);
+  const [aiFeedback, setAiFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     getSettings()
@@ -45,24 +48,29 @@ export function SettingsPanel() {
       return;
     }
     setError(null);
-    setAiMessage(null);
+    setAiFeedback(null);
     try {
       const saved = await updateAiSettings(aiSettings);
       setAiSettings(saved);
-      setAiMessage("AI 设置已保存。");
+      setAiFeedback({ type: "success", message: "AI 设置已保存。" });
     } catch (err) {
-      setError(readError(err));
+      setAiFeedback({ type: "error", message: readError(err) });
     }
   }
 
   async function checkAiConnection() {
+    if (!aiSettings) {
+      return;
+    }
     setError(null);
-    setAiMessage(null);
+    setAiFeedback(null);
     try {
+      const saved = await updateAiSettings(aiSettings);
+      setAiSettings(saved);
       await testAiConnection();
-      setAiMessage("AI 连接正常。");
+      setAiFeedback({ type: "success", message: "AI 连接正常。" });
     } catch (err) {
-      setError(readError(err));
+      setAiFeedback({ type: "error", message: readError(err) });
     }
   }
 
@@ -111,7 +119,6 @@ export function SettingsPanel() {
       </button>
       <div className="settings-divider" />
       <h3>AI 翻译设置</h3>
-      {aiMessage ? <p className="success">{aiMessage}</p> : null}
       <label className="field-label">
         API 地址
         <input
@@ -140,9 +147,17 @@ export function SettingsPanel() {
           }
         />
       </label>
-      <div className="actions">
+      <div className="actions ai-settings-actions" data-testid="ai-test-actions">
         <button onClick={checkAiConnection}>测试 AI 连接</button>
         <button onClick={saveAiSettings}>保存 AI 设置</button>
+        {aiFeedback ? (
+          <span
+            className={`${aiFeedback.type} ai-settings-message`}
+            data-testid="ai-test-message"
+          >
+            {aiFeedback.message}
+          </span>
+        ) : null}
       </div>
     </section>
   );

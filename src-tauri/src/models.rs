@@ -9,6 +9,15 @@ pub enum ReminderStatus {
     Expired,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ReminderPriority {
+    Low,
+    #[default]
+    Medium,
+    High,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum ReminderRepeatRule {
     #[default]
@@ -100,6 +109,7 @@ pub struct Reminder {
     pub remind_at: DateTime<Utc>,
     pub enabled: bool,
     pub status: ReminderStatus,
+    pub priority: ReminderPriority,
     pub repeat_rule: ReminderRepeatRule,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -112,6 +122,8 @@ pub struct NewReminder {
     pub title: String,
     pub notes: Option<String>,
     pub remind_at: DateTime<Utc>,
+    #[serde(default)]
+    pub priority: ReminderPriority,
     #[serde(default)]
     pub repeat_rule: ReminderRepeatRule,
 }
@@ -170,13 +182,27 @@ pub struct PingRequest {
     pub host: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PingResult {
     pub host: String,
     pub reachable: bool,
-    pub summary: String,
-    pub raw_output: String,
+    pub packets_transmitted: Option<u32>,
+    pub packets_received: Option<u32>,
+    pub loss_percent: Option<f32>,
+    pub min_time_ms: Option<f32>,
+    pub max_time_ms: Option<f32>,
+    pub avg_time_ms: Option<f32>,
+    pub ttl: Option<u32>,
+    pub replies: Vec<PingReply>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PingReply {
+    pub bytes: Option<u32>,
+    pub time_ms: Option<f32>,
+    pub ttl: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -320,6 +346,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(value.repeat_rule, ReminderRepeatRule::Once);
+        assert_eq!(value.priority, ReminderPriority::Medium);
     }
 
     #[test]

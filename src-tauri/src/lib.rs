@@ -1,4 +1,5 @@
 mod ai_settings;
+mod app_log;
 mod app_state;
 mod commands;
 mod db;
@@ -42,16 +43,36 @@ pub fn run() {
         .setup(|app| {
             let app_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_dir)?;
-            let conn = db::open(&app_dir.join("passion.sqlite3"))?;
-            let state = AppState::new(conn, Scheduler::default());
+            let db_path = app_dir.join("passion.sqlite3");
+            let log_path = app_dir.join("passion.log");
+            app_log::info(
+                &log_path,
+                format!(
+                    "startup app_dir={} db={} log={}",
+                    app_dir.display(),
+                    db_path.display(),
+                    log_path.display()
+                ),
+            );
+            let conn = db::open(&db_path)?;
+            let state = AppState::new_with_log_path(conn, Scheduler::default(), log_path.clone());
             let future_reminders = {
                 let conn = state
                     .conn
                     .lock()
                     .map_err(|err| error::BackendError::Database(err.to_string()))?;
                 let now = Utc::now();
-                ReminderRepository::mark_due_pending_as_expired(&conn, now)?;
-                ReminderRepository::pending_future_enabled(&conn, now)?
+                let expired = ReminderRepository::mark_due_pending_as_expired(&conn, now)?;
+                let future = ReminderRepository::pending_future_enabled(&conn, now)?;
+                app_log::info(
+                    &log_path,
+                    format!(
+                        "startup reminder reconcile expired={} scheduled={}",
+                        expired.len(),
+                        future.len()
+                    ),
+                );
+                future
             };
             let enabled_script_tasks = {
                 let conn = state
@@ -93,6 +114,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::list_reminders,
             commands::create_reminder,
+            commands::update_reminder,
             commands::toggle_reminder,
             commands::delete_reminder,
             commands::get_settings,

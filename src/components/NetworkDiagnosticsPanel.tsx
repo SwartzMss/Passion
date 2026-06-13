@@ -44,9 +44,7 @@ export function NetworkDiagnosticsPanel() {
       pushHistory(setPingHistory, {
         label: result.host,
         status: result.reachable ? "success" : "failure",
-        detail: `${result.reachable ? "Ping 成功" : "Ping 失败"} · ${
-          formatPingTime(result) ?? result.summary
-        }`,
+        detail: `${result.reachable ? "Ping 成功" : "Ping 失败"} · ${pingHistorySummary(result)}`,
       });
     } catch (err) {
       setError(readError(err));
@@ -110,10 +108,10 @@ export function NetworkDiagnosticsPanel() {
 
   return (
     <section className="network-panel">
-      <div className="section-header">
+      <div className="network-hero">
         <div>
-          <h2>网络检测</h2>
-          <p className="muted">检查网络连通性、TCP 端口开放情况和本机端口占用。</p>
+          <h1>网络检测</h1>
+          <p>检查网络连通性、TCP 端口开放情况和本机端口占用。</p>
         </div>
       </div>
 
@@ -125,7 +123,16 @@ export function NetworkDiagnosticsPanel() {
 
       <div className="diagnostics-grid">
         <article className="diagnostics-card">
-          <h3>Ping 检测</h3>
+          <div className="diagnostics-card-header">
+            <div>
+              <h3>Ping 检测</h3>
+              <p>检测目标地址是否可以访问</p>
+            </div>
+            <StatusBadge
+              status={pingResult?.reachable ? "success" : pingResult ? "failure" : "idle"}
+              label={pingResult?.reachable ? "正常" : pingResult ? "异常" : "待检测"}
+            />
+          </div>
           <label className="field-label">
             Ping 目标
             <input
@@ -135,6 +142,7 @@ export function NetworkDiagnosticsPanel() {
               title="输入域名或 IP 地址，用于判断网络连通性"
             />
           </label>
+          <p className="diagnostics-help">例如：github.com 或 192.168.1.1</p>
           <button
             className="diagnostics-button"
             onClick={runPing}
@@ -144,25 +152,38 @@ export function NetworkDiagnosticsPanel() {
             <span aria-hidden="true">✈</span>
             开始 Ping
           </button>
-          <p className="diagnostics-help">判断网络连通性</p>
+          <div className="diagnostics-divider" />
+          <h4>检测结果</h4>
           <PingResultBox result={pingResult} />
           <HistoryPanel entries={pingHistory} />
         </article>
 
         <article className="diagnostics-card">
-          <h3>端口检测</h3>
+          <div className="diagnostics-card-header">
+            <div>
+              <h3>端口检测</h3>
+              <p>检测指定主机的 TCP 端口是否开放</p>
+            </div>
+            <StatusBadge
+              status={portResult?.open ? "success" : portResult ? "failure" : "idle"}
+              label={portResult?.open ? "开放" : portResult ? "关闭" : "待检测"}
+            />
+          </div>
           <label className="field-label">
-            Host
+            主机地址
             <input
+              id="network-host"
               value={portHost}
               onChange={(event) => setPortHost(event.target.value)}
               title="输入要检测的目标主机，例如 127.0.0.1 或 example.com"
             />
           </label>
           <label className="field-label">
-            Port
+            端口号
             <input
+              id="network-port"
               inputMode="numeric"
+              type="number"
               value={portValue}
               onChange={(event) => setPortValue(event.target.value)}
               title="端口范围为 1 到 65535"
@@ -180,17 +201,41 @@ export function NetworkDiagnosticsPanel() {
             <span aria-hidden="true">◧</span>
             检测端口
           </button>
-          <p className="diagnostics-help">判断指定 TCP 端口是否开放</p>
+          <div className="diagnostics-divider" />
+          <h4>检测结果</h4>
           <PortCheckResultBox result={portResult} />
           <HistoryPanel entries={portHistory} />
         </article>
 
         <article className="diagnostics-card">
-          <h3>端口占用</h3>
+          <div className="diagnostics-card-header">
+            <div>
+              <h3>端口占用</h3>
+              <p>查看本机端口被哪个进程占用</p>
+            </div>
+            <StatusBadge
+              status={
+                occupancyResult
+                  ? occupancyResult.entries.length > 0
+                    ? "failure"
+                    : "success"
+                  : "idle"
+              }
+              label={
+                occupancyResult
+                  ? occupancyResult.entries.length > 0
+                    ? "已占用"
+                    : "未占用"
+                  : "待检测"
+              }
+            />
+          </div>
           <label className="field-label">
-            占用端口
+            端口号
             <input
+              id="occupancy-port"
               inputMode="numeric"
+              type="number"
               value={occupancyPort}
               onChange={(event) => setOccupancyPort(event.target.value)}
               title="输入本机端口，查看是否被进程占用"
@@ -208,12 +253,29 @@ export function NetworkDiagnosticsPanel() {
             <span aria-hidden="true">⌕</span>
             查看占用
           </button>
-          <p className="diagnostics-help">判断本机端口是否被占用</p>
+          <div className="diagnostics-divider" />
+          <h4>检测结果</h4>
           <PortOccupancyResultBox result={occupancyResult} />
           <HistoryPanel entries={occupancyHistory} />
         </article>
       </div>
+      <p className="network-tip">💡 小提示：支持域名、IPv4 地址，端口范围 1-65535。</p>
     </section>
+  );
+}
+
+function StatusBadge({
+  label,
+  status,
+}: {
+  label: string;
+  status: "idle" | "success" | "failure";
+}) {
+  return (
+    <span className={`diagnostics-status ${status}`}>
+      <span aria-hidden="true" />
+      {label}
+    </span>
   );
 }
 
@@ -221,13 +283,40 @@ function PingResultBox({ result }: { result: PingResult | null }) {
   if (!result) {
     return null;
   }
-  const pingTime = formatPingTime(result);
   return (
     <div className={`diagnostics-result ${result.reachable ? "success" : "failure"}`}>
-      <strong>{result.reachable ? "Ping 成功" : "Ping 失败"}</strong>
-      <p>{pingTime ?? result.summary}</p>
-      <pre>{result.rawOutput}</pre>
+      <strong>{result.reachable ? `${result.host} 可连通` : `${result.host} 不可达`}</strong>
+      <span className="sr-only">{result.reachable ? "Ping 成功" : "Ping 失败"}</span>
+      <div className="ping-metrics">
+        <MetricItem label="平均延迟" value={formatMs(result.avgTimeMs)} />
+        <MetricItem label="最小延迟" value={formatMs(result.minTimeMs)} />
+        <MetricItem label="最大延迟" value={formatMs(result.maxTimeMs)} />
+        <MetricItem label="丢包率" value={formatPercent(result.lossPercent)} />
+        <MetricItem
+          label="数据包"
+          value={formatPackets(result.packetsReceived, result.packetsTransmitted)}
+        />
+        <MetricItem label="TTL" value={formatOptionalNumber(result.ttl)} />
+      </div>
+      {result.replies.length > 0 ? (
+        <div className="ping-replies" aria-label="Ping 响应明细">
+          {result.replies.map((reply, index) => (
+            <span key={`${reply.timeMs}-${reply.ttl}-${index}`}>
+              #{index + 1} {formatMs(reply.timeMs)}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+function MetricItem({ label, value }: { label: string; value: string }) {
+  return (
+    <span>
+      <small>{label}</small>
+      <strong>{value}</strong>
+    </span>
   );
 }
 
@@ -237,9 +326,12 @@ function PortCheckResultBox({ result }: { result: PortCheckResult | null }) {
   }
   return (
     <div className={`diagnostics-result ${result.open ? "success" : "failure"}`}>
-      <strong>{result.open ? "开放" : "未开放"}</strong>
+      <strong>
+        {result.host}:{result.port} 端口{result.open ? "已开放" : "未开放"}
+      </strong>
+      <span className="sr-only">{result.open ? "开放" : "未开放"}</span>
       <p>
-        {result.host}:{result.port} · {result.elapsedMs}ms
+        协议：TCP · 响应时间：{result.elapsedMs}ms
       </p>
       {result.error ? <p>{result.error}</p> : null}
     </div>
@@ -257,7 +349,7 @@ function PortOccupancyResultBox({
   const occupied = result.entries.length > 0;
   return (
     <div className={`diagnostics-result ${occupied ? "failure" : "success"}`}>
-      <strong>{occupied ? "已占用" : "未占用"}</strong>
+      <strong>端口 {result.port} {occupied ? "已被占用" : "未被占用"}</strong>
       {occupied ? (
         result.entries.map((entry) => (
           <PortOccupancyRow entry={entry} key={`${entry.pid}-${entry.localAddress}`} />
@@ -283,7 +375,7 @@ function PortOccupancyRow({ entry }: { entry: PortOccupancyEntry }) {
 
 function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
   return (
-    <details className="diagnostics-history">
+    <details className="diagnostics-history" open>
       <summary>历史记录（{entries.length}）</summary>
       {entries.length === 0 ? (
         <p className="muted">暂无历史记录。</p>
@@ -322,10 +414,39 @@ function validatePortValue(value: string) {
   return null;
 }
 
-function formatPingTime(result: PingResult) {
-  const source = `${result.summary} ${result.rawOutput}`;
-  const match = source.match(/(?:time[=<]?|时间[=<]?)(\d+(?:\.\d+)?)\s*ms/i);
-  return match ? `响应时间 ${match[1]}ms` : null;
+function pingHistorySummary(result: PingResult) {
+  const avg = formatMs(result.avgTimeMs);
+  const loss = formatPercent(result.lossPercent);
+  if (avg !== "--" && loss !== "--") {
+    return `平均 ${avg} · 丢包 ${loss}`;
+  }
+  if (avg !== "--") {
+    return `平均 ${avg}`;
+  }
+  return result.reachable ? "可达" : "不可达";
+}
+
+function formatMs(value?: number | null) {
+  return value === null || value === undefined ? "--" : `${formatNumber(value)} ms`;
+}
+
+function formatPercent(value?: number | null) {
+  return value === null || value === undefined ? "--" : `${formatNumber(value)}%`;
+}
+
+function formatPackets(received?: number | null, transmitted?: number | null) {
+  if (received === null || received === undefined || transmitted === null || transmitted === undefined) {
+    return "--";
+  }
+  return `${received} / ${transmitted}`;
+}
+
+function formatOptionalNumber(value?: number | null) {
+  return value === null || value === undefined ? "--" : String(value);
+}
+
+function formatNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function readError(err: unknown) {

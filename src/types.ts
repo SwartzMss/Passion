@@ -1,4 +1,5 @@
 export type ReminderStatus = "pending" | "triggered" | "expired";
+export type ReminderPriority = "low" | "medium" | "high";
 export type ReminderRepeatRule =
   | "once"
   | "daily"
@@ -12,6 +13,7 @@ export interface Reminder {
   remindAt: string;
   enabled: boolean;
   status: ReminderStatus;
+  priority: ReminderPriority;
   repeatRule: ReminderRepeatRule;
   createdAt: string;
   updatedAt: string;
@@ -22,6 +24,7 @@ export interface NewReminder {
   title: string;
   notes?: string | null;
   remindAt: string;
+  priority: ReminderPriority;
   repeatRule: ReminderRepeatRule;
 }
 
@@ -52,8 +55,20 @@ export interface PingRequest {
 export interface PingResult {
   host: string;
   reachable: boolean;
-  summary: string;
-  rawOutput: string;
+  packetsTransmitted?: number | null;
+  packetsReceived?: number | null;
+  lossPercent?: number | null;
+  minTimeMs?: number | null;
+  maxTimeMs?: number | null;
+  avgTimeMs?: number | null;
+  ttl?: number | null;
+  replies: PingReply[];
+}
+
+export interface PingReply {
+  bytes?: number | null;
+  timeMs?: number | null;
+  ttl?: number | null;
 }
 
 export interface PortCheckRequest {
