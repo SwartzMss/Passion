@@ -1,8 +1,10 @@
 use crate::error::{BackendError, BackendResult};
 use crate::models::{
-    PingRequest, PingResult, PortCheckRequest, PortCheckResult, PortOccupancyEntry,
+    PingReply, PingRequest, PingResult, PortCheckRequest, PortCheckResult, PortOccupancyEntry,
     PortOccupancyRequest, PortOccupancyResult,
 };
+#[cfg(target_os = "windows")]
+use encoding_rs::GBK;
 use std::collections::HashMap;
 use std::net::{TcpStream, ToSocketAddrs};
 use std::process::Command;
@@ -22,17 +24,19 @@ pub async fn ping_host(input: PingRequest) -> BackendResult<PingResult> {
         .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?;
     let raw_output = decode_output(&output.stdout, &output.stderr);
     let reachable = output.status.success();
-    let summary = if reachable {
-        format!("{host} 可达")
-    } else {
-        format!("{host} 不可达")
-    };
+    let metrics = parse_ping_output(&raw_output);
 
     Ok(PingResult {
         host: host.to_string(),
         reachable,
-        summary,
-        raw_output,
+        packets_transmitted: metrics.packets_transmitted,
+        packets_received: metrics.packets_received,
+        loss_percent: metrics.loss_percent,
+        min_time_ms: metrics.min_time_ms,
+        max_time_ms: metrics.max_time_ms,
+        avg_time_ms: metrics.avg_time_ms,
+        ttl: metrics.ttl,
+        replies: metrics.replies,
     })
 }
 
@@ -95,15 +99,144 @@ fn ping_args(host: &str) -> [&str; 3] {
 }
 
 fn decode_output(stdout: &[u8], stderr: &[u8]) -> String {
-    let mut output = String::from_utf8_lossy(stdout).to_string();
-    let err = String::from_utf8_lossy(stderr);
-    if !err.trim().is_empty() {
-        if !output.is_empty() {
-            output.push('\n');
+    #[cfg(target_os = "windows")]
+    {
+        let mut output = decode_windows_console_bytes(stdout);
+        let err = decode_windows_console_bytes(stderr);
+        if !err.trim().is_empty() {
+            if !output.is_empty() {
+                output.push('\n');
+            }
+            output.push_str(&err);
         }
-        output.push_str(&err);
+        return output;
     }
-    output
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let mut output = String::from_utf8_lossy(stdout).to_string();
+        let err = String::from_utf8_lossy(stderr);
+        if !err.trim().is_empty() {
+            if !output.is_empty() {
+                output.push('\n');
+            }
+            output.push_str(&err);
+        }
+        output
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn decode_windows_console_bytes(bytes: &[u8]) -> String {
+    let utf8 = String::from_utf8_lossy(bytes);
+    if !utf8.contains('�') {
+        return utf8.to_string();
+    }
+    let (decoded, _, _) = GBK.decode(bytes);
+    decoded.to_string()
+}
+
+#[derive(Debug, Default)]
+struct PingMetrics {
+    packets_transmitted: Option<u32>,
+    packets_received: Option<u32>,
+    loss_percent: Option<f32>,
+    min_time_ms: Option<f32>,
+    max_time_ms: Option<f32>,
+    avg_time_ms: Option<f32>,
+    ttl: Option<u32>,
+    replies: Vec<PingReply>,
+}
+
+fn parse_ping_output(output: &str) -> PingMetrics {
+    let mut metrics = PingMetrics::default();
+    for line in output.lines() {
+        let lower = line.to_lowercase();
+        if lower.contains("ttl=") || line.contains("TTL=") {
+            let reply = PingReply {
+                bytes: find_number_after_any(line, &["bytes=", "字节="]).map(|value| value as u32),
+                time_ms: find_number_after_any(line, &["time", "时间"]),
+                ttl: find_number_after_any(line, &["ttl=", "TTL="]).map(|value| value as u32),
+            };
+            if metrics.ttl.is_none() {
+                metrics.ttl = reply.ttl;
+            }
+            metrics.replies.push(reply);
+        }
+
+        if lower.contains("sent") || line.contains("已发送") {
+            metrics.packets_transmitted =
+                find_number_after_any(line, &["Sent =", "sent =", "已发送 ="])
+                    .map(|value| value as u32);
+            metrics.packets_received =
+                find_number_after_any(line, &["Received =", "received =", "已接收 ="])
+                    .map(|value| value as u32);
+            metrics.loss_percent = find_loss_percent(line);
+        }
+
+        if lower.contains("minimum") || line.contains("最短") || line.contains("最小") {
+            metrics.min_time_ms =
+                find_number_after_any(line, &["Minimum =", "minimum =", "最短 =", "最小 ="]);
+            metrics.max_time_ms =
+                find_number_after_any(line, &["Maximum =", "maximum =", "最长 =", "最大 ="]);
+            metrics.avg_time_ms =
+                find_number_after_any(line, &["Average =", "average =", "平均 ="]);
+        }
+    }
+
+    if metrics.avg_time_ms.is_none() && !metrics.replies.is_empty() {
+        let times = metrics
+            .replies
+            .iter()
+            .filter_map(|reply| reply.time_ms)
+            .collect::<Vec<_>>();
+        if !times.is_empty() {
+            metrics.min_time_ms = Some(times.iter().copied().fold(f32::INFINITY, f32::min));
+            metrics.max_time_ms = Some(times.iter().copied().fold(f32::NEG_INFINITY, f32::max));
+            metrics.avg_time_ms = Some(times.iter().sum::<f32>() / times.len() as f32);
+        }
+    }
+
+    metrics
+}
+
+fn find_loss_percent(line: &str) -> Option<f32> {
+    let percent_index = line.find('%')?;
+    let before = &line[..percent_index];
+    parse_last_number(before)
+}
+
+fn find_number_after_any(line: &str, keys: &[&str]) -> Option<f32> {
+    keys.iter().find_map(|key| {
+        line.find(key)
+            .and_then(|index| parse_first_number(&line[index + key.len()..]))
+    })
+}
+
+fn parse_first_number(value: &str) -> Option<f32> {
+    let start = value.find(|ch: char| ch.is_ascii_digit())?;
+    let rest = &value[start..];
+    let end = rest
+        .find(|ch: char| !(ch.is_ascii_digit() || ch == '.'))
+        .unwrap_or(rest.len());
+    rest[..end].parse::<f32>().ok()
+}
+
+fn parse_last_number(value: &str) -> Option<f32> {
+    let mut current = String::new();
+    let mut last = None;
+    for ch in value.chars() {
+        if ch.is_ascii_digit() || ch == '.' {
+            current.push(ch);
+        } else if !current.is_empty() {
+            last = current.parse::<f32>().ok();
+            current.clear();
+        }
+    }
+    if !current.is_empty() {
+        last = current.parse::<f32>().ok();
+    }
+    last
 }
 
 fn parse_netstat_listening_ports(output: &str, port: u16) -> Vec<PortOccupancyEntry> {
@@ -228,6 +361,61 @@ mod tests {
         .unwrap_err();
 
         assert!(err.to_string().contains("请输入要 Ping"));
+    }
+
+    #[test]
+    fn parse_ping_output_reads_windows_chinese_metrics() {
+        let output = r#"
+正在 Ping 192.168.3.142 具有 32 字节的数据:
+来自 192.168.3.142 的回复: 字节=32 时间=57ms TTL=64
+来自 192.168.3.142 的回复: 字节=32 时间=129ms TTL=64
+来自 192.168.3.142 的回复: 字节=32 时间=3ms TTL=64
+来自 192.168.3.142 的回复: 字节=32 时间=2ms TTL=64
+
+192.168.3.142 的 Ping 统计信息:
+    数据包: 已发送 = 4，已接收 = 4，丢失 = 0 (0% 丢失)，
+往返行程的估计时间(以毫秒为单位):
+    最短 = 2ms，最长 = 129ms，平均 = 47ms
+"#;
+
+        let metrics = parse_ping_output(output);
+
+        assert_eq!(metrics.packets_transmitted, Some(4));
+        assert_eq!(metrics.packets_received, Some(4));
+        assert_eq!(metrics.loss_percent, Some(0.0));
+        assert_eq!(metrics.min_time_ms, Some(2.0));
+        assert_eq!(metrics.max_time_ms, Some(129.0));
+        assert_eq!(metrics.avg_time_ms, Some(47.0));
+        assert_eq!(metrics.ttl, Some(64));
+        assert_eq!(metrics.replies.len(), 4);
+        assert_eq!(metrics.replies[0].time_ms, Some(57.0));
+        assert_eq!(metrics.replies[0].bytes, Some(32));
+    }
+
+    #[test]
+    fn parse_ping_output_reads_windows_english_metrics() {
+        let output = r#"
+Pinging 127.0.0.1 with 32 bytes of data:
+Reply from 127.0.0.1: bytes=32 time<1ms TTL=128
+Reply from 127.0.0.1: bytes=32 time=2ms TTL=128
+
+Ping statistics for 127.0.0.1:
+    Packets: Sent = 2, Received = 2, Lost = 0 (0% loss),
+Approximate round trip times in milli-seconds:
+    Minimum = 0ms, Maximum = 2ms, Average = 1ms
+"#;
+
+        let metrics = parse_ping_output(output);
+
+        assert_eq!(metrics.packets_transmitted, Some(2));
+        assert_eq!(metrics.packets_received, Some(2));
+        assert_eq!(metrics.loss_percent, Some(0.0));
+        assert_eq!(metrics.min_time_ms, Some(0.0));
+        assert_eq!(metrics.max_time_ms, Some(2.0));
+        assert_eq!(metrics.avg_time_ms, Some(1.0));
+        assert_eq!(metrics.ttl, Some(128));
+        assert_eq!(metrics.replies.len(), 2);
+        assert_eq!(metrics.replies[0].time_ms, Some(1.0));
     }
 
     #[test]

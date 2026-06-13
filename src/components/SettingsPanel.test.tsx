@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { SettingsPanel } from "./SettingsPanel";
 
 vi.mock("../lib/api", () => ({
@@ -19,6 +19,10 @@ vi.mock("../lib/api", () => ({
   testAiConnection: vi.fn(async () => undefined),
   testNotification: vi.fn(async () => undefined),
 }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 it("loads and updates settings", async () => {
   const user = userEvent.setup();
@@ -74,4 +78,49 @@ it("can test ai connection", async () => {
 
   const api = await import("../lib/api");
   expect(api.testAiConnection).toHaveBeenCalled();
+});
+
+it("saves current ai settings before testing and shows result in the action row", async () => {
+  const user = userEvent.setup();
+  render(<SettingsPanel />);
+
+  const baseUrlInput = await screen.findByLabelText("API 地址");
+  await user.clear(baseUrlInput);
+  await user.type(baseUrlInput, "https://api.deepseek.com");
+  await user.click(screen.getByRole("button", { name: "测试 AI 连接" }));
+
+  const api = await import("../lib/api");
+  expect(api.updateAiSettings).toHaveBeenCalledWith({
+    baseUrl: "https://api.deepseek.com",
+    model: "qwen2.5:7b",
+    apiKey: "",
+  });
+  expect(vi.mocked(api.updateAiSettings)).toHaveBeenCalledBefore(
+    vi.mocked(api.testAiConnection),
+  );
+  expect(screen.getByTestId("ai-test-message")).toHaveTextContent("AI 连接正常。");
+  expect(screen.getByTestId("ai-test-actions")).toContainElement(
+    screen.getByTestId("ai-test-message"),
+  );
+});
+
+it("shows ai test failures in the action row instead of the page alert", async () => {
+  const api = await import("../lib/api");
+  vi.mocked(api.testAiConnection).mockRejectedValueOnce({
+    message: "AI provider request failed",
+  });
+
+  const user = userEvent.setup();
+  render(<SettingsPanel />);
+
+  await user.click(await screen.findByRole("button", { name: "测试 AI 连接" }));
+
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(screen.getByTestId("ai-test-message")).toHaveTextContent(
+    "AI provider request failed",
+  );
+  expect(screen.getByTestId("ai-test-message")).toHaveClass("error");
+  expect(screen.getByTestId("ai-test-actions")).toContainElement(
+    screen.getByTestId("ai-test-message"),
+  );
 });

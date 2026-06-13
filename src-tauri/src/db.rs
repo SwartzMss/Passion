@@ -20,6 +20,7 @@ pub fn migrate(conn: &Connection) -> BackendResult<()> {
             remind_at INTEGER NOT NULL,
             enabled INTEGER NOT NULL,
             status TEXT NOT NULL CHECK (status IN ('pending', 'triggered', 'expired')),
+            priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
             repeat_rule TEXT NOT NULL DEFAULT 'once' CHECK (repeat_rule IN ('once', 'daily', 'cn_workday') OR repeat_rule GLOB 'weekly:[1-7]*'),
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
@@ -63,6 +64,12 @@ pub fn migrate(conn: &Connection) -> BackendResult<()> {
         "reminders",
         "repeat_rule",
         "ALTER TABLE reminders ADD COLUMN repeat_rule TEXT NOT NULL DEFAULT 'once' CHECK (repeat_rule IN ('once', 'daily', 'cn_workday') OR repeat_rule GLOB 'weekly:[1-7]*')",
+    )?;
+    add_column_if_missing(
+        conn,
+        "reminders",
+        "priority",
+        "ALTER TABLE reminders ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high'))",
     )?;
     relax_reminder_repeat_rule_check(conn)?;
     add_column_if_missing(
@@ -109,14 +116,15 @@ fn relax_reminder_repeat_rule_check(conn: &Connection) -> BackendResult<()> {
             remind_at INTEGER NOT NULL,
             enabled INTEGER NOT NULL,
             status TEXT NOT NULL CHECK (status IN ('pending', 'triggered', 'expired')),
+            priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
             repeat_rule TEXT NOT NULL DEFAULT 'once' CHECK (repeat_rule IN ('once', 'daily', 'cn_workday') OR repeat_rule GLOB 'weekly:[1-7]*'),
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
             triggered_at INTEGER
         );
 
-        INSERT INTO reminders_next (id, title, notes, remind_at, enabled, status, repeat_rule, created_at, updated_at, triggered_at)
-        SELECT id, title, notes, remind_at, enabled, status, repeat_rule, created_at, updated_at, triggered_at
+        INSERT INTO reminders_next (id, title, notes, remind_at, enabled, status, priority, repeat_rule, created_at, updated_at, triggered_at)
+        SELECT id, title, notes, remind_at, enabled, status, 'medium', repeat_rule, created_at, updated_at, triggered_at
         FROM reminders;
 
         DROP TABLE reminders;

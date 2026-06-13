@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import App from "./App";
+import { APP_VERSION } from "./version";
 
 vi.mock("./lib/api", () => ({
   listReminders: vi.fn(async () => []),
@@ -46,15 +47,20 @@ it("shows a left navigation without removing workbench search", async () => {
   const navigation = screen.getByRole("navigation");
 
   expect(screen.getAllByText("Passion")).toHaveLength(1);
-  await waitFor(() => expect(screen.getByText("1 / 1")).toBeInTheDocument());
-  expect(screen.getByText("运行中任务")).toBeInTheDocument();
+  expect(screen.getByLabelText("应用版本")).toHaveTextContent(`v${APP_VERSION}`);
+  await waitFor(() => expect(screen.getByText("运行中脚本")).toBeInTheDocument());
+  expect(screen.queryByText("快速操作")).not.toBeInTheDocument();
   expect(within(navigation).getByRole("button", { name: "工作台" })).toHaveAttribute(
     "aria-current",
     "page",
   );
   expect(within(navigation).getByRole("button", { name: "提醒" })).toBeInTheDocument();
   expect(within(navigation).getByRole("button", { name: "翻译" })).toBeInTheDocument();
-  expect(screen.getByPlaceholderText("搜索工具，例如：端口、翻译、脚本、下载")).toBeInTheDocument();
+  expect(
+    screen.getByPlaceholderText(
+      "搜索功能或输入命令，例如：翻译、Ping、下载、脚本任务...",
+    ),
+  ).toBeInTheDocument();
 });
 
 it("switches features from the left navigation", async () => {
@@ -73,6 +79,8 @@ it("switches features from the left navigation", async () => {
     screen.queryByRole("button", { name: "返回工作台" }),
   ).not.toBeInTheDocument();
   expect(
-    screen.queryByPlaceholderText("搜索工具，例如：端口、翻译、脚本、下载"),
+    screen.queryByPlaceholderText(
+      "搜索功能或输入命令，例如：翻译、Ping、下载、脚本任务...",
+    ),
   ).not.toBeInTheDocument();
 });

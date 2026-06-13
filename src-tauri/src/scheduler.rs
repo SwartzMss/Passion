@@ -78,7 +78,7 @@ impl Scheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{ReminderRepeatRule, ReminderStatus};
+    use crate::models::{ReminderPriority, ReminderRepeatRule, ReminderStatus};
     use chrono::{Duration, Utc};
     use tokio::sync::mpsc;
     use tokio::sync::Barrier;
@@ -231,6 +231,7 @@ mod tests {
             remind_at: now + offset,
             enabled: true,
             status: ReminderStatus::Pending,
+            priority: ReminderPriority::Medium,
             repeat_rule: ReminderRepeatRule::Once,
             created_at: now,
             updated_at: now,

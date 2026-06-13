@@ -16,9 +16,7 @@ interface Props {
 
 export function WorkbenchHome({
   pendingReminderCount,
-  enabledScriptTaskCount,
   runningScriptTaskCount,
-  totalScriptTaskCount,
   onOpenReminders,
   onAddReminder,
   onOpenTranslation,
@@ -89,29 +87,6 @@ export function WorkbenchHome({
       onOpenScriptTasks,
     ],
   );
-  const summaries = useMemo(
-    () => [
-      {
-        label: "待提醒",
-        value: String(pendingReminderCount),
-        description: "当前启用且等待触发的提醒",
-        keywords: "提醒 待提醒 通知 日程",
-      },
-      {
-        label: "启用脚本",
-        value: `${enabledScriptTaskCount} / ${totalScriptTaskCount}`,
-        description: "后台定期任务启用情况",
-        keywords: "脚本 任务 自动化 启用",
-      },
-      {
-        label: "运行中任务",
-        value: String(runningScriptTaskCount),
-        description: "已启动但尚未结束的脚本",
-        keywords: "运行中 脚本 任务 后台",
-      },
-    ],
-    [enabledScriptTaskCount, pendingReminderCount, runningScriptTaskCount, totalScriptTaskCount],
-  );
   const normalizedQuery = query.trim().toLowerCase();
   const visibleTools = normalizedQuery
     ? tools.filter((tool) =>
@@ -120,17 +95,63 @@ export function WorkbenchHome({
           .includes(normalizedQuery),
       )
     : [];
-
+  const statusCards = [
+    {
+      id: "reminders",
+      label: "待提醒",
+      value: String(pendingReminderCount),
+      description: "今日待触发提醒",
+      meta: "查看提醒",
+      tone: "blue",
+      onClick: onOpenReminders,
+    },
+    {
+      id: "downloads",
+      label: "下载中",
+      value: "0",
+      description: "正在进行的下载任务",
+      meta: "查看下载",
+      tone: "green",
+      onClick: onOpenDownloader,
+    },
+    {
+      id: "scripts",
+      label: "运行中脚本",
+      value: String(runningScriptTaskCount),
+      description: "正在执行的脚本任务",
+      meta: "查看脚本任务",
+      tone: "purple",
+      onClick: onOpenScriptTasks,
+    },
+    {
+      id: "system",
+      label: "系统状态",
+      value: "正常",
+      description: "基础资源入口",
+      meta: "查看系统监控",
+      tone: "orange",
+      onClick: onOpenSystemMonitor,
+    },
+  ];
   return (
     <section className="workbench">
+      <div className="workbench-hero">
+        <div>
+          <h1>工作台</h1>
+          <p>欢迎使用 Passion，快速查看任务状态并启动常用工具。</p>
+        </div>
+      </div>
+
       <div className="workbench-searchbar">
         <label className="feature-search">
           <span className="sr-only">搜索工具</span>
           <input
+            aria-label="搜索工具"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索工具，例如：端口、翻译、脚本、下载"
+            placeholder="搜索功能或输入命令，例如：翻译、Ping、下载、脚本任务..."
           />
+          <kbd>Ctrl + K</kbd>
         </label>
       </div>
 
@@ -161,15 +182,23 @@ export function WorkbenchHome({
           <div className="empty-state">没有找到相关工具</div>
         )
       ) : (
-        <div className="workbench-summary" aria-label="工作台摘要">
-          {summaries.map((item) => (
-            <article className="summary-card" key={item.label}>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-              <p>{item.description}</p>
-            </article>
-          ))}
-        </div>
+        <>
+          <div className="workbench-status-grid" aria-label="工作台摘要">
+            {statusCards.map((item) => (
+              <article className="workbench-status-card" key={item.id}>
+                <span className={`workbench-status-icon ${item.tone}`} aria-hidden="true" />
+                <div>
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                  <p>{item.description}</p>
+                </div>
+                <button type="button" onClick={item.onClick}>
+                  {item.meta}
+                </button>
+              </article>
+            ))}
+          </div>
+        </>
       )}
     </section>
   );

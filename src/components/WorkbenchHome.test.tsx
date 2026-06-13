@@ -17,17 +17,27 @@ const defaultProps = {
   onOpenScriptTasks: vi.fn(),
 };
 
-it("shows workbench status summaries below search", () => {
-  render(<WorkbenchHome {...defaultProps} />);
+it("shows the workbench dashboard", async () => {
+  render(
+    <WorkbenchHome {...defaultProps} />,
+  );
 
+  expect(screen.getByRole("heading", { name: "工作台" })).toBeInTheDocument();
+  expect(
+    screen.getByText("欢迎使用 Passion，快速查看任务状态并启动常用工具。"),
+  ).toBeInTheDocument();
   expect(screen.getByLabelText("搜索工具")).toBeInTheDocument();
+  expect(screen.getByText("Ctrl + K")).toBeInTheDocument();
+
   expect(screen.getByText("待提醒")).toBeInTheDocument();
   expect(screen.getByText("2")).toBeInTheDocument();
-  expect(screen.getByText("启用脚本")).toBeInTheDocument();
-  expect(screen.getByText("1 / 3")).toBeInTheDocument();
-  expect(screen.getByText("运行中任务")).toBeInTheDocument();
-  expect(screen.queryByRole("heading", { name: "提醒" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "开始翻译" })).not.toBeInTheDocument();
+  expect(screen.getByText("下载中")).toBeInTheDocument();
+  expect(screen.getByText("运行中脚本")).toBeInTheDocument();
+  expect(screen.getByText("系统状态")).toBeInTheDocument();
+  expect(screen.queryByText("快速操作")).not.toBeInTheDocument();
+  expect(screen.queryByText("即将发生")).not.toBeInTheDocument();
+  expect(screen.queryByText("最近活动")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "新增脚本任务" })).not.toBeInTheDocument();
 });
 
 it("searches tools without showing the old card grid", async () => {
@@ -45,7 +55,7 @@ it("searches tools without showing the old card grid", async () => {
   expect(screen.getByLabelText("工具搜索结果")).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "网络检测" })).toBeInTheDocument();
   expect(screen.queryByText("待提醒")).not.toBeInTheDocument();
-  expect(screen.queryByText("启用脚本")).not.toBeInTheDocument();
+  expect(screen.queryByText("快速操作")).not.toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "开始检测" }));
 

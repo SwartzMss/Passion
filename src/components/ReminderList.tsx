@@ -1,24 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Reminder } from "../types";
 
 interface Props {
   reminders: Reminder[];
   onAdd: () => void;
-  onToggle: (id: string, enabled: boolean) => void;
+  onEdit: (reminder: Reminder) => void;
   onDelete: (id: string) => void;
 }
 
 export function ReminderList({
   reminders,
   onAdd,
-  onToggle,
+  onEdit,
   onDelete,
 }: Props) {
-  const [activeFilter, setActiveFilter] = useState<"current" | "completed">(
-    "current",
+  const [activeFilter, setActiveFilter] = useState<
+    "all" | "pending" | "completed"
+  >(
+    "pending",
   );
   const [query, setQuery] = useState("");
-  const currentReminders = useMemo(
+  const pendingReminders = useMemo(
     () => reminders.filter((reminder) => reminder.status === "pending"),
     [reminders],
   );
@@ -28,7 +30,11 @@ export function ReminderList({
   );
   const visibleReminders = useMemo(() => {
     const source =
-      activeFilter === "current" ? currentReminders : completedReminders;
+      activeFilter === "all"
+        ? reminders
+        : activeFilter === "pending"
+          ? pendingReminders
+          : completedReminders;
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) {
       return source;
@@ -36,7 +42,6 @@ export function ReminderList({
     return source.filter((reminder) =>
       [
         reminder.title,
-        reminder.notes ?? "",
         repeatRuleLabel(reminder.repeatRule),
         statusLabel(reminder.status),
       ]
@@ -44,203 +49,211 @@ export function ReminderList({
         .toLowerCase()
         .includes(normalizedQuery),
     );
-  }, [activeFilter, completedReminders, currentReminders, query]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selectedReminder =
-    visibleReminders.find((reminder) => reminder.id === selectedId) ??
-    visibleReminders[0] ??
-    null;
+  }, [activeFilter, completedReminders, pendingReminders, query, reminders]);
   const emptyListMessage = query.trim()
     ? "没有找到匹配的提醒。"
-    : activeFilter === "current"
-      ? "当前没有提醒。"
-      : "还没有已完成提醒。";
-
-  useEffect(() => {
-    setSelectedId((current) => {
-      if (current && visibleReminders.some((reminder) => reminder.id === current)) {
-        return current;
-      }
-      return visibleReminders[0]?.id ?? null;
-    });
-  }, [visibleReminders]);
+    : activeFilter === "completed"
+      ? "还没有已完成提醒。"
+      : "暂无提醒";
 
   return (
     <section className="reminder-panel">
-      <aside className="reminder-filters" aria-label="提醒筛选">
-        <button
-          aria-label={`当前提醒 ${currentReminders.length}`}
-          className={activeFilter === "current" ? "active" : ""}
-          onClick={() => setActiveFilter("current")}
-        >
-          <span>当前提醒</span>
-          <strong>{currentReminders.length}</strong>
-        </button>
-        <button
-          aria-label={`已完成提醒 ${completedReminders.length}`}
-          className={activeFilter === "completed" ? "active" : ""}
-          onClick={() => setActiveFilter("completed")}
-        >
-          <span>已完成提醒</span>
-          <strong>{completedReminders.length}</strong>
-        </button>
-      </aside>
+      <header className="reminder-hero">
+        <h1>提醒</h1>
+        <p>管理一次性提醒、周期提醒和任务通知。</p>
+      </header>
 
-      <div className="reminder-workspace">
-        <div className="reminder-toolbar">
+      <div className="reminder-filters" aria-label="提醒筛选" role="group">
+        <FilterButton
+          active={activeFilter === "all"}
+          count={reminders.length}
+          label="全部"
+          onClick={() => setActiveFilter("all")}
+        />
+        <FilterButton
+          active={activeFilter === "pending"}
+          count={pendingReminders.length}
+          label="待提醒"
+          onClick={() => setActiveFilter("pending")}
+        />
+        <FilterButton
+          active={activeFilter === "completed"}
+          count={completedReminders.length}
+          label="已完成"
+          onClick={() => setActiveFilter("completed")}
+        />
+      </div>
+
+      <div className="reminder-toolbar">
+        <div className="reminder-search">
+          <span aria-hidden="true" className="reminder-search-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M10.5 5a5.5 5.5 0 0 1 4.4 8.8l3.6 3.6-1.1 1.1-3.6-3.6A5.5 5.5 0 1 1 10.5 5Zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />
+            </svg>
+          </span>
           <label className="sr-only" htmlFor="reminder-search">
             搜索提醒
           </label>
           <input
             id="reminder-search"
-            placeholder="搜索提醒名称、备注或规则"
+            placeholder="搜索提醒名称或重复规则"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
-          <button className="primary-action" onClick={onAdd}>
-            新增提醒
-          </button>
         </div>
+        <button className="primary-action reminder-add-action" onClick={onAdd}>
+          <span aria-hidden="true">+</span>
+          新增提醒
+        </button>
+      </div>
 
-        <div className="reminder-content">
-          <div className="reminder-list" aria-label="提醒列表">
+      <div className="reminder-content reminder-content-single">
+        <section className="reminder-card" aria-label="提醒列表">
+          <div className="reminder-list" aria-label="提醒条目列表">
             {visibleReminders.length === 0 ? (
               <div className="reminder-list-empty">
-                {emptyListMessage}
+                <div className="reminder-empty-illustration reminder-empty-bell">
+                  <svg aria-hidden="true" viewBox="0 0 64 64">
+                    <path d="M18 44h28l-3-5V28c0-7-4-12-10-13V12a3 3 0 0 0-6 0v3c-6 1-10 6-10 13v11l-3 5Z" />
+                    <path d="M27 48a5 5 0 0 0 10 0" />
+                  </svg>
+                </div>
+                <h3>{emptyListMessage}</h3>
               </div>
             ) : null}
-            {visibleReminders.map((reminder) => (
-              <button
-                aria-label={reminder.title}
-                aria-pressed={selectedReminder?.id === reminder.id}
-                className={`reminder-row ${
-                  selectedReminder?.id === reminder.id ? "selected" : ""
-                }`}
-                key={reminder.id}
-                onClick={() => setSelectedId(reminder.id)}
-              >
-                <span>
-                  <strong>{reminder.title}</strong>
-                  <span>
-                    {formatTime(reminder.remindAt)} ·{" "}
-                    {repeatRuleLabel(reminder.repeatRule)}
-                  </span>
-                </span>
-              </button>
-            ))}
+            {visibleReminders.length > 0 ? (
+              <>
+                <table className="reminder-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">名称</th>
+                      <th scope="col">类型</th>
+                      <th scope="col">优先级</th>
+                      <th scope="col">下次触发时间</th>
+                      <th scope="col">状态</th>
+                      <th scope="col">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleReminders.map((reminder) => (
+                      <tr key={reminder.id}>
+                        <td>
+                          <div className="reminder-name-cell">
+                            <strong>{reminder.title}</strong>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`repeat-badge repeat-${repeatKind(reminder.repeatRule)}`}>
+                            {repeatRuleLabel(reminder.repeatRule)}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`priority-badge priority-${reminder.priority}`}>
+                            {priorityLabel(reminder.priority)}
+                          </span>
+                        </td>
+                        <td>{formatTime(reminder.remindAt)}</td>
+                        <td>
+                          <span className={`status status-${reminder.status}`}>
+                            {statusLabel(reminder.status)}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="reminder-table-actions">
+                            <button
+                              onClick={() => onEdit(reminder)}
+                              aria-label={`编辑 ${reminder.title}`}
+                            >
+                              编辑
+                            </button>
+                            <button
+                              className="danger-action"
+                              onClick={() => onDelete(reminder.id)}
+                              aria-label={`删除 ${reminder.title}`}
+                            >
+                              删除
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="reminder-table-footer">
+                  <span>共 {visibleReminders.length} 条</span>
+                  <div className="reminder-table-pager" aria-label="分页">
+                    <button aria-label="上一页" disabled>
+                      ‹
+                    </button>
+                    <strong>1</strong>
+                    <button aria-label="下一页" disabled>
+                      ›
+                    </button>
+                    <span>20条/页</span>
+                  </div>
+                </div>
+              </>
+            ) : null}
           </div>
-
-          <aside className="reminder-detail" aria-label="提醒详情">
-            {selectedReminder ? (
-              <ReminderDetail
-                reminder={selectedReminder}
-                onDelete={onDelete}
-                onToggle={onToggle}
-              />
-            ) : (
-              <div className="reminder-detail-empty">
-                <h3>选择一个提醒</h3>
-                <p className="muted">左侧列表没有可显示的提醒。</p>
-              </div>
-            )}
-          </aside>
-        </div>
+        </section>
       </div>
     </section>
   );
 }
 
-function ReminderDetail({
-  reminder,
-  onToggle,
-  onDelete,
+function FilterButton({
+  active,
+  count,
+  label,
+  onClick,
 }: {
-  reminder: Reminder;
-  onToggle: (id: string, enabled: boolean) => void;
-  onDelete: (id: string) => void;
+  active: boolean;
+  count: number;
+  label: string;
+  onClick: () => void;
 }) {
   return (
-    <>
-      <div className="reminder-detail-header">
-        <span className={`status status-${reminder.status}`}>
-          {statusLabel(reminder.status)}
-        </span>
-        <span className={reminder.enabled ? "enabled" : "disabled"}>
-          {reminder.enabled ? "已启用" : "已停用"}
-        </span>
-      </div>
-      <h2>{reminder.title}</h2>
-      <dl className="reminder-detail-list">
-        <div>
-          <dt>下次触发</dt>
-          <dd>{formatTime(reminder.remindAt)}</dd>
-        </div>
-        <div>
-          <dt>重复规则</dt>
-          <dd>{repeatRuleLabel(reminder.repeatRule)}</dd>
-        </div>
-        {reminder.triggeredAt ? (
-          <div>
-            <dt>完成时间</dt>
-            <dd>{formatTime(reminder.triggeredAt)}</dd>
-          </div>
-        ) : null}
-      </dl>
-      <div className="reminder-notes">
-        <h3>备注</h3>
-        <p>{reminder.notes || "没有备注。"}</p>
-      </div>
-      <div className="reminder-detail-actions">
-        <button
-          onClick={() => onToggle(reminder.id, !reminder.enabled)}
-          disabled={reminder.status !== "pending"}
-          aria-label={`${reminder.enabled ? "停用" : "启用"} ${reminder.title}`}
-        >
-          {reminder.enabled ? "停用" : "启用"}
-        </button>
-        <button
-          className="danger-action"
-          onClick={() => onDelete(reminder.id)}
-          aria-label={`删除 ${reminder.title}`}
-        >
-          删除
-        </button>
-      </div>
-    </>
+    <button
+      aria-label={`${label} ${count}`}
+      className={active ? "active" : ""}
+      onClick={onClick}
+    >
+      <span>{label}</span>
+      <strong>{count}</strong>
+    </button>
   );
 }
 
 function repeatRuleLabel(rule: Reminder["repeatRule"]) {
   switch (rule) {
     case "once":
-      return "单次提醒";
+      return "一次性";
     case "daily":
       return "每天";
     case "cn_workday":
-      return "中国法定工作日";
+      return "法定工作日";
     default:
-      if (rule.startsWith("weekly:")) {
-        const days = rule
-          .replace("weekly:", "")
-          .split(",")
-          .map((day) => WEEKDAY_LABELS[day])
-          .filter(Boolean)
-          .join("、");
-        return days ? `每周 ${days}` : "每周";
-      }
       return "重复提醒";
   }
 }
 
-const WEEKDAY_LABELS: Record<string, string> = {
-  "1": "周一",
-  "2": "周二",
-  "3": "周三",
-  "4": "周四",
-  "5": "周五",
-  "6": "周六",
-  "7": "周日",
-};
+function repeatKind(rule: Reminder["repeatRule"]) {
+  if (rule === "once" || rule === "daily" || rule === "cn_workday") {
+    return rule;
+  }
+  return "custom";
+}
+
+function priorityLabel(priority: Reminder["priority"]) {
+  switch (priority) {
+    case "low":
+      return "低";
+    case "medium":
+      return "中";
+    case "high":
+      return "高";
+  }
+}
 
 function statusLabel(status: Reminder["status"]) {
   switch (status) {
@@ -254,11 +267,11 @@ function statusLabel(status: Reminder["status"]) {
 }
 
 function formatTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
 }

@@ -7,8 +7,17 @@ vi.mock("../lib/api", () => ({
   pingHost: vi.fn(async () => ({
     host: "127.0.0.1",
     reachable: true,
-    summary: "可达 time=8ms",
-    rawOutput: "reply time=8ms",
+    packetsTransmitted: 4,
+    packetsReceived: 4,
+    lossPercent: 0,
+    minTimeMs: 2,
+    maxTimeMs: 12,
+    avgTimeMs: 8,
+    ttl: 64,
+    replies: [
+      { bytes: 32, timeMs: 8, ttl: 64 },
+      { bytes: 32, timeMs: 7, ttl: 64 },
+    ],
   })),
   checkPort: vi.fn(async () => ({
     host: "127.0.0.1",
@@ -31,6 +40,18 @@ vi.mock("../lib/api", () => ({
   })),
 }));
 
+it("renders the network diagnostics workspace", () => {
+  render(<NetworkDiagnosticsPanel />);
+
+  expect(screen.getByRole("heading", { name: "网络检测" })).toBeInTheDocument();
+  expect(screen.getByText("检查网络连通性、TCP 端口开放情况和本机端口占用。")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "使用说明" })).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Ping 检测" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "端口检测" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "端口占用" })).toBeInTheDocument();
+  expect(screen.getByText(/支持域名、IPv4 地址，端口范围 1-65535。/)).toBeInTheDocument();
+});
+
 it("rejects empty ping host", async () => {
   const user = userEvent.setup();
   render(<NetworkDiagnosticsPanel />);
@@ -48,7 +69,12 @@ it("runs ping and shows result", async () => {
   await user.click(screen.getByRole("button", { name: /开始 Ping/ }));
 
   expect(await screen.findByText("Ping 成功")).toBeInTheDocument();
-  expect(screen.getByText("响应时间 8ms")).toBeInTheDocument();
+  expect(screen.getByText("平均延迟")).toBeInTheDocument();
+  expect(screen.getAllByText("8 ms").length).toBeGreaterThan(0);
+  expect(screen.getByText("丢包率")).toBeInTheDocument();
+  expect(screen.getAllByText("0%").length).toBeGreaterThan(0);
+  expect(screen.getByText("TTL")).toBeInTheDocument();
+  expect(screen.queryByText(/reply time=8ms/)).not.toBeInTheDocument();
   expect(screen.getByText("历史记录（1）")).toBeInTheDocument();
   const api = await import("../lib/api");
   expect(api.pingHost).toHaveBeenCalledWith({ host: "127.0.0.1" });
@@ -58,8 +84,8 @@ it("checks a tcp port and shows result", async () => {
   const user = userEvent.setup();
   render(<NetworkDiagnosticsPanel />);
 
-  await user.clear(screen.getByLabelText("Port"));
-  await user.type(screen.getByLabelText("Port"), "80");
+  await user.clear(screen.getByLabelText("端口号", { selector: "#network-port" }));
+  await user.type(screen.getByLabelText("端口号", { selector: "#network-port" }), "80");
   await user.click(screen.getByRole("button", { name: /检测端口/ }));
 
   expect(await screen.findByText("未开放")).toBeInTheDocument();
@@ -71,8 +97,8 @@ it("inspects port occupancy and shows process details", async () => {
   const user = userEvent.setup();
   render(<NetworkDiagnosticsPanel />);
 
-  await user.clear(screen.getByLabelText("占用端口"));
-  await user.type(screen.getByLabelText("占用端口"), "1420");
+  await user.clear(screen.getByLabelText("端口号", { selector: "#occupancy-port" }));
+  await user.type(screen.getByLabelText("端口号", { selector: "#occupancy-port" }), "1420");
   await user.click(screen.getByRole("button", { name: /查看占用/ }));
 
   expect(await screen.findByText("已占用")).toBeInTheDocument();
@@ -87,8 +113,8 @@ it("validates port values before running checks", async () => {
   const user = userEvent.setup();
   render(<NetworkDiagnosticsPanel />);
 
-  await user.clear(screen.getByLabelText("Port"));
-  await user.type(screen.getByLabelText("Port"), "70000");
+  await user.clear(screen.getByLabelText("端口号", { selector: "#network-port" }));
+  await user.type(screen.getByLabelText("端口号", { selector: "#network-port" }), "70000");
 
   expect(screen.getByText("端口范围 1-65535")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /检测端口/ })).toBeDisabled();

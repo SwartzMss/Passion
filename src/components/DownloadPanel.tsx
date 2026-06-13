@@ -3,6 +3,7 @@ import { downloadFile } from "../lib/api";
 import type { DownloadResult } from "../types";
 
 type DownloadTaskStatus = "running" | "completed" | "failed";
+type DownloadTaskFilter = "all" | DownloadTaskStatus;
 
 interface DownloadTask {
   id: string;
@@ -15,12 +16,14 @@ interface DownloadTask {
   error?: string | null;
 }
 
+const DEFAULT_DOWNLOAD_DIR = "系统下载目录";
+
 export function DownloadPanel() {
   const [url, setUrl] = useState("");
   const [fileName, setFileName] = useState("");
   const [tasks, setTasks] = useState<DownloadTask[]>([]);
-  const [activeFilter, setActiveFilter] =
-    useState<DownloadTaskStatus>("running");
+  const [activeFilter, setActiveFilter] = useState<DownloadTaskFilter>("all");
+  const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -34,7 +37,7 @@ export function DownloadPanel() {
     const trimmedUrl = url.trim();
     const trimmedFileName = fileName.trim();
     setError(null);
-    setActiveFilter("running");
+    setActiveFilter("all");
     setSelectedId(taskId);
     setTasks((current) => [
       {
@@ -64,7 +67,6 @@ export function DownloadPanel() {
             : task,
         ),
       );
-      setActiveFilter("completed");
     } catch (err) {
       const message = readError(err);
       setError(message);
@@ -80,7 +82,6 @@ export function DownloadPanel() {
             : task,
         ),
       );
-      setActiveFilter("failed");
     } finally {
       setIsDownloading(false);
     }
@@ -89,16 +90,31 @@ export function DownloadPanel() {
   const runningTasks = tasks.filter((task) => task.status === "running");
   const completedTasks = tasks.filter((task) => task.status === "completed");
   const failedTasks = tasks.filter((task) => task.status === "failed");
-  const visibleTasks =
-    activeFilter === "running"
+  const filteredTasks =
+    activeFilter === "all"
+      ? tasks
+      : activeFilter === "running"
       ? runningTasks
       : activeFilter === "completed"
         ? completedTasks
         : failedTasks;
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleTasks = normalizedQuery
+    ? filteredTasks.filter((task) =>
+        [downloadTaskTitle(task), task.url, task.requestedFileName]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedQuery),
+      )
+    : filteredTasks;
   const selectedTask =
     visibleTasks.find((task) => task.id === selectedId) ?? visibleTasks[0] ?? null;
   const emptyListMessage =
-    activeFilter === "running"
+    normalizedQuery
+      ? "没有找到匹配的下载任务。"
+      : activeFilter === "all"
+        ? "还没有下载任务。"
+        : activeFilter === "running"
       ? "当前没有正在下载的任务。"
       : activeFilter === "completed"
         ? "还没有已完成下载。"
@@ -106,12 +122,10 @@ export function DownloadPanel() {
 
   return (
     <section className="download-panel">
-      <div className="section-header">
-        <div>
-          <h2>下载工具</h2>
-          <p className="muted">输入 HTTP/HTTPS 地址，文件会保存到系统下载目录。</p>
-        </div>
-      </div>
+      <header className="download-hero">
+        <h1>下载工具</h1>
+        <p>输入 HTTP/HTTPS 地址，文件会保存到系统下载目录。</p>
+      </header>
 
       {error ? (
         <p className="error" role="alert">
@@ -120,56 +134,88 @@ export function DownloadPanel() {
       ) : null}
 
       <div className="download-card">
-        <label className="field-label">
+        <h2>新建下载任务</h2>
+        <label className="field-label" htmlFor="download-url">
           下载地址
-          <input
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-            placeholder="https://example.com/file.zip"
-          />
+          <span className="download-input-shell">
+            <span aria-hidden="true">🔗</span>
+            <input
+              id="download-url"
+              aria-label="下载地址"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder="请输入 HTTP/HTTPS 地址，例如：https://example.com/file.zip"
+            />
+          </span>
         </label>
-        <label className="field-label">
+        <label className="field-label" htmlFor="download-file-name">
           文件名（可选）
           <input
+            id="download-file-name"
+            aria-label="文件名（可选）"
             value={fileName}
             onChange={(event) => setFileName(event.target.value)}
             placeholder="留空则自动从 URL 获取"
           />
         </label>
-        <button onClick={submit} disabled={isDownloading}>
-          {isDownloading ? "下载中..." : "开始下载"}
-        </button>
+        <div className="download-form-footer">
+          <div className="download-location">
+            <span>保存位置</span>
+            <div>
+              <span aria-hidden="true">📁</span>
+              <strong>{DEFAULT_DOWNLOAD_DIR}</strong>
+              <button disabled type="button">更改目录</button>
+            </div>
+          </div>
+          <button className="primary-action download-start-button" onClick={submit} disabled={isDownloading}>
+            <span aria-hidden="true">+</span>
+            {isDownloading ? "下载中..." : "开始下载"}
+          </button>
+        </div>
       </div>
 
-      <div className="task-workspace">
-        <aside className="task-filters" aria-label="下载任务筛选">
-          <button
-            aria-label={`下载中 ${runningTasks.length}`}
-            className={activeFilter === "running" ? "active" : ""}
+      <div className="download-toolbar">
+        <div className="download-filters" aria-label="下载任务筛选" role="group">
+          <FilterButton
+            active={activeFilter === "all"}
+            count={tasks.length}
+            label="全部"
+            onClick={() => setActiveFilter("all")}
+          />
+          <FilterButton
+            active={activeFilter === "running"}
+            count={runningTasks.length}
+            label="下载中"
             onClick={() => setActiveFilter("running")}
-          >
-            <span>下载中</span>
-            <strong>{runningTasks.length}</strong>
-          </button>
-          <button
-            aria-label={`已完成 ${completedTasks.length}`}
-            className={activeFilter === "completed" ? "active" : ""}
+          />
+          <FilterButton
+            active={activeFilter === "completed"}
+            count={completedTasks.length}
+            label="已完成"
             onClick={() => setActiveFilter("completed")}
-          >
-            <span>已完成</span>
-            <strong>{completedTasks.length}</strong>
-          </button>
-          <button
-            aria-label={`失败 ${failedTasks.length}`}
-            className={activeFilter === "failed" ? "active" : ""}
+          />
+          <FilterButton
+            active={activeFilter === "failed"}
+            count={failedTasks.length}
+            label="失败"
             onClick={() => setActiveFilter("failed")}
-          >
-            <span>失败</span>
-            <strong>{failedTasks.length}</strong>
-          </button>
-        </aside>
+          />
+        </div>
+        <div className="download-search">
+          <label className="sr-only" htmlFor="download-search">
+            搜索下载任务
+          </label>
+          <input
+            id="download-search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索文件名或地址"
+          />
+          <span aria-hidden="true">⌕</span>
+        </div>
+      </div>
 
-        <div className="task-content">
+      <div className="download-workspace">
           <div className="task-list" aria-label="下载任务列表">
             {visibleTasks.length === 0 ? (
               <div className="task-list-empty">{emptyListMessage}</div>
@@ -184,9 +230,20 @@ export function DownloadPanel() {
                 key={task.id}
                 onClick={() => setSelectedId(task.id)}
               >
+                <span className="download-file-icon" aria-hidden="true">⇩</span>
                 <span>
                   <strong>{downloadTaskTitle(task)}</strong>
-                  <span>{downloadTaskStatusLabel(task.status)} · {formatTime(task.startedAt)}</span>
+                  <span>{task.url}</span>
+                  <span>
+                    <span className={`download-status download-status-${task.status}`}>
+                      {downloadTaskStatusLabel(task.status)}
+                    </span>
+                    {task.status === "completed" && task.result
+                      ? ` · ${formatBytes(task.result.bytes)}`
+                      : task.status === "failed"
+                        ? ` · ${task.error ?? "下载失败"}`
+                        : " · 等待下载完成"}
+                  </span>
                 </span>
               </button>
             ))}
@@ -198,13 +255,36 @@ export function DownloadPanel() {
             ) : (
               <div className="task-detail-empty">
                 <h3>选择一个下载任务</h3>
-                <p className="muted">当前分类没有可显示的下载任务。</p>
+                <p className="muted">从左侧列表选择任务后，可以查看保存位置和下载状态。</p>
               </div>
             )}
           </aside>
-        </div>
       </div>
     </section>
+  );
+}
+
+function FilterButton({
+  active,
+  count,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  count: number;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-label={`${label} ${count}`}
+      className={active ? "active" : ""}
+      onClick={onClick}
+      type="button"
+    >
+      <span>{label}</span>
+      <strong>{count}</strong>
+    </button>
   );
 }
 
@@ -217,6 +297,11 @@ function DownloadTaskDetail({ task }: { task: DownloadTask }) {
         </span>
       </div>
       <h3>{downloadTaskTitle(task)}</h3>
+      <div className="download-progress-row">
+        <span>进度</span>
+        <progress value={task.status === "completed" ? 100 : 0} max={100} />
+        <strong>{task.status === "completed" ? "100%" : task.status === "running" ? "下载中" : "失败"}</strong>
+      </div>
       <dl className="task-detail-list">
         <div>
           <dt>下载地址</dt>

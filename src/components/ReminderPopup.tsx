@@ -11,20 +11,55 @@ export function ReminderPopup({ reminder, onClose }: Props) {
   }
 
   return (
-    <div className="modal-backdrop">
+    <div className="reminder-toast-layer">
       <section
-        className="modal"
+        className="reminder-toast"
         role="dialog"
-        aria-modal="true"
-        aria-label="提醒已触发"
+        aria-label="提醒"
       >
-        <h2>{reminder.title}</h2>
-        {reminder.notes ? <p>{reminder.notes}</p> : null}
-        <p className="muted">
-          {new Date(reminder.remindAt).toLocaleString("zh-CN")}
-        </p>
-        <button onClick={onClose}>知道了</button>
+        <div className="reminder-toast-icon" aria-hidden="true">
+          <span />
+        </div>
+        <button
+          aria-label="关闭提醒"
+          className="reminder-toast-close"
+          onClick={onClose}
+          type="button"
+        >
+          ×
+        </button>
+        <div className="reminder-toast-content">
+          <h2>{reminder.title}</h2>
+          <p>{formatReminderTime(reminder.remindAt)}</p>
+          {reminder.notes ? <small>{reminder.notes}</small> : null}
+        </div>
+        <button className="reminder-toast-complete" onClick={onClose} type="button">
+          完成
+        </button>
       </section>
     </div>
   );
+}
+
+function formatReminderTime(value: string) {
+  const date = new Date(value);
+  const now = new Date();
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  const time = new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+  if (sameDay) {
+    return `今天 ${time}`;
+  }
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }

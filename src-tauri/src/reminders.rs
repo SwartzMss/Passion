@@ -1,5 +1,5 @@
 use crate::error::{BackendError, BackendResult};
-use crate::models::{NewReminder, Reminder, ReminderRepeatRule, ReminderStatus};
+use crate::models::{NewReminder, Reminder, ReminderPriority, ReminderRepeatRule, ReminderStatus};
 use chrono::{DateTime, Datelike, Duration, FixedOffset, TimeZone, Timelike, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use uuid::Uuid;
@@ -27,6 +27,27 @@ impl ReminderStatus {
             "expired" => Ok(Self::Expired),
             other => Err(BackendError::Database(format!(
                 "invalid reminder status {other}"
+            ))),
+        }
+    }
+}
+
+impl ReminderPriority {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReminderPriority::Low => "low",
+            ReminderPriority::Medium => "medium",
+            ReminderPriority::High => "high",
+        }
+    }
+
+    fn from_db(value: &str) -> BackendResult<Self> {
+        match value {
+            "low" => Ok(Self::Low),
+            "medium" => Ok(Self::Medium),
+            "high" => Ok(Self::High),
+            other => Err(BackendError::Database(format!(
+                "invalid reminder priority {other}"
             ))),
         }
     }
@@ -71,6 +92,7 @@ impl ReminderRepository {
             remind_at,
             enabled: true,
             status: ReminderStatus::Pending,
+            priority: input.priority,
             repeat_rule: input.repeat_rule,
             created_at: now,
             updated_at: now,
@@ -78,8 +100,8 @@ impl ReminderRepository {
         };
 
         conn.execute(
-            "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, repeat_rule, created_at, updated_at, triggered_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL)",
+            "INSERT INTO reminders (id, title, notes, remind_at, enabled, status, priority, repeat_rule, created_at, updated_at, triggered_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL)",
             params![
                 reminder.id,
                 reminder.title,
@@ -87,6 +109,7 @@ impl ReminderRepository {
                 reminder.remind_at.timestamp_millis(),
                 reminder.enabled,
                 reminder.status.as_str(),
+                reminder.priority.as_str(),
                 reminder.repeat_rule.as_str(),
                 reminder.created_at.timestamp_millis(),
                 reminder.updated_at.timestamp_millis(),
@@ -131,6 +154,55 @@ impl ReminderRepository {
             params![enabled, Utc::now().timestamp_millis(), id],
         )
         .map_err(|err| BackendError::Database(err.to_string()))?;
+        Self::get(conn, id)
+    }
+
+    pub fn update(conn: &Connection, id: &str, input: NewReminder) -> BackendResult<Reminder> {
+        Self::update_at(conn, id, input, Utc::now())
+    }
+
+    pub fn update_at(
+        conn: &Connection,
+        id: &str,
+        input: NewReminder,
+        now: DateTime<Utc>,
+    ) -> BackendResult<Reminder> {
+        Self::get(conn, id)?;
+        let title = input.title.trim().to_string();
+        if title.is_empty() {
+            return Err(BackendError::EmptyTitle);
+        }
+        let remind_at = if input.repeat_rule.is_repeating() {
+            next_repeating_remind_at(&input.repeat_rule, input.remind_at, now)?
+        } else {
+            input.remind_at
+        };
+        if remind_at <= now {
+            return Err(BackendError::ReminderTimeInPast);
+        }
+        let notes = input
+            .notes
+            .map(|notes| notes.trim().to_string())
+            .filter(|notes| !notes.is_empty());
+        let count = conn
+            .execute(
+                "UPDATE reminders
+                 SET title = ?1, notes = ?2, remind_at = ?3, status = 'pending', priority = ?4, repeat_rule = ?5, updated_at = ?6, triggered_at = NULL
+                 WHERE id = ?7",
+                params![
+                    title,
+                    notes,
+                    remind_at.timestamp_millis(),
+                    input.priority.as_str(),
+                    input.repeat_rule.as_str(),
+                    now.timestamp_millis(),
+                    id,
+                ],
+            )
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        if count == 0 {
+            return Err(BackendError::ReminderNotFound);
+        }
         Self::get(conn, id)
     }
 
@@ -272,6 +344,7 @@ impl ReminderRepository {
 
     fn from_row(row: &Row<'_>) -> rusqlite::Result<Reminder> {
         let status: String = row.get("status")?;
+        let priority: String = row.get("priority")?;
         let repeat_rule: String = row.get("repeat_rule")?;
         Ok(Reminder {
             id: row.get("id")?,
@@ -280,6 +353,13 @@ impl ReminderRepository {
             remind_at: millis_to_datetime(row.get("remind_at")?, REMIND_AT_COLUMN_INDEX)?,
             enabled: row.get("enabled")?,
             status: ReminderStatus::from_db(&status).map_err(|err| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    0,
+                    rusqlite::types::Type::Text,
+                    Box::new(err),
+                )
+            })?,
+            priority: ReminderPriority::from_db(&priority).map_err(|err| {
                 rusqlite::Error::FromSqlConversionFailure(
                     0,
                     rusqlite::types::Type::Text,
@@ -420,6 +500,7 @@ mod tests {
             title: "  ".to_string(),
             notes: None,
             remind_at: Utc::now() + Duration::minutes(5),
+            priority: ReminderPriority::Medium,
             repeat_rule: ReminderRepeatRule::Once,
         };
 
@@ -435,6 +516,7 @@ mod tests {
             title: "Past".to_string(),
             notes: None,
             remind_at: Utc::now() - Duration::minutes(1),
+            priority: ReminderPriority::Medium,
             repeat_rule: ReminderRepeatRule::Once,
         };
 
@@ -452,6 +534,7 @@ mod tests {
                 title: "Drink water".to_string(),
                 notes: Some("Stand up first".to_string()),
                 remind_at: Utc::now() + Duration::minutes(5),
+                priority: ReminderPriority::Medium,
                 repeat_rule: ReminderRepeatRule::Once,
             },
         )
@@ -469,6 +552,39 @@ mod tests {
 
         ReminderRepository::delete(&conn, &reminder.id).unwrap();
         assert!(ReminderRepository::list(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn update_resets_reminder_to_pending_with_new_content() {
+        let conn = db::test_connection();
+        let id = insert_raw_at(
+            &conn,
+            "Old",
+            Utc::now() - Duration::minutes(1),
+            true,
+            ReminderStatus::Triggered,
+            Some(Utc::now() - Duration::minutes(1)),
+        );
+
+        let updated = ReminderRepository::update(
+            &conn,
+            &id,
+            NewReminder {
+                title: "New title".to_string(),
+                notes: Some(" New notes ".to_string()),
+                remind_at: Utc::now() + Duration::minutes(10),
+                priority: ReminderPriority::High,
+                repeat_rule: ReminderRepeatRule::Daily,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(updated.title, "New title");
+        assert_eq!(updated.notes.as_deref(), Some("New notes"));
+        assert_eq!(updated.status, ReminderStatus::Pending);
+        assert!(updated.triggered_at.is_none());
+        assert_eq!(updated.repeat_rule, ReminderRepeatRule::Daily);
+        assert_eq!(updated.priority, ReminderPriority::High);
     }
 
     #[test]
@@ -709,6 +825,7 @@ mod tests {
             title: "Standup".to_string(),
             notes: None,
             remind_at: china_time(2026, 10, 1, 9, 0),
+            priority: ReminderPriority::Medium,
             repeat_rule: ReminderRepeatRule::CnWorkday,
         };
 
@@ -751,6 +868,7 @@ mod tests {
             title: "Daily".to_string(),
             notes: None,
             remind_at: china_time(2026, 6, 1, 9, 0),
+            priority: ReminderPriority::Medium,
             repeat_rule: ReminderRepeatRule::Daily,
         };
 
@@ -767,6 +885,7 @@ mod tests {
             title: "Weekly".to_string(),
             notes: None,
             remind_at: china_time(2026, 6, 1, 9, 0),
+            priority: ReminderPriority::Medium,
             repeat_rule: ReminderRepeatRule::Weekly(vec![chrono::Weekday::Wed]),
         };
 

@@ -25,8 +25,37 @@ it("saves valid reminder", async () => {
     title: "Pay rent",
     notes: null,
     remindAt: new Date("2099-01-01T09:00").toISOString(),
+    priority: "medium",
     repeatRule: "once",
   });
+});
+
+it("only offers one-time, daily, and China legal workday repeat rules", () => {
+  render(<AddReminderDialog onCancel={() => {}} onSave={vi.fn()} />);
+
+  expect(screen.getByRole("option", { name: "单次提醒" })).toBeInTheDocument();
+  expect(screen.getByRole("option", { name: "每天" })).toBeInTheDocument();
+  expect(screen.getByRole("option", { name: "中国法定工作日" })).toBeInTheDocument();
+  expect(screen.getByRole("option", { name: "中" })).toBeInTheDocument();
+  expect(screen.queryByRole("option", { name: "每周" })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("备注")).not.toBeInTheDocument();
+});
+
+it("saves selected priority", async () => {
+  const user = userEvent.setup();
+  const onSave = vi.fn();
+  render(<AddReminderDialog onCancel={() => {}} onSave={onSave} />);
+
+  await user.type(screen.getByLabelText("标题"), "Go sleep");
+  await user.type(screen.getByLabelText("日期和时间"), "2099-01-01T22:00");
+  await user.selectOptions(screen.getByLabelText("优先级"), "high");
+  await user.click(screen.getByRole("button", { name: "保存" }));
+
+  expect(onSave).toHaveBeenCalledWith(
+    expect.objectContaining({
+      priority: "high",
+    }),
+  );
 });
 
 it("saves China legal workday reminders", async () => {
@@ -66,38 +95,4 @@ it("saves daily reminders", async () => {
   );
   expect(remindAt.getHours()).toBe(9);
   expect(remindAt.getMinutes()).toBe(0);
-});
-
-it("saves weekly reminders with selected weekdays", async () => {
-  const user = userEvent.setup();
-  const onSave = vi.fn();
-  render(<AddReminderDialog onCancel={() => {}} onSave={onSave} />);
-
-  await user.type(screen.getByLabelText("标题"), "Team sync");
-  await user.selectOptions(screen.getByLabelText("重复规则"), "weekly");
-  expect(screen.queryByLabelText("日期和时间")).not.toBeInTheDocument();
-  await user.type(screen.getByLabelText("提醒时间"), "09:30");
-  await user.click(screen.getByLabelText("周一"));
-  await user.click(screen.getByLabelText("周三"));
-  await user.click(screen.getByRole("button", { name: "保存" }));
-
-  expect(onSave).toHaveBeenCalledWith(
-    expect.objectContaining({
-      repeatRule: "weekly:1,3",
-    }),
-  );
-});
-
-it("requires at least one weekday for weekly reminders", async () => {
-  const user = userEvent.setup();
-  const onSave = vi.fn();
-  render(<AddReminderDialog onCancel={() => {}} onSave={onSave} />);
-
-  await user.type(screen.getByLabelText("标题"), "Team sync");
-  await user.selectOptions(screen.getByLabelText("重复规则"), "weekly");
-  await user.type(screen.getByLabelText("提醒时间"), "09:00");
-  await user.click(screen.getByRole("button", { name: "保存" }));
-
-  expect(screen.getByText("请选择至少一个星期几。")).toBeInTheDocument();
-  expect(onSave).not.toHaveBeenCalled();
 });
