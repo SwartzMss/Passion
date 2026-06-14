@@ -3,7 +3,6 @@ use crate::models::{NewScriptTask, ScriptTask};
 use crate::script_runner::ScriptExecutionResult;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Row};
-use std::path::Path;
 use uuid::Uuid;
 
 pub struct ScriptTaskRepository;
@@ -18,6 +17,7 @@ impl ScriptTaskRepository {
     pub fn create(conn: &Connection, input: NewScriptTask) -> BackendResult<ScriptTask> {
         let name = input.name.trim().to_string();
         let script_path = input.script_path.trim().to_string();
+        let script_args = normalize_script_args(input.script_args.as_deref());
         let schedule = normalize_schedule(&input)?;
         validate_name(&name)?;
         validate_script_path(&script_path)?;
@@ -27,6 +27,7 @@ impl ScriptTaskRepository {
             id: Uuid::new_v4().to_string(),
             name,
             script_path,
+            script_args,
             schedule_type: schedule.schedule_type,
             interval_minutes: schedule.interval_minutes,
             time_of_day: schedule.time_of_day,
@@ -45,14 +46,15 @@ impl ScriptTaskRepository {
         let weekdays = weekdays_to_string(task.weekdays.as_deref());
         conn.execute(
             "INSERT INTO script_tasks (
-                id, name, script_path, schedule_type, interval_minutes, time_of_day, weekdays, enabled,
+                id, name, script_path, script_args, schedule_type, interval_minutes, time_of_day, weekdays, enabled,
                 last_started_at, last_finished_at, last_exit_code, last_stdout, last_stderr,
                 last_error, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, NULL, NULL, NULL, NULL, NULL, ?9, ?10)",
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL, NULL, NULL, NULL, NULL, NULL, ?10, ?11)",
             params![
                 &task.id,
                 &task.name,
                 &task.script_path,
+                &task.script_args,
                 &task.schedule_type,
                 task.interval_minutes,
                 &task.time_of_day,
@@ -163,6 +165,7 @@ impl ScriptTaskRepository {
             id: row.get("id")?,
             name: row.get("name")?,
             script_path: row.get("script_path")?,
+            script_args: row.get("script_args")?,
             schedule_type: row.get("schedule_type")?,
             interval_minutes: row.get("interval_minutes")?,
             time_of_day: row.get("time_of_day")?,
@@ -197,18 +200,16 @@ impl ScriptTaskRepository {
 
 pub fn validate_script_path(script_path: &str) -> BackendResult<()> {
     if script_path.trim().is_empty() {
-        return Err(BackendError::ScriptTask("脚本路径不能为空。".to_string()));
-    }
-    let extension = Path::new(script_path)
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .map(str::to_ascii_lowercase);
-    if !matches!(extension.as_deref(), Some("ps1" | "bat" | "cmd" | "exe")) {
-        return Err(BackendError::ScriptTask(
-            "仅支持 .ps1、.bat、.cmd、.exe。".to_string(),
-        ));
+        return Err(BackendError::ScriptTask("执行命令不能为空。".to_string()));
     }
     Ok(())
+}
+
+fn normalize_script_args(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 fn validate_name(name: &str) -> BackendResult<()> {
@@ -368,6 +369,7 @@ mod tests {
             NewScriptTask {
                 name: "  Backup  ".to_string(),
                 script_path: "  C:\\tools\\backup.ps1  ".to_string(),
+                script_args: Some("  --config C:\\cfg\\a.json  ".to_string()),
                 schedule_type: "interval".to_string(),
                 interval_minutes: Some(15),
                 time_of_day: None,
@@ -379,6 +381,10 @@ mod tests {
 
         assert_eq!(task.name, "Backup");
         assert_eq!(task.script_path, "C:\\tools\\backup.ps1");
+        assert_eq!(
+            task.script_args.as_deref(),
+            Some("--config C:\\cfg\\a.json")
+        );
         assert_eq!(task.interval_minutes, 15);
         assert_eq!(task.schedule_type, "interval");
         assert_eq!(task.time_of_day, None);
@@ -399,6 +405,7 @@ mod tests {
                 NewScriptTask {
                     name: " ".to_string(),
                     script_path: "C:\\tools\\a.ps1".to_string(),
+                    script_args: None,
                     schedule_type: "interval".to_string(),
                     interval_minutes: Some(1),
                     time_of_day: None,
@@ -411,30 +418,20 @@ mod tests {
                 NewScriptTask {
                     name: "A".to_string(),
                     script_path: " ".to_string(),
+                    script_args: None,
                     schedule_type: "interval".to_string(),
                     interval_minutes: Some(1),
                     time_of_day: None,
                     weekdays: None,
                     enabled: true,
                 },
-                "脚本路径不能为空。",
-            ),
-            (
-                NewScriptTask {
-                    name: "A".to_string(),
-                    script_path: "C:\\tools\\a.txt".to_string(),
-                    schedule_type: "interval".to_string(),
-                    interval_minutes: Some(1),
-                    time_of_day: None,
-                    weekdays: None,
-                    enabled: true,
-                },
-                "仅支持 .ps1、.bat、.cmd、.exe。",
+                "执行命令不能为空。",
             ),
             (
                 NewScriptTask {
                     name: "A".to_string(),
                     script_path: "C:\\tools\\a.ps1".to_string(),
+                    script_args: None,
                     schedule_type: "interval".to_string(),
                     interval_minutes: Some(0),
                     time_of_day: None,
@@ -460,6 +457,7 @@ mod tests {
             NewScriptTask {
                 name: "Daily".to_string(),
                 script_path: "C:\\tools\\daily.ps1".to_string(),
+                script_args: None,
                 schedule_type: "daily".to_string(),
                 interval_minutes: None,
                 time_of_day: Some("09:30".to_string()),
@@ -476,6 +474,7 @@ mod tests {
             NewScriptTask {
                 name: "Weekly".to_string(),
                 script_path: "C:\\tools\\weekly.ps1".to_string(),
+                script_args: None,
                 schedule_type: "weekly".to_string(),
                 interval_minutes: None,
                 time_of_day: Some("18:00".to_string()),
@@ -496,6 +495,7 @@ mod tests {
             NewScriptTask {
                 name: "Backup".to_string(),
                 script_path: "C:\\tools\\backup.cmd".to_string(),
+                script_args: None,
                 schedule_type: "interval".to_string(),
                 interval_minutes: Some(10),
                 time_of_day: None,
@@ -529,6 +529,7 @@ mod tests {
             NewScriptTask {
                 name: "Backup".to_string(),
                 script_path: "C:\\tools\\backup.exe".to_string(),
+                script_args: None,
                 schedule_type: "interval".to_string(),
                 interval_minutes: Some(10),
                 time_of_day: None,

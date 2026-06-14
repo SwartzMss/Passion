@@ -51,6 +51,7 @@ button:disabled {
 .window-titlebar {
   display: flex;
   align-items: center;
+  gap: 8px;
   flex: 1;
   height: 100%;
   border: 0;
@@ -59,6 +60,13 @@ button:disabled {
   padding: 0 0 0 14px;
   cursor: default;
   text-align: left;
+}
+
+.window-title-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border-radius: 5px;
 }
 
 .window-titlebar:hover {
@@ -208,6 +216,7 @@ button.primary-action {
 main {
   min-width: 0;
   min-height: 0;
+  height: 100%;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -1237,8 +1246,10 @@ main {
 
 .network-panel {
   display: grid;
+  grid-template-rows: auto auto 1fr auto;
   gap: 14px;
   min-width: 0;
+  min-height: 100%;
 }
 
 .network-hero {
@@ -1267,13 +1278,29 @@ main {
 
 .download-panel {
   display: grid;
+  grid-template-areas:
+    "hero"
+    "error"
+    "toolbar"
+    "workspace";
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 14px;
   min-width: 0;
+  height: 100%;
+  min-height: 0;
+}
+
+.download-panel > .error {
+  grid-area: error;
+  margin: 0;
 }
 
 .download-hero {
-  display: grid;
-  gap: 6px;
+  grid-area: hero;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .download-hero h1,
@@ -1288,14 +1315,65 @@ main {
 }
 
 .download-hero p {
+  margin-top: 6px;
   color: #667085;
   font-size: 14px;
+}
+
+.download-create-button {
+  min-width: 96px;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .system-panel {
   display: grid;
   gap: 12px;
   min-width: 0;
+}
+
+.system-panel-simple {
+  gap: 22px;
+}
+
+.system-simple-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.system-simple-header h1,
+.system-simple-header p {
+  margin: 0;
+}
+
+.system-simple-header h1 {
+  color: #172033;
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.system-simple-header p {
+  margin-top: 8px;
+  color: #52617a;
+  font-size: 14px;
+}
+
+.system-simple-actions {
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+  min-width: 220px;
+}
+
+.system-simple-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 18px;
+  max-width: 980px;
 }
 
 .system-hero {
@@ -1360,6 +1438,8 @@ main {
 .system-updated {
   width: 100%;
   text-align: right;
+  color: #52617a;
+  font-size: 13px;
 }
 
 .system-metric-grid {
@@ -1396,6 +1476,7 @@ main {
 }
 
 .download-card input,
+.download-task-modal input,
 .download-search input {
   box-sizing: border-box;
   width: 100%;
@@ -1404,6 +1485,32 @@ main {
   border-radius: 8px;
   background: #ffffff;
   padding: 9px 11px;
+}
+
+.download-task-modal {
+  width: min(520px, 100%);
+}
+
+.download-task-modal .modal-title {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.download-task-modal .modal-title button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  color: #667085;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.download-modal-fields {
+  display: grid;
+  gap: 12px;
 }
 
 .download-input-shell {
@@ -1479,35 +1586,44 @@ main {
 }
 
 .download-toolbar {
+  grid-area: toolbar;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 12px;
   align-items: center;
   min-width: 0;
+  border: 1px solid #e0e5ee;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 10px 12px;
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.04);
 }
 
 .download-filters {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 6px;
   min-width: 0;
+  overflow: hidden;
 }
 
 .download-filters button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 8px 0;
+  border-radius: 8px;
+  background: #f5f7fb;
+  padding: 8px 12px;
   color: #475467;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .download-filters button.active {
-  box-shadow: inset 0 -2px 0 #172033;
-  color: #172033;
+  background: #eef5ff;
+  color: #1d4ed8;
 }
 
 .download-search {
@@ -1528,10 +1644,231 @@ main {
 }
 
 .download-workspace {
+  grid-area: workspace;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 1.05fr);
-  gap: 14px;
   min-width: 0;
+  min-height: 0;
+}
+
+.download-table-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #e0e5ee;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(16, 24, 40, 0.05);
+}
+
+.download-table-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+}
+
+.download-table-title h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 16px;
+}
+
+.download-table-scroll {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.download-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: #172033;
+  font-size: 13px;
+}
+
+.download-table-running th:nth-child(1) {
+  width: 24%;
+}
+
+.download-table-running th:nth-child(2) {
+  width: 18%;
+}
+
+.download-table-running th:nth-child(3),
+.download-table-running th:nth-child(4),
+.download-table-running th:nth-child(6) {
+  width: 10%;
+}
+
+.download-table-running th:nth-child(5) {
+  width: 14%;
+}
+
+.download-table-running th:nth-child(7) {
+  width: 14%;
+}
+
+.download-table-completed th:nth-child(1) {
+  width: 30%;
+}
+
+.download-table-completed th:nth-child(2) {
+  width: 34%;
+}
+
+.download-table-completed th:nth-child(3),
+.download-table-completed th:nth-child(4) {
+  width: 13%;
+}
+
+.download-table-completed th:nth-child(5) {
+  width: 10%;
+}
+
+.download-table-failed th:nth-child(1) {
+  width: 28%;
+}
+
+.download-table-failed th:nth-child(2) {
+  width: 28%;
+}
+
+.download-table-failed th:nth-child(3) {
+  width: 24%;
+}
+
+.download-table-failed th:nth-child(4),
+.download-table-failed th:nth-child(5) {
+  width: 10%;
+}
+
+.download-table th {
+  border-top: 1px solid #edf1f7;
+  border-bottom: 1px solid #edf1f7;
+  background: #f8fafc;
+  padding: 10px 12px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.download-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid #edf1f7;
+  padding: 12px;
+  vertical-align: middle;
+}
+
+.download-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.download-table-empty {
+  height: 100%;
+  color: #667085;
+  text-align: center;
+}
+
+.download-file-cell {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.download-file-cell strong,
+.download-file-cell small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-file-cell small {
+  margin-top: 4px;
+  color: #667085;
+  font-size: 12px;
+}
+
+.download-path-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-table-progress {
+  display: grid;
+  grid-template-columns: minmax(42px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #667085;
+  font-size: 12px;
+}
+
+.download-table-progress progress {
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: #e5e9f2;
+}
+
+.download-table-progress progress::-webkit-progress-bar {
+  background: #e5e9f2;
+}
+
+.download-table-progress progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: #2563eb;
+}
+
+.download-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.download-row-actions button {
+  border: 1px solid #d8deea;
+  border-radius: 7px;
+  background: #ffffff;
+  padding: 6px 9px;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.download-row-actions .danger-action {
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.download-row-actions span {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.download-status-bar {
+  border-top: 1px solid #edf1f7;
+  background: #fbfcff;
+  padding: 10px 14px;
+  color: #475467;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .translation-stack {
@@ -1786,7 +2123,8 @@ main {
 }
 
 .network-tip {
-  margin: 0 0 0 4px;
+  align-self: end;
+  margin: 10px 0 0 4px;
   color: #667085;
   font-size: 13px;
 }
@@ -1818,6 +2156,14 @@ main {
   box-shadow: 0 10px 24px rgba(16, 24, 40, 0.05);
 }
 
+.system-card-simple {
+  gap: 14px;
+  min-height: 180px;
+  padding: 24px;
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.06);
+}
+
 .system-card h3,
 .system-card p {
   margin: 0;
@@ -1846,6 +2192,13 @@ main {
   border-radius: 10px;
   font-size: 10px;
   font-weight: 800;
+}
+
+.system-card-simple .system-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  font-size: 11px;
 }
 
 .system-icon.blue {
@@ -1894,11 +2247,29 @@ main {
   white-space: nowrap;
 }
 
+.system-card-simple .system-value {
+  margin-top: 8px;
+  font-size: 30px;
+}
+
 .system-progress {
   overflow: hidden;
   height: 7px;
   border-radius: 999px;
   background: #e9edf5;
+}
+
+.system-progress-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  color: #667085;
+  font-size: 14px;
+}
+
+.system-card-simple .system-progress {
+  height: 8px;
 }
 
 .system-progress span {
@@ -2229,18 +2600,6 @@ main {
   font-size: 12px;
 }
 
-.download-file-icon {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 34px;
-  border: 1px solid #b7c7e6;
-  border-radius: 4px;
-  background: #f8fbff;
-  color: #2563eb;
-  font-size: 15px;
-}
-
 .download-status {
   display: inline-flex;
   border-radius: 999px;
@@ -2397,11 +2756,25 @@ main {
 
 .script-panel {
   display: grid;
+  grid-template-areas:
+    "hero"
+    "error"
+    "toolbar"
+    "workspace";
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 18px;
   min-width: 0;
+  height: 100%;
+  min-height: 0;
+}
+
+.script-panel > .error {
+  grid-area: error;
+  margin: 0;
 }
 
 .script-hero {
+  grid-area: hero;
   display: flex;
   align-items: start;
   justify-content: space-between;
@@ -2467,8 +2840,9 @@ main {
 }
 
 .script-list-toolbar {
+  grid-area: toolbar;
   display: grid;
-  grid-template-columns: minmax(390px, 1fr) minmax(135px, 180px) auto;
+  grid-template-columns: max-content minmax(150px, 1fr) auto;
   align-items: center;
   gap: 10px;
 }
@@ -2493,11 +2867,11 @@ main {
 
 .script-filters {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(5, max-content);
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 8px;
   background: #f6f8fc;
   padding: 4px;
@@ -2508,11 +2882,11 @@ main {
   align-items: center;
   justify-content: center;
   gap: 5px;
-  min-width: 0;
+  min-width: max-content;
   border: 0;
   border-radius: 7px;
   background: transparent;
-  padding: 8px 5px;
+  padding: 8px 7px;
   color: #475467;
   font-size: 12px;
   font-weight: 700;
@@ -2520,8 +2894,8 @@ main {
 }
 
 .script-filters button span:not(.script-filter-icon) {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .script-filters button.active {
@@ -2546,6 +2920,11 @@ main {
 
 .script-filter-icon.all {
   border-radius: 4px;
+  color: #2563eb;
+}
+
+.script-filter-icon.running {
+  color: #16a34a;
 }
 
 .script-filter-icon.running::before {
@@ -2567,12 +2946,24 @@ main {
   content: "";
 }
 
+.script-filter-icon.waiting {
+  color: #f59e0b;
+}
+
+.script-filter-icon.disabled {
+  color: #667085;
+}
+
 .script-filter-icon.disabled::before {
   width: 2px;
   height: 8px;
   border-right: 2px solid currentColor;
   border-left: 2px solid currentColor;
   content: "";
+}
+
+.script-filter-icon.failed {
+  color: #ef4444;
 }
 
 .script-filter-icon.failed::before {
@@ -2586,22 +2977,173 @@ main {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-width: 96px;
+  min-width: 88px;
   height: 38px;
   border-radius: 8px;
-  padding: 8px 11px;
+  padding: 8px 14px;
   font-size: 13px;
   white-space: nowrap;
 }
 
-.script-open-create-button span {
-  font-size: 20px;
-  line-height: 1;
+.script-panel .task-workspace {
+  grid-area: workspace;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  width: 100%;
+  min-height: 0;
 }
 
-.script-panel .task-workspace {
-  display: block;
+.script-table-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
+  border: 1px solid #e0e5ee;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 10px 26px rgba(16, 24, 40, 0.05);
+}
+
+.script-table-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+}
+
+.script-table-title h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 16px;
+}
+
+.script-table-scroll {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.script-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  border-collapse: collapse;
+  color: #172033;
+  font-size: 13px;
+}
+
+.script-table th:nth-child(1) {
+  width: 18%;
+}
+
+.script-table th:nth-child(2) {
+  width: 13%;
+}
+
+.script-table th:nth-child(3) {
+  width: 23%;
+}
+
+.script-table th:nth-child(4) {
+  width: 15%;
+}
+
+.script-table th:nth-child(5) {
+  width: 12%;
+}
+
+.script-table th:nth-child(6) {
+  width: 19%;
+}
+
+.script-table th {
+  border-top: 1px solid #edf1f7;
+  border-bottom: 1px solid #edf1f7;
+  background: #f8fafc;
+  padding: 10px 12px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.script-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid #edf1f7;
+  padding: 12px;
+  vertical-align: middle;
+}
+
+.script-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.script-table-empty {
+  height: 100%;
+  color: #667085;
+  text-align: center;
+}
+
+.script-task-name-cell {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.script-task-name-cell strong,
+.script-path-cell,
+.script-path-cell small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.script-path-cell small {
+  display: block;
+  margin-top: 4px;
+  color: #667085;
+  font-size: 12px;
+}
+
+.script-error-text {
+  display: block;
+  margin-top: 5px;
+  overflow: hidden;
+  color: #b42318;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.script-row-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.script-row-actions button {
+  border-radius: 7px;
+  padding: 6px 7px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.script-status-bar {
+  border-top: 1px solid #edf1f7;
+  background: #fbfcff;
+  padding: 10px 14px;
+  color: #475467;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .script-panel .task-content {
@@ -3164,8 +3706,18 @@ main {
   .feature-grid,
   .diagnostics-grid,
   .system-metric-grid,
-  .system-dashboard-grid {
+  .system-dashboard-grid,
+  .system-simple-grid {
     grid-template-columns: 1fr;
+  }
+
+  .system-simple-header {
+    display: grid;
+  }
+
+  .system-simple-actions {
+    justify-items: start;
+    min-width: 0;
   }
 
   .system-hero {

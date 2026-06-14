@@ -169,6 +169,7 @@ mod tests {
             id: "task-1".to_string(),
             name: "Backup".to_string(),
             script_path: "C:\\tools\\backup.ps1".to_string(),
+            script_args: None,
             schedule_type: schedule_type.to_string(),
             interval_minutes: 15,
             time_of_day: None,

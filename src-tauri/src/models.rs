@@ -248,8 +248,10 @@ pub struct PortOccupancyResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadRequest {
+    pub task_id: Option<String>,
     pub url: String,
     pub file_name: Option<String>,
+    pub save_dir: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -260,6 +262,21 @@ pub struct DownloadResult {
     pub saved_path: String,
     pub bytes: u64,
     pub elapsed_ms: u128,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadProgressEvent {
+    pub task_id: String,
+    pub url: String,
+    pub file_name: String,
+    pub saved_path: String,
+    pub total_bytes: Option<u64>,
+    pub downloaded_bytes: u64,
+    pub elapsed_ms: u128,
+    pub bytes_per_second: f64,
+    pub status: String,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -278,6 +295,8 @@ pub struct SystemSnapshot {
 pub struct NewScriptTask {
     pub name: String,
     pub script_path: String,
+    #[serde(default)]
+    pub script_args: Option<String>,
     pub schedule_type: String,
     pub interval_minutes: Option<u32>,
     pub time_of_day: Option<String>,
@@ -291,6 +310,7 @@ pub struct ScriptTask {
     pub id: String,
     pub name: String,
     pub script_path: String,
+    pub script_args: Option<String>,
     pub schedule_type: String,
     pub interval_minutes: u32,
     pub time_of_day: Option<String>,

@@ -1,5 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { MouseEvent } from "react";
+import appIcon from "../../src-tauri/icons/32x32.png";
 
 export function WindowControls() {
   const appWindow = getCurrentWindow();
@@ -17,6 +18,7 @@ export function WindowControls() {
         className="window-titlebar"
         onMouseDown={startDragging}
       >
+        <img className="window-title-icon" src={appIcon} alt="" aria-hidden="true" />
         <span className="window-title">Passion</span>
       </div>
       <div className="window-controls">
