@@ -102,8 +102,10 @@ export interface PortOccupancyResult {
 }
 
 export interface DownloadRequest {
+  taskId?: string | null;
   url: string;
   fileName?: string | null;
+  saveDir?: string | null;
 }
 
 export interface DownloadResult {
@@ -112,6 +114,19 @@ export interface DownloadResult {
   savedPath: string;
   bytes: number;
   elapsedMs: number;
+}
+
+export interface DownloadProgressEvent {
+  taskId: string;
+  url: string;
+  fileName: string;
+  savedPath: string;
+  totalBytes?: number | null;
+  downloadedBytes: number;
+  elapsedMs: number;
+  bytesPerSecond: number;
+  status: "running" | "completed" | "failed" | "paused";
+  error?: string | null;
 }
 
 export interface SystemSnapshot {
@@ -128,6 +143,7 @@ export type ScriptTaskScheduleType = "interval" | "daily" | "weekly";
 export interface NewScriptTask {
   name: string;
   scriptPath: string;
+  scriptArgs?: string | null;
   scheduleType: ScriptTaskScheduleType;
   intervalMinutes?: number | null;
   timeOfDay?: string | null;
@@ -139,6 +155,7 @@ export interface ScriptTask {
   id: string;
   name: string;
   scriptPath: string;
+  scriptArgs?: string | null;
   scheduleType: ScriptTaskScheduleType;
   intervalMinutes: number;
   timeOfDay?: string | null;

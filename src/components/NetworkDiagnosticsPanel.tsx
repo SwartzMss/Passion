@@ -7,13 +7,6 @@ import type {
   PortOccupancyResult,
 } from "../types";
 
-interface HistoryEntry {
-  id: string;
-  label: string;
-  status: "success" | "failure";
-  detail: string;
-}
-
 export function NetworkDiagnosticsPanel() {
   const [pingHostValue, setPingHostValue] = useState("");
   const [portHost, setPortHost] = useState("127.0.0.1");
@@ -23,9 +16,6 @@ export function NetworkDiagnosticsPanel() {
   const [portResult, setPortResult] = useState<PortCheckResult | null>(null);
   const [occupancyResult, setOccupancyResult] =
     useState<PortOccupancyResult | null>(null);
-  const [pingHistory, setPingHistory] = useState<HistoryEntry[]>([]);
-  const [portHistory, setPortHistory] = useState<HistoryEntry[]>([]);
-  const [occupancyHistory, setOccupancyHistory] = useState<HistoryEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const portValidation = validatePortValue(portValue);
@@ -41,11 +31,6 @@ export function NetworkDiagnosticsPanel() {
     try {
       const result = await pingHost({ host: pingHostValue.trim() });
       setPingResult(result);
-      pushHistory(setPingHistory, {
-        label: result.host,
-        status: result.reachable ? "success" : "failure",
-        detail: `${result.reachable ? "Ping 成功" : "Ping 失败"} · ${pingHistorySummary(result)}`,
-      });
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -68,11 +53,6 @@ export function NetworkDiagnosticsPanel() {
     try {
       const result = await checkPort({ host: portHost.trim(), port });
       setPortResult(result);
-      pushHistory(setPortHistory, {
-        label: `${result.host}:${result.port}`,
-        status: result.open ? "success" : "failure",
-        detail: `${result.open ? "开放" : "未开放"} · ${result.elapsedMs}ms`,
-      });
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -91,14 +71,6 @@ export function NetworkDiagnosticsPanel() {
     try {
       const result = await inspectPortOccupancy({ port });
       setOccupancyResult(result);
-      pushHistory(setOccupancyHistory, {
-        label: `端口 ${result.port}`,
-        status: result.entries.length > 0 ? "failure" : "success",
-        detail:
-          result.entries.length > 0
-            ? `已占用 · ${result.entries.length} 个进程`
-            : "未占用",
-      });
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -155,7 +127,6 @@ export function NetworkDiagnosticsPanel() {
           <div className="diagnostics-divider" />
           <h4>检测结果</h4>
           <PingResultBox result={pingResult} />
-          <HistoryPanel entries={pingHistory} />
         </article>
 
         <article className="diagnostics-card">
@@ -204,7 +175,6 @@ export function NetworkDiagnosticsPanel() {
           <div className="diagnostics-divider" />
           <h4>检测结果</h4>
           <PortCheckResultBox result={portResult} />
-          <HistoryPanel entries={portHistory} />
         </article>
 
         <article className="diagnostics-card">
@@ -256,7 +226,6 @@ export function NetworkDiagnosticsPanel() {
           <div className="diagnostics-divider" />
           <h4>检测结果</h4>
           <PortOccupancyResultBox result={occupancyResult} />
-          <HistoryPanel entries={occupancyHistory} />
         </article>
       </div>
       <p className="network-tip">💡 小提示：支持域名、IPv4 地址，端口范围 1-65535。</p>
@@ -373,57 +342,12 @@ function PortOccupancyRow({ entry }: { entry: PortOccupancyEntry }) {
   );
 }
 
-function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
-  return (
-    <details className="diagnostics-history" open>
-      <summary>历史记录（{entries.length}）</summary>
-      {entries.length === 0 ? (
-        <p className="muted">暂无历史记录。</p>
-      ) : (
-        <ul>
-          {entries.map((entry) => (
-            <li key={entry.id}>
-              <span className={`history-dot ${entry.status}`} />
-              <span>
-                <strong>{entry.label}</strong>
-                <span>{entry.detail}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </details>
-  );
-}
-
-function pushHistory(
-  setHistory: (value: (current: HistoryEntry[]) => HistoryEntry[]) => void,
-  entry: Omit<HistoryEntry, "id">,
-) {
-  setHistory((current) => [
-    { ...entry, id: crypto.randomUUID() },
-    ...current.slice(0, 4),
-  ]);
-}
-
 function validatePortValue(value: string) {
   const port = Number(value);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     return "端口范围 1-65535";
   }
   return null;
-}
-
-function pingHistorySummary(result: PingResult) {
-  const avg = formatMs(result.avgTimeMs);
-  const loss = formatPercent(result.lossPercent);
-  if (avg !== "--" && loss !== "--") {
-    return `平均 ${avg} · 丢包 ${loss}`;
-  }
-  if (avg !== "--") {
-    return `平均 ${avg}`;
-  }
-  return result.reachable ? "可达" : "不可达";
 }
 
 function formatMs(value?: number | null) {

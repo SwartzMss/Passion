@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::Local;
 use std::{
     fs::{create_dir_all, OpenOptions},
     io::Write,
@@ -22,7 +22,13 @@ fn write_log_line(path: &Path, level: &str, message: &str) -> std::io::Result<()
         create_dir_all(parent)?;
     }
     let mut file = OpenOptions::new().create(true).append(true).open(path)?;
-    writeln!(file, "{} [{}] {}", Utc::now().to_rfc3339(), level, message)
+    writeln!(
+        file,
+        "{} [{}] {}",
+        Local::now().to_rfc3339(),
+        level,
+        message
+    )
 }
 
 #[cfg(test)]
@@ -39,5 +45,11 @@ mod tests {
         let content = std::fs::read_to_string(path).unwrap();
         assert!(content.contains("[INFO] scheduler started"));
         assert!(content.contains("T"));
+        assert!(content
+            .split_whitespace()
+            .next()
+            .is_some_and(|timestamp| timestamp.ends_with("+08:00")
+                || timestamp.ends_with("+00:00")
+                || timestamp[timestamp.len().saturating_sub(6)..].contains(':')));
     }
 }

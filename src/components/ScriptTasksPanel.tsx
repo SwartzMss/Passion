@@ -24,7 +24,6 @@ export function ScriptTasksPanel() {
   const [tasks, setTasks] = useState<ScriptTask[]>([]);
   const [activeFilter, setActiveFilter] = useState<ScriptFilter>("all");
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [scriptPath, setScriptPath] = useState("");
@@ -69,14 +68,18 @@ export function ScriptTasksPanel() {
       return filteredByStatus;
     }
     return filteredByStatus.filter((task) =>
-      [task.name, task.scriptPath, scheduleLabel(task), scriptTaskStatusLabel(task)]
+      [
+        task.name,
+        task.scriptPath,
+        task.scriptArgs ?? "",
+        scheduleLabel(task),
+        scriptTaskStatusLabel(task),
+      ]
         .join(" ")
         .toLowerCase()
         .includes(trimmedQuery),
     );
   }, [activeFilter, query, tasks]);
-  const selectedTask =
-    visibleTasks.find((task) => task.id === selectedId) ?? visibleTasks[0] ?? null;
   const emptyListMessage = query.trim()
     ? "没有找到匹配的脚本任务。"
     : (() => {
@@ -94,24 +97,22 @@ export function ScriptTasksPanel() {
     }
   })();
 
-  useEffect(() => {
-    setSelectedId((current) => {
-      if (current && visibleTasks.some((task) => task.id === current)) {
-        return current;
-      }
-      return visibleTasks[0]?.id ?? null;
-    });
-  }, [visibleTasks]);
+  const footerSummary = `总任务: ${tasks.length} | 运行中: ${runningTasks.length} | 等待执行: ${waitingTasks.length} | 已停用: ${disabledTasks.length} | 失败: ${failedTasks.length}`;
 
   async function createTask() {
     const trimmedName = name.trim();
-    const trimmedPath = scriptPath.trim();
+    const trimmedCommand = scriptPath.trim();
     if (!trimmedName) {
       setError("任务名不能为空。");
       return;
     }
-    if (!trimmedPath) {
-      setError("脚本路径不能为空。");
+    if (!trimmedCommand) {
+      setError("执行命令不能为空。");
+      return;
+    }
+    const command = splitCommandLine(trimmedCommand);
+    if (!command) {
+      setError("执行命令中的引号未闭合。");
       return;
     }
     const interval =
@@ -137,7 +138,8 @@ export function ScriptTasksPanel() {
     try {
       await createScriptTask({
         name: trimmedName,
-        scriptPath: trimmedPath,
+        scriptPath: command.program,
+        scriptArgs: command.args.length > 0 ? command.args.join(" ") : null,
         scheduleType,
         intervalMinutes: scheduleType === "interval" ? Number(interval) : null,
         timeOfDay: scheduleType === "interval" ? null : timeOfDay,
@@ -241,7 +243,7 @@ export function ScriptTasksPanel() {
         </div>
         <input
           aria-label="搜索脚本任务"
-          placeholder="搜索任务名称或脚本路径"
+          placeholder="搜索任务名称或执行命令"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -253,62 +255,49 @@ export function ScriptTasksPanel() {
           }}
           type="button"
         >
-          <span aria-hidden="true">＋</span>
           新增任务
         </button>
       </div>
 
       <div className="task-workspace">
-        <div className="task-content">
-          <div className="task-list" aria-label="脚本任务列表">
-            {visibleTasks.length === 0 ? (
-              <div className="task-list-empty">{emptyListMessage}</div>
-            ) : null}
-            {visibleTasks.map((task) => (
-              <button
-                aria-label={task.name}
-                aria-pressed={selectedTask?.id === task.id}
-                className={`task-row ${
-                  selectedTask?.id === task.id ? "selected" : ""
-                }`}
-                key={task.id}
-                onClick={() => setSelectedId(task.id)}
-              >
-                <span className={`script-task-icon ${scriptTaskStatus(task)}`} aria-hidden="true">
-                  {scriptTaskIcon(task)}
-                </span>
-                <span>
-                  <strong>{task.name}</strong>
-                  <span>{task.scriptPath}</span>
-                </span>
-                <span className={`status status-${scriptTaskStatus(task)}`}>
-                  {scriptTaskStatusLabel(task)}
-                </span>
-                <span>{scheduleLabel(task)}</span>
-                <span>{task.enabled ? nextRunLabel(task) : "已停用"}</span>
-              </button>
-            ))}
-            {visibleTasks.length > 0 ? (
-              <p className="script-list-count">共 {visibleTasks.length} 个任务</p>
-            ) : null}
+        <div className="script-table-card">
+          <div className="script-table-title">
+            <h2>脚本任务列表</h2>
           </div>
-
-          <aside className="task-detail" aria-label="脚本任务详情">
-            {selectedTask ? (
-              <ScriptTaskDetail
-                isBusy={isBusy}
-                onDelete={remove}
-                onRunNow={runNow}
-                onToggle={toggle}
-                task={selectedTask}
-              />
-            ) : (
-              <div className="task-detail-empty">
-                <h3>选择一个脚本任务</h3>
-                <p className="muted">当前分类没有可显示的脚本任务。</p>
-              </div>
-            )}
-          </aside>
+          <div className="script-table-scroll">
+            <table aria-label="脚本任务列表" className="script-table">
+              <thead>
+                <tr>
+                  <th>任务名</th>
+                  <th>执行方式</th>
+                  <th>执行命令</th>
+                  <th>下次执行</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleTasks.length === 0 ? (
+                  <tr>
+                    <td className="script-table-empty" colSpan={6}>
+                      {emptyListMessage}
+                    </td>
+                  </tr>
+                ) : null}
+                {visibleTasks.map((task) => (
+                  <ScriptTaskRow
+                    isBusy={isBusy}
+                    key={task.id}
+                    onDelete={remove}
+                    onRunNow={runNow}
+                    onToggle={toggle}
+                    task={task}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="script-status-bar">{footerSummary}</div>
         </div>
       </div>
       {isCreateOpen ? (
@@ -324,13 +313,6 @@ export function ScriptTasksPanel() {
           >
             <div className="modal-title">
               <h2 id="script-create-title">新增脚本任务</h2>
-              <button
-                aria-label="关闭新增脚本任务"
-                onClick={() => setIsCreateOpen(false)}
-                type="button"
-              >
-                ×
-              </button>
             </div>
             {error ? <p className="error">{error}</p> : null}
             <ScriptTaskFormFields
@@ -407,15 +389,14 @@ function ScriptTaskFormFields({
         />
       </label>
       <label className="field-label script-path-field">
-        脚本路径
+        执行命令
         <span className="script-path-input">
           <input
-            aria-label="脚本路径"
+            aria-label="执行命令"
             value={scriptPath}
             onChange={(event) => setScriptPath(event.target.value)}
-            placeholder="请选择脚本文件"
+            placeholder='例如："C:\Python\python.exe" "C:\tasks\a.py" --port 7890'
           />
-          <button type="button">选择脚本</button>
         </span>
       </label>
       <label className="field-label">
@@ -426,7 +407,7 @@ function ScriptTaskFormFields({
             setScheduleType(event.target.value as ScriptTaskScheduleType)
           }
         >
-          <option value="interval">每隔一段时间</option>
+          <option value="interval">周期</option>
           <option value="daily">每天</option>
           <option value="weekly">每周</option>
         </select>
@@ -534,7 +515,7 @@ function labelToFilterIcon(label: string) {
   }
 }
 
-function ScriptTaskDetail({
+function ScriptTaskRow({
   isBusy,
   onDelete,
   onRunNow,
@@ -548,13 +529,28 @@ function ScriptTaskDetail({
   task: ScriptTask;
 }) {
   return (
-    <>
-      <div className="task-detail-header">
-        <div>
-          <h2>任务详情</h2>
-          <p>{task.name}</p>
+    <tr>
+      <td>
+        <div className="script-task-name-cell">
+          <span className={`script-task-icon ${scriptTaskStatus(task)}`} aria-hidden="true">
+            {scriptTaskIcon(task)}
+          </span>
+          <strong>{task.name}</strong>
         </div>
-        <div className="task-detail-actions">
+      </td>
+      <td>{scheduleLabel(task)}</td>
+      <td className="script-path-cell">
+        {scriptCommandLabel(task)}
+      </td>
+      <td>{task.enabled ? nextRunLabel(task) : "已停用"}</td>
+      <td>
+        <span className={`status status-${scriptTaskStatus(task)}`}>
+          {scriptTaskStatusLabel(task)}
+        </span>
+        {task.lastError ? <small className="script-error-text">{task.lastError}</small> : null}
+      </td>
+      <td>
+        <div className="script-row-actions">
           <button className="primary-action" onClick={() => onRunNow(task.id)} disabled={isBusy}>
             立即运行
           </button>
@@ -565,81 +561,8 @@ function ScriptTaskDetail({
             删除
           </button>
         </div>
-      </div>
-      <div className="script-status-strip">
-        <span className={`status status-${scriptTaskStatus(task)}`}>
-          {scriptTaskStatusLabel(task)}
-        </span>
-        <span className={task.enabled ? "enabled" : "disabled"}>
-          {task.enabled ? "已启用" : "已停用"}
-        </span>
-      </div>
-      <dl className="task-detail-list">
-        <div>
-          <dt>任务名称</dt>
-          <dd>{task.name}</dd>
-        </div>
-        <div>
-          <dt>脚本路径</dt>
-          <dd>{task.scriptPath}</dd>
-        </div>
-        <div>
-          <dt>执行方式</dt>
-          <dd>{scheduleLabel(task)}</dd>
-        </div>
-        <div>
-          <dt>创建后启用</dt>
-          <dd>{task.enabled ? "是" : "否"}</dd>
-        </div>
-        <div>
-          <dt>最近执行</dt>
-          <dd>
-            {formatLastRun(task)}
-            {task.lastExitCode !== null && task.lastExitCode !== undefined
-              ? ` · 退出码 ${task.lastExitCode}`
-              : ""}
-          </dd>
-        </div>
-        <div>
-          <dt>下次执行</dt>
-          <dd>{task.enabled ? "需要后端补充" : "已停用"}</dd>
-        </div>
-        <div>
-          <dt>创建时间</dt>
-          <dd>{formatDateTime(task.createdAt)}</dd>
-        </div>
-      </dl>
-      <div className="script-log-panel">
-        <div className="script-log-header">
-          <h3>执行日志</h3>
-          <button type="button">清空日志</button>
-        </div>
-        <ScriptOutput title="错误" value={task.lastError} />
-        <ScriptOutput title="stdout" value={task.lastStdout} />
-        <ScriptOutput title="stderr" value={task.lastStderr} />
-        {!task.lastError && !task.lastStdout && !task.lastStderr ? (
-          <p className="muted">暂无最近一次输出。</p>
-        ) : null}
-      </div>
-    </>
-  );
-}
-
-function ScriptOutput({
-  title,
-  value,
-}: {
-  title: string;
-  value?: string | null;
-}) {
-  if (!value) {
-    return null;
-  }
-  return (
-    <div className="result-box">
-      <strong>{title}</strong>
-      <pre>{value}</pre>
-    </div>
+      </td>
+    </tr>
   );
 }
 
@@ -715,15 +638,10 @@ function scheduleLabel(task: ScriptTask) {
   return `每 ${task.intervalMinutes} 分钟`;
 }
 
-function formatLastRun(task: ScriptTask) {
-  if (!task.lastStartedAt) {
-    return "尚未执行";
-  }
-  return formatDateTime(task.lastStartedAt);
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString();
+function scriptCommandLabel(task: ScriptTask) {
+  return [quoteCommandPart(task.scriptPath), task.scriptArgs?.trim()]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function nextRunLabel(task: ScriptTask) {
@@ -731,6 +649,55 @@ function nextRunLabel(task: ScriptTask) {
     return "运行中";
   }
   return "下次执行：需要后端";
+}
+
+function splitCommandLine(value: string): { program: string; args: string[] } | null {
+  const parts: string[] = [];
+  let current = "";
+  let quote: string | null = null;
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if ((char === '"' || char === "'") && quote === null) {
+      quote = char;
+      continue;
+    }
+    if (char === quote) {
+      quote = null;
+      continue;
+    }
+    if (char === "\\" && (value[index + 1] === '"' || value[index + 1] === "'")) {
+      index += 1;
+      current += value[index];
+      continue;
+    }
+    if (/\s/.test(char) && quote === null) {
+      if (current) {
+        parts.push(current);
+        current = "";
+      }
+      continue;
+    }
+    current += char;
+  }
+  if (quote !== null) {
+    return null;
+  }
+  if (current) {
+    parts.push(current);
+  }
+  const [program, ...args] = parts;
+  return program ? { program, args: args.map(quoteCommandPart) } : null;
+}
+
+function quoteCommandPart(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  if (/^["'].*["']$/.test(trimmed) || !/\s/.test(trimmed)) {
+    return trimmed;
+  }
+  return `"${trimmed.replace(/"/g, '\\"')}"`;
 }
 
 function readError(err: unknown) {

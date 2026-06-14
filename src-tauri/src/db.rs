@@ -39,6 +39,7 @@ pub fn migrate(conn: &Connection) -> BackendResult<()> {
             id TEXT PRIMARY KEY NOT NULL,
             name TEXT NOT NULL,
             script_path TEXT NOT NULL,
+            script_args TEXT,
             schedule_type TEXT NOT NULL DEFAULT 'interval' CHECK (schedule_type IN ('interval', 'daily', 'weekly')),
             interval_minutes INTEGER NOT NULL,
             time_of_day TEXT,
@@ -72,6 +73,12 @@ pub fn migrate(conn: &Connection) -> BackendResult<()> {
         "ALTER TABLE reminders ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high'))",
     )?;
     relax_reminder_repeat_rule_check(conn)?;
+    add_column_if_missing(
+        conn,
+        "script_tasks",
+        "script_args",
+        "ALTER TABLE script_tasks ADD COLUMN script_args TEXT",
+    )?;
     add_column_if_missing(
         conn,
         "script_tasks",
@@ -210,6 +217,22 @@ mod tests {
                 id, name, script_path, schedule_type, interval_minutes, time_of_day, weekdays, enabled,
                 created_at, updated_at
              ) VALUES ('2', 'Weekly', 'C:\\tools\\weekly.ps1', 'weekly', 15, '18:00', '1,5', 1, 1, 1)",
+            [],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn migrate_adds_script_task_args_column() {
+        let conn = Connection::open_in_memory().unwrap();
+
+        migrate(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO script_tasks (
+                id, name, script_path, script_args, schedule_type, interval_minutes, enabled,
+                created_at, updated_at
+             ) VALUES ('1', 'Py', 'C:\\tools\\sync.py', '--name test', 'interval', 15, 1, 1, 1)",
             [],
         )
         .unwrap();

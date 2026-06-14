@@ -35,6 +35,7 @@ fn greet(name: &str) -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -128,6 +129,8 @@ pub fn run() {
             commands::check_port,
             commands::inspect_port_occupancy,
             commands::download_file,
+            commands::pause_download,
+            commands::get_default_download_dir,
             commands::get_system_snapshot,
             commands::list_script_tasks,
             commands::create_script_task,

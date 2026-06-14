@@ -7,6 +7,8 @@ use crate::models::{
 use encoding_rs::GBK;
 use std::collections::HashMap;
 use std::net::{TcpStream, ToSocketAddrs};
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
@@ -18,7 +20,7 @@ pub async fn ping_host(input: PingRequest) -> BackendResult<PingResult> {
         ));
     }
 
-    let output = Command::new("ping")
+    let output = background_command("ping")
         .args(ping_args(host))
         .output()
         .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?;
@@ -71,7 +73,7 @@ pub async fn check_port(input: PortCheckRequest) -> BackendResult<PortCheckResul
 pub async fn inspect_port_occupancy(
     input: PortOccupancyRequest,
 ) -> BackendResult<PortOccupancyResult> {
-    let output = Command::new("netstat")
+    let output = background_command("netstat")
         .args(["-ano", "-p", "tcp"])
         .output()
         .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?;
@@ -290,7 +292,7 @@ fn lookup_process_names(pids: Vec<u32>) -> HashMap<u32, String> {
 
 fn lookup_process_name(pid: u32) -> Option<String> {
     let filter = format!("PID eq {pid}");
-    let output = Command::new("tasklist")
+    let output = background_command("tasklist")
         .args(["/FI", &filter, "/FO", "CSV", "/NH"])
         .output()
         .ok()?;
@@ -316,6 +318,20 @@ fn parse_csv_first_field(line: &str) -> Option<String> {
         return rest.split('"').next().map(str::to_string);
     }
     trimmed.split(',').next().map(str::to_string)
+}
+
+fn background_command(program: &str) -> Command {
+    let mut command = Command::new(program);
+    #[cfg(target_os = "windows")]
+    {
+        command.creation_flags(background_process_creation_flags());
+    }
+    command
+}
+
+#[cfg(target_os = "windows")]
+fn background_process_creation_flags() -> u32 {
+    0x08000000
 }
 
 #[cfg(test)]
@@ -366,13 +382,13 @@ mod tests {
     #[test]
     fn parse_ping_output_reads_windows_chinese_metrics() {
         let output = r#"
-正在 Ping 192.168.3.142 具有 32 字节的数据:
-来自 192.168.3.142 的回复: 字节=32 时间=57ms TTL=64
-来自 192.168.3.142 的回复: 字节=32 时间=129ms TTL=64
-来自 192.168.3.142 的回复: 字节=32 时间=3ms TTL=64
-来自 192.168.3.142 的回复: 字节=32 时间=2ms TTL=64
+正在 Ping 192.0.2.142 具有 32 字节的数据:
+来自 192.0.2.142 的回复: 字节=32 时间=57ms TTL=64
+来自 192.0.2.142 的回复: 字节=32 时间=129ms TTL=64
+来自 192.0.2.142 的回复: 字节=32 时间=3ms TTL=64
+来自 192.0.2.142 的回复: 字节=32 时间=2ms TTL=64
 
-192.168.3.142 的 Ping 统计信息:
+192.0.2.142 的 Ping 统计信息:
     数据包: 已发送 = 4，已接收 = 4，丢失 = 0 (0% 丢失)，
 往返行程的估计时间(以毫秒为单位):
     最短 = 2ms，最长 = 129ms，平均 = 47ms
@@ -444,5 +460,11 @@ Approximate round trip times in milli-seconds:
             parse_tasklist_process_name(output),
             Some("node.exe".to_string())
         );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_background_commands_use_no_window_flag() {
+        assert_eq!(background_process_creation_flags(), 0x08000000);
     }
 }

@@ -20,6 +20,7 @@ it("shows the app title and only minimize and close window controls", async () =
   render(<WindowControls />);
 
   expect(screen.getByText("Passion")).toBeInTheDocument();
+  expect(document.querySelector(".window-title-icon")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "最小化" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "关闭" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "最大化" })).not.toBeInTheDocument();

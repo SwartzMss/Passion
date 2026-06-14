@@ -97,6 +97,14 @@ export async function downloadFile(
   return invoke<DownloadResult>("download_file", { input });
 }
 
+export async function pauseDownload(taskId: string): Promise<void> {
+  return invoke<void>("pause_download", { taskId });
+}
+
+export async function getDefaultDownloadDir(): Promise<string> {
+  return invoke<string>("get_default_download_dir");
+}
+
 export async function getSystemSnapshot(): Promise<SystemSnapshot> {
   return invoke<SystemSnapshot>("get_system_snapshot");
 }

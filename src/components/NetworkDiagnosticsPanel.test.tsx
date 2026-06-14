@@ -75,7 +75,7 @@ it("runs ping and shows result", async () => {
   expect(screen.getAllByText("0%").length).toBeGreaterThan(0);
   expect(screen.getByText("TTL")).toBeInTheDocument();
   expect(screen.queryByText(/reply time=8ms/)).not.toBeInTheDocument();
-  expect(screen.getByText("历史记录（1）")).toBeInTheDocument();
+  expect(screen.queryByText(/历史记录/)).not.toBeInTheDocument();
   const api = await import("../lib/api");
   expect(api.pingHost).toHaveBeenCalledWith({ host: "127.0.0.1" });
 });

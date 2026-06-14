@@ -251,6 +251,16 @@ pub async fn download_file(
 }
 
 #[tauri::command]
+pub fn pause_download(task_id: String) -> CommandResult<()> {
+    crate::downloader::pause_download(&task_id).map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub fn get_default_download_dir(app: AppHandle) -> CommandResult<String> {
+    crate::downloader::default_download_dir(&app).map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
 pub async fn get_system_snapshot() -> CommandResult<SystemSnapshot> {
     Ok(crate::system_monitor::get_system_snapshot())
 }
