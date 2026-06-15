@@ -17,7 +17,9 @@ export function NetworkDiagnosticsPanel() {
   const [occupancyResult, setOccupancyResult] =
     useState<PortOccupancyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
+  const [isPingRunning, setIsPingRunning] = useState(false);
+  const [isPortRunning, setIsPortRunning] = useState(false);
+  const [isOccupancyRunning, setIsOccupancyRunning] = useState(false);
   const portValidation = validatePortValue(portValue);
   const occupancyValidation = validatePortValue(occupancyPort);
 
@@ -27,14 +29,14 @@ export function NetworkDiagnosticsPanel() {
       return;
     }
     setError(null);
-    setIsRunning(true);
+    setIsPingRunning(true);
     try {
       const result = await pingHost({ host: pingHostValue.trim() });
       setPingResult(result);
     } catch (err) {
       setError(readError(err));
     } finally {
-      setIsRunning(false);
+      setIsPingRunning(false);
     }
   }
 
@@ -49,14 +51,14 @@ export function NetworkDiagnosticsPanel() {
     }
     const port = Number(portValue);
     setError(null);
-    setIsRunning(true);
+    setIsPortRunning(true);
     try {
       const result = await checkPort({ host: portHost.trim(), port });
       setPortResult(result);
     } catch (err) {
       setError(readError(err));
     } finally {
-      setIsRunning(false);
+      setIsPortRunning(false);
     }
   }
 
@@ -67,14 +69,14 @@ export function NetworkDiagnosticsPanel() {
     }
     const port = Number(occupancyPort);
     setError(null);
-    setIsRunning(true);
+    setIsOccupancyRunning(true);
     try {
       const result = await inspectPortOccupancy({ port });
       setOccupancyResult(result);
     } catch (err) {
       setError(readError(err));
     } finally {
-      setIsRunning(false);
+      setIsOccupancyRunning(false);
     }
   }
 
@@ -118,7 +120,7 @@ export function NetworkDiagnosticsPanel() {
           <button
             className="diagnostics-button"
             onClick={runPing}
-            disabled={isRunning}
+            disabled={isPingRunning}
             title="发送 Ping 请求并查看是否可达"
           >
             <span aria-hidden="true">✈</span>
@@ -166,7 +168,7 @@ export function NetworkDiagnosticsPanel() {
           <button
             className="diagnostics-button"
             onClick={runPortCheck}
-            disabled={isRunning || Boolean(portValidation)}
+            disabled={isPortRunning || Boolean(portValidation)}
             title="检测指定 TCP 端口是否开放"
           >
             <span aria-hidden="true">◧</span>
@@ -217,7 +219,7 @@ export function NetworkDiagnosticsPanel() {
           <button
             className="diagnostics-button query-button"
             onClick={runPortOccupancy}
-            disabled={isRunning || Boolean(occupancyValidation)}
+            disabled={isOccupancyRunning || Boolean(occupancyValidation)}
             title="查看本机端口占用进程"
           >
             <span aria-hidden="true">⌕</span>
