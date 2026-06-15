@@ -142,7 +142,7 @@ function MainApp() {
             <span>v{APP_VERSION}</span>
           </div>
         </aside>
-        <main>
+        <main className={`app-main app-main-${view}`}>
           {error ? (
             <p className="error" role="alert">
               {error}

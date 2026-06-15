@@ -20,9 +20,11 @@ const reminder = {
 it("shows a compact reminder toast and closes from either action", async () => {
   const user = userEvent.setup();
   const onClose = vi.fn();
-  render(<ReminderPopup reminder={reminder} onClose={onClose} />);
+  const { container } = render(<ReminderPopup reminder={reminder} onClose={onClose} />);
 
   expect(screen.getByRole("dialog", { name: "提醒" })).toBeInTheDocument();
+  expect(screen.getByText("Passion")).toBeInTheDocument();
+  expect(container.querySelector(".reminder-toast-brand img")).toBeInTheDocument();
   expect(screen.getByText("测试提醒")).toBeInTheDocument();
   expect(screen.getByText(/今天|2026/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "完成" })).toBeInTheDocument();

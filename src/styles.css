@@ -221,6 +221,11 @@ main {
   padding-right: 4px;
 }
 
+.app-main-reminders,
+.app-main-download {
+  overflow: hidden;
+}
+
 .section-header,
 .actions {
   display: flex;
@@ -250,80 +255,134 @@ main {
 }
 
 .reminder-toast {
-  position: relative;
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
-  grid-template-rows: auto auto;
-  gap: 14px 16px;
-  width: min(336px, calc(100vw - 48px));
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(340px, 100vw);
   box-sizing: border-box;
   border: 1px solid rgba(226, 232, 240, 0.92);
-  border-radius: 14px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.98);
-  padding: 18px 24px 20px 18px;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
   pointer-events: auto;
 }
 
+.reminder-toast-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #e4e9f2;
+  padding: 8px 14px;
+}
+
+.reminder-toast-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #172033;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.reminder-toast-brand img {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.16);
+}
+
+.reminder-toast-body {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 0;
+  padding: 14px 18px 18px 14px;
+}
+
 .reminder-toast-icon {
-  position: relative;
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 58px;
+  width: 50px;
+  height: 50px;
   border-radius: 999px;
-  background: #eef4ff;
+  background: linear-gradient(180deg, #f3f7ff 0%, #eef4ff 100%);
   color: #2563eb;
 }
 
-.reminder-toast-icon::before {
-  width: 23px;
-  height: 24px;
-  border: 2px solid currentColor;
-  border-radius: 12px 12px 8px 8px;
-  content: "";
+.reminder-toast-icon svg {
+  width: 50px;
+  height: 50px;
 }
 
-.reminder-toast-icon::after {
-  position: absolute;
-  top: 12px;
-  right: 11px;
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: #f59e0b;
-  content: "";
+.alarm-bg {
+  fill: #eaf1ff;
 }
 
-.reminder-toast-icon span {
-  position: absolute;
-  bottom: 14px;
-  width: 12px;
-  height: 2px;
-  border-radius: 999px;
-  background: currentColor;
+.alarm-face {
+  fill: #ffffff;
+  stroke: #60a5fa;
+  stroke-width: 4;
+}
+
+.alarm-face-ring,
+.alarm-hand,
+.alarm-leg {
+  fill: none;
+  stroke: #2563eb;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.alarm-bell-left,
+.alarm-bell-right {
+  fill: #3b82f6;
+}
+
+.alarm-center {
+  fill: #2563eb;
+}
+
+.alarm-small-bell {
+  fill: #fbbf24;
+  stroke: #f59e0b;
+  stroke-width: 3;
+}
+
+.alarm-small-bell-clapper {
+  fill: none;
+  stroke: #f59e0b;
+  stroke-linecap: round;
+  stroke-width: 3;
+}
+
+.alarm-spark {
+  fill: #60a5fa;
+  stroke: #fbbf24;
+  stroke-linecap: round;
+  stroke-width: 3;
 }
 
 .reminder-toast-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border: 0;
   border-radius: 999px;
   background: transparent;
   padding: 0;
-  color: #64748b;
-  font-size: 24px;
+  color: #5f6b7a;
+  font-size: 22px;
+  font-weight: 300;
   line-height: 1;
 }
 
 .reminder-toast-content {
   min-width: 0;
-  padding-right: 22px;
 }
 
 .reminder-toast-content h2,
@@ -334,34 +393,38 @@ main {
 .reminder-toast-content h2 {
   overflow: hidden;
   color: #0f172a;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .reminder-toast-content p {
-  margin-top: 6px;
-  color: #64748b;
-  font-size: 15px;
+  margin-top: 5px;
+  color: #7a8699;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .reminder-toast-content small {
   display: block;
-  margin-top: 6px;
+  margin-top: 8px;
   color: #64748b;
+  font-size: 16px;
 }
 
 .reminder-toast-complete {
-  grid-column: 2;
+  grid-column: 3;
   justify-self: end;
-  min-width: 100px;
+  align-self: center;
+  min-width: 76px;
   border-color: #1d4ed8;
-  border-radius: 9px;
-  background: #1455e8;
-  padding: 10px 22px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #0b7cff 0%, #075cf0 100%);
+  padding: 7px 16px;
   color: #ffffff;
+  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.25);
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -371,7 +434,7 @@ main {
   box-sizing: border-box;
   width: 100vw;
   height: 100vh;
-  padding: 18px;
+  padding: 0;
   overflow: hidden;
   background: transparent;
 }
@@ -385,7 +448,7 @@ main {
 }
 
 .reminder-window .reminder-toast {
-  width: min(336px, 100%);
+  width: min(340px, 100%);
 }
 
 .reminder-window-message {
@@ -577,12 +640,14 @@ main {
   border-radius: 10px;
 }
 
-.workbench-status-icon::before {
-  width: 18px;
-  height: 18px;
-  border: 2px solid currentColor;
-  border-radius: 6px;
-  content: "";
+.workbench-status-icon svg {
+  width: 25px;
+  height: 25px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.1;
 }
 
 .workbench-status-icon.blue {
@@ -702,8 +767,10 @@ main {
   display: grid;
   gap: 16px;
   grid-template-rows: auto auto auto minmax(0, 1fr);
-  min-height: 100%;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .reminder-hero {
@@ -846,11 +913,12 @@ main {
   grid-template-rows: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
-  min-height: 420px;
+  min-height: 0;
   border: 1px solid #e0e5ee;
   border-radius: 10px;
   background: #ffffff;
   padding: 16px;
+  overflow: hidden;
 }
 
 .reminder-card h2 {
@@ -870,9 +938,16 @@ main {
   border-radius: 10px;
 }
 
+.reminder-table-scroll {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
 .reminder-table {
   align-self: start;
   width: 100%;
+  min-width: 660px;
   border-collapse: collapse;
   background: #ffffff;
 }
@@ -1288,6 +1363,7 @@ main {
   min-width: 0;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .download-panel > .error {
@@ -1648,6 +1724,7 @@ main {
   display: grid;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .download-table-card {
@@ -1680,7 +1757,7 @@ main {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 .download-table {
