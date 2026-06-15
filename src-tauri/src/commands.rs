@@ -504,7 +504,7 @@ fn show_reminder_window(app: &AppHandle, reminder: &Reminder) -> crate::error::B
         WebviewUrl::App(reminder_window_path(&reminder.id)),
     )
     .title("提醒")
-    .inner_size(380.0, 190.0)
+    .inner_size(340.0, 160.0)
     .resizable(false)
     .decorations(false)
     .always_on_top(true)

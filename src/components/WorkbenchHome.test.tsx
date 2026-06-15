@@ -18,7 +18,7 @@ const defaultProps = {
 };
 
 it("shows the workbench dashboard", async () => {
-  render(
+  const { container } = render(
     <WorkbenchHome {...defaultProps} />,
   );
 
@@ -34,6 +34,7 @@ it("shows the workbench dashboard", async () => {
   expect(screen.getByText("下载中")).toBeInTheDocument();
   expect(screen.getByText("运行中脚本")).toBeInTheDocument();
   expect(screen.getByText("系统状态")).toBeInTheDocument();
+  expect(container.querySelectorAll(".workbench-status-icon svg")).toHaveLength(4);
   expect(screen.queryByText("快速操作")).not.toBeInTheDocument();
   expect(screen.queryByText("即将发生")).not.toBeInTheDocument();
   expect(screen.queryByText("最近活动")).not.toBeInTheDocument();

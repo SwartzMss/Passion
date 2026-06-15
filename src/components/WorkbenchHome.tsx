@@ -98,6 +98,7 @@ export function WorkbenchHome({
   const statusCards = [
     {
       id: "reminders",
+      icon: "alarm",
       label: "待提醒",
       value: String(pendingReminderCount),
       description: "今日待触发提醒",
@@ -107,6 +108,7 @@ export function WorkbenchHome({
     },
     {
       id: "downloads",
+      icon: "download",
       label: "下载中",
       value: "0",
       description: "正在进行的下载任务",
@@ -116,6 +118,7 @@ export function WorkbenchHome({
     },
     {
       id: "scripts",
+      icon: "code",
       label: "运行中脚本",
       value: String(runningScriptTaskCount),
       description: "正在执行的脚本任务",
@@ -125,6 +128,7 @@ export function WorkbenchHome({
     },
     {
       id: "system",
+      icon: "activity",
       label: "系统状态",
       value: "正常",
       description: "基础资源入口",
@@ -186,7 +190,9 @@ export function WorkbenchHome({
           <div className="workbench-status-grid" aria-label="工作台摘要">
             {statusCards.map((item) => (
               <article className="workbench-status-card" key={item.id}>
-                <span className={`workbench-status-icon ${item.tone}`} aria-hidden="true" />
+                <span className={`workbench-status-icon ${item.tone}`} aria-hidden="true">
+                  <StatusIcon name={item.icon} />
+                </span>
                 <div>
                   <span>{item.label}</span>
                   <strong>{item.value}</strong>
@@ -202,4 +208,41 @@ export function WorkbenchHome({
       )}
     </section>
   );
+}
+
+function StatusIcon({ name }: { name: string }) {
+  switch (name) {
+    case "alarm":
+      return (
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M7 4.5 4.8 2.8M17 4.5l2.2-1.7M7.5 20.5l1.2-2.1M16.5 20.5l-1.2-2.1" />
+          <circle cx="12" cy="11.5" r="6.5" />
+          <path d="M12 8v4l2.6 1.6" />
+        </svg>
+      );
+    case "download":
+      return (
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M12 4v10" />
+          <path d="m7.5 9.5 4.5 4.5 4.5-4.5" />
+          <path d="M5 18.5h14" />
+        </svg>
+      );
+    case "code":
+      return (
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="m9 7-5 5 5 5" />
+          <path d="m15 7 5 5-5 5" />
+          <path d="m13 5-2 14" />
+        </svg>
+      );
+    case "activity":
+      return (
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M4 13h4l2-6 4 12 2-6h4" />
+        </svg>
+      );
+    default:
+      return null;
+  }
 }

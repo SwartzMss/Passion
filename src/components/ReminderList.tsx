@@ -123,62 +123,64 @@ export function ReminderList({
             ) : null}
             {visibleReminders.length > 0 ? (
               <>
-                <table className="reminder-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">名称</th>
-                      <th scope="col">类型</th>
-                      <th scope="col">优先级</th>
-                      <th scope="col">下次触发时间</th>
-                      <th scope="col">状态</th>
-                      <th scope="col">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleReminders.map((reminder) => (
-                      <tr key={reminder.id}>
-                        <td>
-                          <div className="reminder-name-cell">
-                            <strong>{reminder.title}</strong>
-                          </div>
-                        </td>
-                        <td>
-                          <span className={`repeat-badge repeat-${repeatKind(reminder.repeatRule)}`}>
-                            {repeatRuleLabel(reminder.repeatRule)}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={`priority-badge priority-${reminder.priority}`}>
-                            {priorityLabel(reminder.priority)}
-                          </span>
-                        </td>
-                        <td>{formatTime(reminder.remindAt)}</td>
-                        <td>
-                          <span className={`status status-${reminder.status}`}>
-                            {statusLabel(reminder.status)}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="reminder-table-actions">
-                            <button
-                              onClick={() => onEdit(reminder)}
-                              aria-label={`编辑 ${reminder.title}`}
-                            >
-                              编辑
-                            </button>
-                            <button
-                              className="danger-action"
-                              onClick={() => onDelete(reminder.id)}
-                              aria-label={`删除 ${reminder.title}`}
-                            >
-                              删除
-                            </button>
-                          </div>
-                        </td>
+                <div className="reminder-table-scroll">
+                  <table className="reminder-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">名称</th>
+                        <th scope="col">类型</th>
+                        <th scope="col">优先级</th>
+                        <th scope="col">下次触发时间</th>
+                        <th scope="col">状态</th>
+                        <th scope="col">操作</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {visibleReminders.map((reminder) => (
+                        <tr key={reminder.id}>
+                          <td>
+                            <div className="reminder-name-cell">
+                              <strong>{reminder.title}</strong>
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`repeat-badge repeat-${repeatKind(reminder.repeatRule)}`}>
+                              {repeatRuleLabel(reminder.repeatRule)}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`priority-badge priority-${reminder.priority}`}>
+                              {priorityLabel(reminder.priority)}
+                            </span>
+                          </td>
+                          <td>{formatTime(reminder.remindAt)}</td>
+                          <td>
+                            <span className={`status status-${reminder.status}`}>
+                              {statusLabel(reminder.status)}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="reminder-table-actions">
+                              <button
+                                onClick={() => onEdit(reminder)}
+                                aria-label={`编辑 ${reminder.title}`}
+                              >
+                                编辑
+                              </button>
+                              <button
+                                className="danger-action"
+                                onClick={() => onDelete(reminder.id)}
+                                aria-label={`删除 ${reminder.title}`}
+                              >
+                                删除
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 <div className="reminder-table-footer">
                   <span>共 {visibleReminders.length} 条</span>
                   <div className="reminder-table-pager" aria-label="分页">
