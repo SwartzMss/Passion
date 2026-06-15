@@ -13,81 +13,92 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 pub async fn ping_host(input: PingRequest) -> BackendResult<PingResult> {
-    let host = input.host.trim();
+    let host = input.host.trim().to_string();
     if host.is_empty() {
         return Err(BackendError::NetworkDiagnostic(
             "请输入要 Ping 的 IP 或域名。".to_string(),
         ));
     }
 
-    let output = background_command("ping")
-        .args(ping_args(host))
-        .output()
-        .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?;
-    let raw_output = decode_output(&output.stdout, &output.stderr);
-    let reachable = output.status.success();
-    let metrics = parse_ping_output(&raw_output);
+    tauri::async_runtime::spawn_blocking(move || {
+        let output = background_command("ping")
+            .args(ping_args(&host))
+            .output()
+            .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?;
+        let raw_output = decode_output(&output.stdout, &output.stderr);
+        let reachable = output.status.success();
+        let metrics = parse_ping_output(&raw_output);
 
-    Ok(PingResult {
-        host: host.to_string(),
-        reachable,
-        packets_transmitted: metrics.packets_transmitted,
-        packets_received: metrics.packets_received,
-        loss_percent: metrics.loss_percent,
-        min_time_ms: metrics.min_time_ms,
-        max_time_ms: metrics.max_time_ms,
-        avg_time_ms: metrics.avg_time_ms,
-        ttl: metrics.ttl,
-        replies: metrics.replies,
+        Ok(PingResult {
+            host,
+            reachable,
+            packets_transmitted: metrics.packets_transmitted,
+            packets_received: metrics.packets_received,
+            loss_percent: metrics.loss_percent,
+            min_time_ms: metrics.min_time_ms,
+            max_time_ms: metrics.max_time_ms,
+            avg_time_ms: metrics.avg_time_ms,
+            ttl: metrics.ttl,
+            replies: metrics.replies,
+        })
     })
+    .await
+    .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?
 }
 
 pub async fn check_port(input: PortCheckRequest) -> BackendResult<PortCheckResult> {
-    let host = input.host.trim();
+    let host = input.host.trim().to_string();
     if host.is_empty() {
         return Err(BackendError::NetworkDiagnostic("请输入 Host。".to_string()));
     }
+    let port = input.port;
 
-    let timeout = Duration::from_secs(3);
-    let start = Instant::now();
-    let mut addrs = (host, input.port)
-        .to_socket_addrs()
-        .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?;
-    let Some(addr) = addrs.next() else {
-        return Err(BackendError::NetworkDiagnostic(
-            "无法解析 Host。".to_string(),
-        ));
-    };
-    let result = TcpStream::connect_timeout(&addr, timeout);
-    let elapsed_ms = start.elapsed().as_millis();
+    tauri::async_runtime::spawn_blocking(move || {
+        let timeout = Duration::from_secs(3);
+        let start = Instant::now();
+        let mut addrs = (host.as_str(), port)
+            .to_socket_addrs()
+            .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?;
+        let Some(addr) = addrs.next() else {
+            return Err(BackendError::NetworkDiagnostic(
+                "无法解析 Host。".to_string(),
+            ));
+        };
+        let result = TcpStream::connect_timeout(&addr, timeout);
+        let elapsed_ms = start.elapsed().as_millis();
 
-    Ok(PortCheckResult {
-        host: host.to_string(),
-        port: input.port,
-        open: result.is_ok(),
-        elapsed_ms,
-        error: result.err().map(|err| err.to_string()),
+        Ok(PortCheckResult {
+            host,
+            port,
+            open: result.is_ok(),
+            elapsed_ms,
+            error: result.err().map(|err| err.to_string()),
+        })
     })
+    .await
+    .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?
 }
 
 pub async fn inspect_port_occupancy(
     input: PortOccupancyRequest,
 ) -> BackendResult<PortOccupancyResult> {
-    let output = background_command("netstat")
-        .args(["-ano", "-p", "tcp"])
-        .output()
-        .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?;
-    let raw_output = decode_output(&output.stdout, &output.stderr);
-    let mut entries = parse_netstat_listening_ports(&raw_output, input.port);
-    let process_names = lookup_process_names(entries.iter().map(|entry| entry.pid).collect());
-    for entry in &mut entries {
-        entry.process_name = process_names.get(&entry.pid).cloned();
-    }
+    let port = input.port;
+    tauri::async_runtime::spawn_blocking(move || {
+        let output = background_command("netstat")
+            .args(["-ano", "-p", "tcp"])
+            .output()
+            .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?;
+        let raw_output = decode_output(&output.stdout, &output.stderr);
+        let mut entries = parse_netstat_listening_ports(&raw_output, port);
+        let process_names = lookup_process_names(entries.iter().map(|entry| entry.pid).collect());
+        for entry in &mut entries {
+            entry.process_name = process_names.get(&entry.pid).cloned();
+        }
 
-    Ok(PortOccupancyResult {
-        port: input.port,
-        entries,
+        Ok(PortOccupancyResult { port, entries })
     })
+    .await
+    .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?
 }
 
 #[cfg(target_os = "windows")]

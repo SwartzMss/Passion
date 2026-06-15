@@ -1,6 +1,6 @@
 [package]
 name = "passion"
-version = "0.2.1"
+version = "0.2.2"
 description = "A personal desktop reminder assistant"
 edition = "2021"
 

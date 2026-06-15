@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { NetworkDiagnosticsPanel } from "./NetworkDiagnosticsPanel";
+import type { PingResult } from "../types";
 
 vi.mock("../lib/api", () => ({
   pingHost: vi.fn(async () => ({
@@ -78,6 +79,43 @@ it("runs ping and shows result", async () => {
   expect(screen.queryByText(/历史记录/)).not.toBeInTheDocument();
   const api = await import("../lib/api");
   expect(api.pingHost).toHaveBeenCalledWith({ host: "127.0.0.1" });
+});
+
+it("keeps each network diagnostic action independent while one check is running", async () => {
+  const user = userEvent.setup();
+  const api = await import("../lib/api");
+  let resolvePing: (value: PingResult) => void = () => {};
+  vi.mocked(api.pingHost).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolvePing = resolve;
+      }),
+  );
+  render(<NetworkDiagnosticsPanel />);
+
+  await user.type(screen.getByLabelText("Ping 目标"), "127.0.0.1");
+  await user.click(screen.getByRole("button", { name: /开始 Ping/ }));
+
+  expect(screen.getByRole("button", { name: /开始 Ping/ })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /检测端口/ })).toBeEnabled();
+  expect(screen.getByRole("button", { name: /查看占用/ })).toBeEnabled();
+
+  await user.click(screen.getByRole("button", { name: /检测端口/ }));
+  expect(api.checkPort).toHaveBeenCalledWith({ host: "127.0.0.1", port: 80 });
+
+  resolvePing({
+    host: "127.0.0.1",
+    reachable: true,
+    packetsTransmitted: 4,
+    packetsReceived: 4,
+    lossPercent: 0,
+    minTimeMs: 2,
+    maxTimeMs: 12,
+    avgTimeMs: 8,
+    ttl: 64,
+    replies: [],
+  });
+  expect(await screen.findByText("Ping 成功")).toBeInTheDocument();
 });
 
 it("checks a tcp port and shows result", async () => {
