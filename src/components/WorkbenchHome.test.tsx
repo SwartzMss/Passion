@@ -15,6 +15,7 @@ const defaultProps = {
   onOpenDownloader: vi.fn(),
   onOpenSystemMonitor: vi.fn(),
   onOpenScriptTasks: vi.fn(),
+  onOpenUtilities: vi.fn(),
 };
 
 it("shows the workbench dashboard", async () => {

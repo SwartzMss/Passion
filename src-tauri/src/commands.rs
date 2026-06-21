@@ -262,7 +262,9 @@ pub fn get_default_download_dir(app: AppHandle) -> CommandResult<String> {
 
 #[tauri::command]
 pub async fn get_system_snapshot() -> CommandResult<SystemSnapshot> {
-    Ok(crate::system_monitor::get_system_snapshot())
+    tauri::async_runtime::spawn_blocking(crate::system_monitor::get_system_snapshot)
+        .await
+        .map_err(|err| ErrorPayload::from(BackendError::SystemMonitor(err.to_string())))
 }
 
 #[tauri::command]
@@ -492,19 +494,20 @@ fn emit_reminder_triggered(
 }
 
 fn show_reminder_window(app: &AppHandle, reminder: &Reminder) -> crate::error::BackendResult<()> {
-    let label = reminder_window_label(&reminder.id);
-    if let Some(window) = app.get_webview_window(&label) {
-        window
-            .close()
-            .map_err(|err| BackendError::Window(err.to_string()))?;
+    let label_prefix = reminder_window_label_prefix(&reminder.id);
+    for (existing_label, window) in app.webview_windows() {
+        if existing_label.starts_with(&label_prefix) {
+            let _ = window.close();
+        }
     }
+    let label = reminder_window_label(&reminder.id);
     WebviewWindowBuilder::new(
         app,
         label,
         WebviewUrl::App(reminder_window_path(&reminder.id)),
     )
     .title("提醒")
-    .inner_size(340.0, 160.0)
+    .inner_size(340.0, 145.0)
     .resizable(false)
     .decorations(false)
     .always_on_top(true)
@@ -517,8 +520,12 @@ fn show_reminder_window(app: &AppHandle, reminder: &Reminder) -> crate::error::B
     Ok(())
 }
 
+fn reminder_window_label_prefix(id: &str) -> String {
+    format!("reminder-{id}-")
+}
+
 fn reminder_window_label(id: &str) -> String {
-    format!("reminder-{id}")
+    format!("{}{}", reminder_window_label_prefix(id), uuid::Uuid::new_v4())
 }
 
 fn reminder_window_path(id: &str) -> PathBuf {
@@ -649,13 +656,14 @@ mod tests {
     }
 
     #[test]
-    fn reminder_window_uses_stable_label_and_query_url() {
+    fn reminder_window_uses_unique_label_and_stable_query_url() {
         let id = "8d9b3616-f4d9-4a49-a096-a7c2c9c13f70";
+        let first_label = reminder_window_label(id);
+        let second_label = reminder_window_label(id);
 
-        assert_eq!(
-            reminder_window_label(id),
-            "reminder-8d9b3616-f4d9-4a49-a096-a7c2c9c13f70"
-        );
+        assert!(first_label.starts_with("reminder-8d9b3616-f4d9-4a49-a096-a7c2c9c13f70-"));
+        assert!(second_label.starts_with("reminder-8d9b3616-f4d9-4a49-a096-a7c2c9c13f70-"));
+        assert_ne!(first_label, second_label);
         assert_eq!(
             reminder_window_path(id),
             PathBuf::from("index.html?reminderId=8d9b3616-f4d9-4a49-a096-a7c2c9c13f70")

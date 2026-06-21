@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
+use tokio::fs as async_fs;
+use tokio::io::AsyncWriteExt;
 
 const COPY_BUFFER_SIZE: usize = 64 * 1024;
 const DOWNLOAD_PROGRESS_EVENT: &str = "download_progress";
@@ -41,16 +43,24 @@ pub async fn download_file(
         .await
     } else {
         let file_name = infer_local_file_name(source, input.file_name.as_deref())?;
-        copy_local_file_to_dir_with_progress(
-            &task_id,
-            source,
-            &file_name,
-            &save_dir,
-            COPY_BUFFER_SIZE,
-            |event| {
-                let _ = app.emit(DOWNLOAD_PROGRESS_EVENT, event);
-            },
-        )
+        let task_id_for_copy = task_id.clone();
+        let source_for_copy = source.to_string();
+        let save_dir_for_copy = save_dir.clone();
+        let app_for_copy = app.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            copy_local_file_to_dir_with_progress(
+                &task_id_for_copy,
+                &source_for_copy,
+                &file_name,
+                &save_dir_for_copy,
+                COPY_BUFFER_SIZE,
+                |event| {
+                    let _ = app_for_copy.emit(DOWNLOAD_PROGRESS_EVENT, event);
+                },
+            )
+        })
+        .await
+        .map_err(|err| BackendError::Download(err.to_string()))?
     };
 
     if let Err(err) = &result {
@@ -149,13 +159,16 @@ async fn download_http_to_dir(
     }
 
     let mut file = if existing_bytes > 0 {
-        OpenOptions::new()
+        async_fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(&part_path)
+            .await
             .map_err(|err| BackendError::Download(err.to_string()))?
     } else {
-        File::create(&part_path).map_err(|err| BackendError::Download(err.to_string()))?
+        async_fs::File::create(&part_path)
+            .await
+            .map_err(|err| BackendError::Download(err.to_string()))?
     };
     let total_bytes = response
         .content_length()
@@ -180,6 +193,7 @@ async fn download_http_to_dir(
         .map_err(|err| BackendError::Download(err.to_string()))?
     {
         file.write_all(&chunk)
+            .await
             .map_err(|err| BackendError::Download(err.to_string()))?;
         bytes += chunk.len() as u64;
         if is_pause_requested(task_id)? {
@@ -210,7 +224,10 @@ async fn download_http_to_dir(
             false,
         );
     }
-    finalize_part_file(&part_path, &path)?;
+    file.flush()
+        .await
+        .map_err(|err| BackendError::Download(err.to_string()))?;
+    finalize_part_file_async(&part_path, &path).await?;
     progress.emit(
         task_id,
         url,
@@ -434,6 +451,17 @@ fn finalize_part_file(part_path: &Path, final_path: &Path) -> BackendResult<()> 
         fs::remove_file(final_path).map_err(|err| BackendError::Download(err.to_string()))?;
     }
     fs::rename(part_path, final_path).map_err(|err| BackendError::Download(err.to_string()))
+}
+
+async fn finalize_part_file_async(part_path: &Path, final_path: &Path) -> BackendResult<()> {
+    if final_path.exists() {
+        async_fs::remove_file(final_path)
+            .await
+            .map_err(|err| BackendError::Download(err.to_string()))?;
+    }
+    async_fs::rename(part_path, final_path)
+        .await
+        .map_err(|err| BackendError::Download(err.to_string()))
 }
 
 fn paused_downloads() -> &'static Mutex<HashSet<String>> {

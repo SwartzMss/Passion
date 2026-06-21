@@ -12,6 +12,7 @@ interface Props {
   onOpenDownloader: () => void;
   onOpenSystemMonitor: () => void;
   onOpenScriptTasks: () => void;
+  onOpenUtilities: () => void;
 }
 
 export function WorkbenchHome({
@@ -24,6 +25,7 @@ export function WorkbenchHome({
   onOpenDownloader,
   onOpenSystemMonitor,
   onOpenScriptTasks,
+  onOpenUtilities,
 }: Props) {
   const [query, setQuery] = useState("");
   const tools = useMemo(
@@ -75,6 +77,13 @@ export function WorkbenchHome({
         keywords: "脚本 定时 自动化 powershell bat cmd exe",
         actions: [{ label: "管理任务", onClick: onOpenScriptTasks, primary: true }],
       },
+      {
+        id: "utilities",
+        label: "实用工具",
+        description: "Base64、Hex 和时间戳转换。",
+        keywords: "实用 工具 base64 hex 十六进制 时间戳 编码 解码",
+        actions: [{ label: "打开工具", onClick: onOpenUtilities, primary: true }],
+      },
     ],
     [
       pendingReminderCount,
@@ -85,6 +94,7 @@ export function WorkbenchHome({
       onOpenDownloader,
       onOpenSystemMonitor,
       onOpenScriptTasks,
+      onOpenUtilities,
     ],
   );
   const normalizedQuery = query.trim().toLowerCase();

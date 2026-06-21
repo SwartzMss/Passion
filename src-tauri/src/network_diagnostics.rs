@@ -26,8 +26,8 @@ pub async fn ping_host(input: PingRequest) -> BackendResult<PingResult> {
             .output()
             .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?;
         let raw_output = decode_output(&output.stdout, &output.stderr);
-        let reachable = output.status.success();
         let metrics = parse_ping_output(&raw_output);
+        let reachable = ping_output_is_reachable(output.status.success(), &metrics);
 
         Ok(PingResult {
             host,
@@ -211,6 +211,16 @@ fn parse_ping_output(output: &str) -> PingMetrics {
     }
 
     metrics
+}
+
+fn ping_output_is_reachable(status_success: bool, metrics: &PingMetrics) -> bool {
+    let successful_replies = metrics
+        .replies
+        .iter()
+        .filter(|reply| reply.ttl.is_some() || reply.time_ms.is_some())
+        .count();
+
+    status_success && successful_replies > 0
 }
 
 fn find_loss_percent(line: &str) -> Option<f32> {
@@ -417,6 +427,27 @@ mod tests {
         assert_eq!(metrics.replies.len(), 4);
         assert_eq!(metrics.replies[0].time_ms, Some(57.0));
         assert_eq!(metrics.replies[0].bytes, Some(32));
+    }
+
+    #[test]
+    fn ping_reachability_rejects_unreachable_host_replies() {
+        let output = r#"
+正在 Ping 192.168.3.12 具有 32 字节的数据:
+来自 192.168.3.196 的回复: 无法访问目标主机。
+来自 192.168.3.196 的回复: 无法访问目标主机。
+来自 192.168.3.196 的回复: 无法访问目标主机。
+来自 192.168.3.196 的回复: 无法访问目标主机。
+
+192.168.3.12 的 Ping 统计信息:
+    数据包: 已发送 = 4，已接收 = 4，丢失 = 0 (0% 丢失)，
+"#;
+
+        let metrics = parse_ping_output(output);
+
+        assert_eq!(metrics.packets_transmitted, Some(4));
+        assert_eq!(metrics.packets_received, Some(4));
+        assert_eq!(metrics.replies.len(), 0);
+        assert!(!ping_output_is_reachable(true, &metrics));
     }
 
     #[test]

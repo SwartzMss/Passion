@@ -17,28 +17,21 @@ export function ReminderPopup({ reminder, onClose }: Props) {
         className="reminder-toast"
         role="dialog"
         aria-label="提醒"
+        data-tauri-drag-region
       >
-        <header className="reminder-toast-header">
-          <div className="reminder-toast-brand">
+        <header className="reminder-toast-header" data-tauri-drag-region>
+          <div className="reminder-toast-brand" data-tauri-drag-region>
             <img src={appIcon} alt="" />
-            <strong>Passion</strong>
+            <strong data-tauri-drag-region>Passion</strong>
           </div>
-          <button
-            aria-label="关闭提醒"
-            className="reminder-toast-close"
-            onClick={onClose}
-            type="button"
-          >
-            ×
-          </button>
         </header>
-        <div className="reminder-toast-body">
-          <div className="reminder-toast-icon" aria-hidden="true">
+        <div className="reminder-toast-body" data-tauri-drag-region>
+          <div className="reminder-toast-icon" aria-hidden="true" data-tauri-drag-region>
             <AlarmIllustration />
           </div>
-          <div className="reminder-toast-content">
-            <h2>{reminder.title}</h2>
-            <p>{formatReminderTime(reminder.remindAt)}</p>
+          <div className="reminder-toast-content" data-tauri-drag-region>
+            <h2 data-tauri-drag-region>{reminder.title}</h2>
+            <p data-tauri-drag-region>{formatReminderTime(reminder.remindAt)}</p>
             {reminder.notes ? <small>{reminder.notes}</small> : null}
           </div>
           <button className="reminder-toast-complete" onClick={onClose} type="button">

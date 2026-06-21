@@ -1,10 +1,6 @@
 export type ReminderStatus = "pending" | "triggered" | "expired";
 export type ReminderPriority = "low" | "medium" | "high";
-export type ReminderRepeatRule =
-  | "once"
-  | "daily"
-  | "cn_workday"
-  | `weekly:${string}`;
+export type ReminderRepeatRule = "once" | "daily" | "cn_workday";
 
 export interface Reminder {
   id: string;
