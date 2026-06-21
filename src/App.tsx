@@ -9,6 +9,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { ScriptTasksPanel } from "./components/ScriptTasksPanel";
 import { SystemMonitorPanel } from "./components/SystemMonitorPanel";
 import { TranslationPanel } from "./components/TranslationPanel";
+import { UtilitiesPanel } from "./components/UtilitiesPanel";
 import { WindowControls } from "./components/WindowControls";
 import { WorkbenchHome } from "./components/WorkbenchHome";
 import {
@@ -30,6 +31,7 @@ type View =
   | "download"
   | "system"
   | "scripts"
+  | "utilities"
   | "settings";
 
 type NavIcon =
@@ -40,6 +42,7 @@ type NavIcon =
   | "download"
   | "activity"
   | "code"
+  | "toolbox"
   | "settings";
 
 const NAV_ITEMS: Array<{ view: View; label: string; icon: NavIcon }> = [
@@ -50,6 +53,7 @@ const NAV_ITEMS: Array<{ view: View; label: string; icon: NavIcon }> = [
   { view: "download", label: "下载工具", icon: "download" },
   { view: "system", label: "系统监控", icon: "activity" },
   { view: "scripts", label: "脚本任务", icon: "code" },
+  { view: "utilities", label: "实用工具", icon: "toolbox" },
   { view: "settings", label: "设置", icon: "settings" },
 ];
 
@@ -175,6 +179,7 @@ function MainApp() {
               onOpenDownloader={() => setView("download")}
               onOpenSystemMonitor={() => setView("system")}
               onOpenScriptTasks={() => setView("scripts")}
+              onOpenUtilities={() => setView("utilities")}
             />
           ) : null}
           {view === "reminders" ? (
@@ -199,6 +204,9 @@ function MainApp() {
           ) : null}
           {view === "scripts" ? (
             <ScriptTasksPanel />
+          ) : null}
+          {view === "utilities" ? (
+            <UtilitiesPanel />
           ) : null}
           {view === "settings" ? (
             <SettingsPanel />
@@ -275,6 +283,12 @@ function NavIcon({ name }: { name: NavIcon }) {
       "m9 7-5 5 5 5",
       "m15 7 5 5-5 5",
       "M13 5l-2 14",
+    ],
+    toolbox: [
+      "M9 6V4.8A1.8 1.8 0 0 1 10.8 3h2.4A1.8 1.8 0 0 1 15 4.8V6",
+      "M4 8.5A2.5 2.5 0 0 1 6.5 6h11A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z",
+      "M4 11h16",
+      "M10 11v2h4v-2",
     ],
     settings: [
       "M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z",

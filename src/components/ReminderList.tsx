@@ -234,16 +234,11 @@ function repeatRuleLabel(rule: Reminder["repeatRule"]) {
       return "每天";
     case "cn_workday":
       return "法定工作日";
-    default:
-      return "重复提醒";
   }
 }
 
 function repeatKind(rule: Reminder["repeatRule"]) {
-  if (rule === "once" || rule === "daily" || rule === "cn_workday") {
-    return rule;
-  }
-  return "custom";
+  return rule;
 }
 
 function priorityLabel(priority: Reminder["priority"]) {

@@ -392,9 +392,6 @@ pub fn next_repeating_remind_at(
         ReminderRepeatRule::Once => Ok(requested),
         ReminderRepeatRule::CnWorkday => next_cn_workday_remind_at(requested, now),
         ReminderRepeatRule::Daily => next_local_day_match(requested, now, |_| true),
-        ReminderRepeatRule::Weekly(days) => {
-            next_local_day_match(requested, now, |date| days.contains(&date.weekday()))
-        }
     }
 }
 
@@ -876,23 +873,6 @@ mod tests {
             ReminderRepository::create_at(&conn, input, china_time(2026, 6, 1, 10, 0)).unwrap();
 
         assert_eq!(reminder.remind_at, china_time(2026, 6, 2, 9, 0));
-    }
-
-    #[test]
-    fn create_weekly_reminder_uses_selected_weekdays() {
-        let conn = db::test_connection();
-        let input = NewReminder {
-            title: "Weekly".to_string(),
-            notes: None,
-            remind_at: china_time(2026, 6, 1, 9, 0),
-            priority: ReminderPriority::Medium,
-            repeat_rule: ReminderRepeatRule::Weekly(vec![chrono::Weekday::Wed]),
-        };
-
-        let reminder =
-            ReminderRepository::create_at(&conn, input, china_time(2026, 6, 1, 10, 0)).unwrap();
-
-        assert_eq!(reminder.remind_at, china_time(2026, 6, 3, 9, 0));
     }
 
     fn insert_raw(

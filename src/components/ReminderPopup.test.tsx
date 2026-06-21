@@ -17,7 +17,7 @@ const reminder = {
   triggeredAt: "2026-06-13T00:34:00.000Z",
 };
 
-it("shows a compact reminder toast and closes from either action", async () => {
+it("shows a compact draggable reminder toast and closes from complete action", async () => {
   const user = userEvent.setup();
   const onClose = vi.fn();
   const { container } = render(<ReminderPopup reminder={reminder} onClose={onClose} />);
@@ -28,11 +28,13 @@ it("shows a compact reminder toast and closes from either action", async () => {
   expect(screen.getByText("测试提醒")).toBeInTheDocument();
   expect(screen.getByText(/今天|2026/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "完成" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "关闭提醒" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "关闭提醒" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "知道了" })).not.toBeInTheDocument();
+  expect(screen.getByRole("dialog", { name: "提醒" })).toHaveAttribute(
+    "data-tauri-drag-region",
+  );
 
   await user.click(screen.getByRole("button", { name: "完成" }));
-  await user.click(screen.getByRole("button", { name: "关闭提醒" }));
 
-  expect(onClose).toHaveBeenCalledTimes(2);
+  expect(onClose).toHaveBeenCalledTimes(1);
 });

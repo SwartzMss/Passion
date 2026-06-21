@@ -136,9 +136,6 @@ function parseRepeatRule(rule?: ReminderRepeatRule) {
   if (!rule) {
     return { kind: "once" };
   }
-  if (rule.startsWith("weekly:")) {
-    return { kind: "daily" };
-  }
   return { kind: rule };
 }
 

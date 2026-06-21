@@ -103,8 +103,8 @@ export function NetworkDiagnosticsPanel() {
               <p>检测目标地址是否可以访问</p>
             </div>
             <StatusBadge
-              status={pingResult?.reachable ? "success" : pingResult ? "failure" : "idle"}
-              label={pingResult?.reachable ? "正常" : pingResult ? "异常" : "待检测"}
+              status={isPingRunning ? "running" : pingResult?.reachable ? "success" : pingResult ? "failure" : "idle"}
+              label={isPingRunning ? "检测中" : pingResult?.reachable ? "正常" : pingResult ? "异常" : "待检测"}
             />
           </div>
           <label className="field-label">
@@ -123,8 +123,8 @@ export function NetworkDiagnosticsPanel() {
             disabled={isPingRunning}
             title="发送 Ping 请求并查看是否可达"
           >
-            <span aria-hidden="true">✈</span>
-            开始 Ping
+            <span aria-hidden="true">{isPingRunning ? "…" : "✈"}</span>
+            {isPingRunning ? "检测中..." : "开始 Ping"}
           </button>
           <div className="diagnostics-divider" />
           <h4>检测结果</h4>
@@ -138,8 +138,8 @@ export function NetworkDiagnosticsPanel() {
               <p>检测指定主机的 TCP 端口是否开放</p>
             </div>
             <StatusBadge
-              status={portResult?.open ? "success" : portResult ? "failure" : "idle"}
-              label={portResult?.open ? "开放" : portResult ? "关闭" : "待检测"}
+              status={isPortRunning ? "running" : portResult?.open ? "success" : portResult ? "failure" : "idle"}
+              label={isPortRunning ? "检测中" : portResult?.open ? "开放" : portResult ? "关闭" : "待检测"}
             />
           </div>
           <label className="field-label">
@@ -171,8 +171,8 @@ export function NetworkDiagnosticsPanel() {
             disabled={isPortRunning || Boolean(portValidation)}
             title="检测指定 TCP 端口是否开放"
           >
-            <span aria-hidden="true">◧</span>
-            检测端口
+            <span aria-hidden="true">{isPortRunning ? "…" : "◧"}</span>
+            {isPortRunning ? "检测中..." : "检测端口"}
           </button>
           <div className="diagnostics-divider" />
           <h4>检测结果</h4>
@@ -187,14 +187,18 @@ export function NetworkDiagnosticsPanel() {
             </div>
             <StatusBadge
               status={
-                occupancyResult
+                isOccupancyRunning
+                  ? "running"
+                  : occupancyResult
                   ? occupancyResult.entries.length > 0
                     ? "failure"
                     : "success"
                   : "idle"
               }
               label={
-                occupancyResult
+                isOccupancyRunning
+                  ? "检测中"
+                  : occupancyResult
                   ? occupancyResult.entries.length > 0
                     ? "已占用"
                     : "未占用"
@@ -222,8 +226,8 @@ export function NetworkDiagnosticsPanel() {
             disabled={isOccupancyRunning || Boolean(occupancyValidation)}
             title="查看本机端口占用进程"
           >
-            <span aria-hidden="true">⌕</span>
-            查看占用
+            <span aria-hidden="true">{isOccupancyRunning ? "…" : "⌕"}</span>
+            {isOccupancyRunning ? "检测中..." : "查看占用"}
           </button>
           <div className="diagnostics-divider" />
           <h4>检测结果</h4>
@@ -240,7 +244,7 @@ function StatusBadge({
   status,
 }: {
   label: string;
-  status: "idle" | "success" | "failure";
+  status: "idle" | "running" | "success" | "failure";
 }) {
   return (
     <span className={`diagnostics-status ${status}`}>

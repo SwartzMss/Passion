@@ -96,7 +96,8 @@ it("keeps each network diagnostic action independent while one check is running"
   await user.type(screen.getByLabelText("Ping 目标"), "127.0.0.1");
   await user.click(screen.getByRole("button", { name: /开始 Ping/ }));
 
-  expect(screen.getByRole("button", { name: /开始 Ping/ })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /检测中/ })).toBeDisabled();
+  expect(screen.getByText("检测中")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /检测端口/ })).toBeEnabled();
   expect(screen.getByRole("button", { name: /查看占用/ })).toBeEnabled();
 
