@@ -41,18 +41,6 @@ it("loads and updates settings", async () => {
   });
 });
 
-it("can send a test notification", async () => {
-  const user = userEvent.setup();
-  render(<SettingsPanel />);
-
-  await user.click(
-    await screen.findByRole("button", { name: "测试通知" }),
-  );
-
-  const api = await import("../lib/api");
-  expect(api.testNotification).toHaveBeenCalled();
-});
-
 it("loads and saves ai translation settings", async () => {
   const user = userEvent.setup();
   render(<SettingsPanel />);
@@ -78,6 +66,21 @@ it("can test ai connection", async () => {
 
   const api = await import("../lib/api");
   expect(api.testAiConnection).toHaveBeenCalled();
+});
+
+it("shows the default ai connection status and can reveal api key", async () => {
+  const user = userEvent.setup();
+  render(<SettingsPanel />);
+
+  expect(await screen.findByTestId("ai-test-message")).toHaveTextContent("未测试");
+  const apiKeyInput = screen.getByLabelText("API Key");
+  expect(apiKeyInput).toHaveAttribute("type", "password");
+
+  await user.click(screen.getByRole("button", { name: "显示" }));
+
+  expect(apiKeyInput).toHaveAttribute("type", "text");
+  expect(screen.getByRole("button", { name: "隐藏" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "测试通知" })).not.toBeInTheDocument();
 });
 
 it("saves current ai settings before testing and shows result in the action row", async () => {

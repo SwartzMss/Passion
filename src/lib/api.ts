@@ -5,8 +5,6 @@ import type {
   DownloadResult,
   NewReminder,
   NewScriptTask,
-  PingRequest,
-  PingResult,
   PortCheckRequest,
   PortCheckResult,
   PortOccupancyRequest,
@@ -73,10 +71,6 @@ export async function translateText(
   input: TranslationRequest,
 ): Promise<TranslationResult> {
   return invoke<TranslationResult>("translate_text", { input });
-}
-
-export async function pingHost(input: PingRequest): Promise<PingResult> {
-  return invoke<PingResult>("ping_host", { input });
 }
 
 export async function checkPort(

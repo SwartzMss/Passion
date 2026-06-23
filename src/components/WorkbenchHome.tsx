@@ -50,8 +50,8 @@ export function WorkbenchHome({
       {
         id: "network",
         label: "网络检测",
-        description: "Ping、端口连通性和端口占用进程查看。",
-        keywords: "网络 ping 端口 检测 占用 pid 进程",
+        description: "端口连通性和端口占用进程查看。",
+        keywords: "网络 端口 检测 占用 pid 进程",
         actions: [
           { label: "开始检测", onClick: onOpenNetworkDiagnostics, primary: true },
         ],
@@ -163,7 +163,7 @@ export function WorkbenchHome({
             aria-label="搜索工具"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索功能或输入命令，例如：翻译、Ping、下载、脚本任务..."
+            placeholder="搜索功能或输入命令，例如：翻译、端口、下载、脚本任务..."
           />
           <kbd>Ctrl + K</kbd>
         </label>

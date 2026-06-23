@@ -1,11 +1,18 @@
 import { useMemo, useState } from "react";
 
 type UtilityError = string | null;
+type UtilityTab = "base64" | "hex" | "timestamp";
 
 const MAX_UTILITY_INPUT_CHARS = 1_000_000;
 const OVERSIZED_INPUT_MESSAGE = "输入内容过大，请控制在 1 MB 以内。";
+const UTILITY_TABS: Array<{ id: UtilityTab; label: string }> = [
+  { id: "base64", label: "Base64" },
+  { id: "hex", label: "Hex" },
+  { id: "timestamp", label: "时间戳" },
+];
 
 export function UtilitiesPanel() {
+  const [activeTool, setActiveTool] = useState<UtilityTab>("base64");
   const [base64Input, setBase64Input] = useState("");
   const [base64Result, setBase64Result] = useState("");
   const [base64Error, setBase64Error] = useState<UtilityError>(null);
@@ -104,8 +111,32 @@ export function UtilitiesPanel() {
         </div>
       </header>
 
-      <div className="utilities-grid">
-        <section className="utility-card" aria-label="Base64 工具">
+      <div className="utility-tabs" role="tablist" aria-label="实用工具类型">
+        {UTILITY_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTool === tab.id}
+            aria-controls={`utility-panel-${tab.id}`}
+            id={`utility-tab-${tab.id}`}
+            className={activeTool === tab.id ? "active" : ""}
+            onClick={() => setActiveTool(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="utilities-grid utilities-tab-content">
+        {activeTool === "base64" ? (
+        <section
+          className="utility-card utility-card-wide"
+          aria-label="Base64 工具"
+          role="tabpanel"
+          id="utility-panel-base64"
+          aria-labelledby="utility-tab-base64"
+        >
           <div className="utility-card-header">
             <div>
               <h2>Base64</h2>
@@ -124,10 +155,10 @@ export function UtilitiesPanel() {
           {base64Error ? <p className="utility-error">{base64Error}</p> : null}
           <div className="utility-actions">
             <button className="primary-action" onClick={encodeBase64} type="button">
-              Base64 编码
+              编码
             </button>
             <button onClick={decodeBase64} type="button">
-              Base64 解码
+              解码
             </button>
             <button onClick={() => copyText(base64Result)} disabled={!base64Result} type="button">
               复制结果
@@ -144,8 +175,16 @@ export function UtilitiesPanel() {
             </button>
           </div>
         </section>
+        ) : null}
 
-        <section className="utility-card" aria-label="Hex 工具">
+        {activeTool === "hex" ? (
+        <section
+          className="utility-card utility-card-wide"
+          aria-label="Hex 工具"
+          role="tabpanel"
+          id="utility-panel-hex"
+          aria-labelledby="utility-tab-hex"
+        >
           <div className="utility-card-header">
             <div>
               <h2>Hex</h2>
@@ -164,10 +203,10 @@ export function UtilitiesPanel() {
           {hexError ? <p className="utility-error">{hexError}</p> : null}
           <div className="utility-actions">
             <button className="primary-action" onClick={encodeHex} type="button">
-              Hex 编码
+              编码
             </button>
             <button onClick={decodeHex} type="button">
-              Hex 解码
+              解码
             </button>
             <button onClick={() => copyText(hexResult)} disabled={!hexResult} type="button">
               复制结果
@@ -184,8 +223,16 @@ export function UtilitiesPanel() {
             </button>
           </div>
         </section>
+        ) : null}
 
-        <section className="utility-card utility-card-wide" aria-label="时间戳转换">
+        {activeTool === "timestamp" ? (
+        <section
+          className="utility-card utility-card-wide"
+          aria-label="时间戳转换"
+          role="tabpanel"
+          id="utility-panel-timestamp"
+          aria-labelledby="utility-tab-timestamp"
+        >
           <div className="utility-card-header">
             <div>
               <h2>时间戳转换</h2>
@@ -225,6 +272,7 @@ export function UtilitiesPanel() {
             <span>当前毫秒级：{currentTimestamp.milliseconds}</span>
           </div>
         </section>
+        ) : null}
       </div>
     </section>
   );

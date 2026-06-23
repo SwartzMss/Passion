@@ -58,7 +58,7 @@ it("shows a left navigation without removing workbench search", async () => {
   expect(within(navigation).getByRole("button", { name: "翻译" })).toBeInTheDocument();
   expect(
     screen.getByPlaceholderText(
-      "搜索功能或输入命令，例如：翻译、Ping、下载、脚本任务...",
+      "搜索功能或输入命令，例如：翻译、端口、下载、脚本任务...",
     ),
   ).toBeInTheDocument();
 });
@@ -80,7 +80,7 @@ it("switches features from the left navigation", async () => {
   ).not.toBeInTheDocument();
   expect(
     screen.queryByPlaceholderText(
-      "搜索功能或输入命令，例如：翻译、Ping、下载、脚本任务...",
+      "搜索功能或输入命令，例如：翻译、端口、下载、脚本任务...",
     ),
   ).not.toBeInTheDocument();
 });
