@@ -146,35 +146,6 @@ pub struct TranslationResult {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PingRequest {
-    pub host: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PingResult {
-    pub host: String,
-    pub reachable: bool,
-    pub packets_transmitted: Option<u32>,
-    pub packets_received: Option<u32>,
-    pub loss_percent: Option<f32>,
-    pub min_time_ms: Option<f32>,
-    pub max_time_ms: Option<f32>,
-    pub avg_time_ms: Option<f32>,
-    pub ttl: Option<u32>,
-    pub replies: Vec<PingReply>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PingReply {
-    pub bytes: Option<u32>,
-    pub time_ms: Option<f32>,
-    pub ttl: Option<u32>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PortCheckRequest {
     pub host: String,
     pub port: u16,

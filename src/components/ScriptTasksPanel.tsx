@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createScriptTask,
   deleteScriptTask,
@@ -312,7 +312,17 @@ export function ScriptTasksPanel() {
             }}
           >
             <div className="modal-title">
+              <span className="script-modal-title-icon" aria-hidden="true">
+                &lt;/&gt;
+              </span>
               <h2 id="script-create-title">新增脚本任务</h2>
+              <button
+                aria-label="关闭新增脚本任务"
+                onClick={() => setIsCreateOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
             </div>
             {error ? <p className="error">{error}</p> : null}
             <ScriptTaskFormFields
@@ -391,11 +401,11 @@ function ScriptTaskFormFields({
       <label className="field-label script-path-field">
         执行命令
         <span className="script-path-input">
-          <input
+          <textarea
             aria-label="执行命令"
             value={scriptPath}
             onChange={(event) => setScriptPath(event.target.value)}
-            placeholder='例如："C:\Python\python.exe" "C:\tasks\a.py" --port 7890'
+            placeholder='例如："C:\Python\python.exe" "C:\tasks\backup.py"'
           />
         </span>
       </label>
@@ -439,36 +449,43 @@ function ScriptTaskFormFields({
         </label>
       )}
       {scheduleType === "weekly" ? (
-        <fieldset className="weekday-picker script-weekday-picker">
-          <legend>每周执行</legend>
-          {WEEKDAYS.map((day) => (
-            <label
-              className={weekdays.includes(day.value) ? "selected" : ""}
-              key={day.value}
-            >
-              <input
-                type="checkbox"
-                checked={weekdays.includes(day.value)}
-                onChange={(event) => {
-                  setWeekdays((current) =>
-                    event.target.checked
-                      ? [...current, day.value].sort()
-                      : current.filter((value) => value !== day.value),
-                  );
-                }}
-              />
-              {day.label}
-            </label>
-          ))}
-        </fieldset>
+        <div
+          className="script-weekday-picker"
+          role="group"
+          aria-label="每周执行日期"
+        >
+          <span className="script-weekday-title">每周执行日期</span>
+          <div className="script-weekday-options">
+            {WEEKDAYS.map((day) => (
+              <label
+                className={weekdays.includes(day.value) ? "selected" : ""}
+                key={day.value}
+              >
+                <input
+                  type="checkbox"
+                  checked={weekdays.includes(day.value)}
+                  onChange={(event) => {
+                    setWeekdays((current) =>
+                      event.target.checked
+                        ? [...current, day.value].sort()
+                        : current.filter((value) => value !== day.value),
+                    );
+                  }}
+                />
+                {day.label}
+              </label>
+            ))}
+          </div>
+        </div>
       ) : null}
-      <label className="checkbox-label">
+      <label className="checkbox-label script-enabled-row">
+        <span>创建后启用</span>
         <input
           type="checkbox"
           checked={enabled}
           onChange={(event) => setEnabled(event.target.checked)}
         />
-        创建后启用
+        <span>创建任务后自动启用</span>
       </label>
     </div>
   );
@@ -528,13 +545,26 @@ function ScriptTaskRow({
   onToggle: (task: ScriptTask) => void;
   task: ScriptTask;
 }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+    function closeOnOutsidePointer(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [isMenuOpen]);
+
   return (
     <tr>
       <td>
         <div className="script-task-name-cell">
-          <span className={`script-task-icon ${scriptTaskStatus(task)}`} aria-hidden="true">
-            {scriptTaskIcon(task)}
-          </span>
           <strong>{task.name}</strong>
         </div>
       </td>
@@ -554,12 +584,43 @@ function ScriptTaskRow({
           <button className="primary-action" onClick={() => onRunNow(task.id)} disabled={isBusy}>
             立即运行
           </button>
-          <button onClick={() => onToggle(task)} disabled={isBusy}>
-            {task.enabled ? "停用" : "启用"}
-          </button>
-          <button className="danger-action" onClick={() => onDelete(task.id)} disabled={isBusy}>
-            删除
-          </button>
+          <div className="script-actions-menu" ref={menuRef}>
+            <button
+              aria-expanded={isMenuOpen}
+              aria-label="更多操作"
+              className="script-actions-menu-trigger"
+              onClick={() => setIsMenuOpen((value) => !value)}
+              title="更多操作"
+              type="button"
+            >
+              ⋮
+            </button>
+            {isMenuOpen ? (
+              <div className="script-actions-menu-panel">
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onToggle(task);
+                }}
+                disabled={isBusy}
+                type="button"
+              >
+                {task.enabled ? "停用任务" : "启用任务"}
+              </button>
+              <button
+                className="danger-action"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onDelete(task.id);
+                }}
+                disabled={isBusy}
+                type="button"
+              >
+                删除任务
+              </button>
+            </div>
+            ) : null}
+          </div>
         </div>
       </td>
     </tr>
@@ -611,19 +672,6 @@ function isWaitingTask(task: ScriptTask) {
   return Boolean(task.enabled && !isRunningTask(task) && !isFailedTask(task));
 }
 
-function scriptTaskIcon(task: ScriptTask) {
-  switch (scriptTaskStatus(task)) {
-    case "running":
-      return "↗";
-    case "waiting":
-      return "⌁";
-    case "disabled":
-      return "Ⅱ";
-    case "failed":
-      return "×";
-  }
-}
-
 function scheduleLabel(task: ScriptTask) {
   if (task.scheduleType === "daily") {
     return `每天 ${task.timeOfDay ?? "--:--"}`;
@@ -648,7 +696,97 @@ function nextRunLabel(task: ScriptTask) {
   if (isRunningTask(task)) {
     return "运行中";
   }
-  return "下次执行：需要后端";
+  const next = nextRunDate(task, new Date());
+  return next ? formatDateTime(next) : "--";
+}
+
+function nextRunDate(task: ScriptTask, now: Date) {
+  if (task.scheduleType === "daily") {
+    return nextDailyRun(task, now);
+  }
+  if (task.scheduleType === "weekly") {
+    return nextWeeklyRun(task, now);
+  }
+  const minutes = Number(task.intervalMinutes);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return null;
+  }
+  return new Date(now.getTime() + minutes * 60_000);
+}
+
+function nextDailyRun(task: ScriptTask, now: Date) {
+  const time = parseTimeOfDay(task.timeOfDay);
+  if (!time) {
+    return null;
+  }
+  const candidate = withLocalTime(now, time.hour, time.minute);
+  if (candidate.getTime() > now.getTime()) {
+    return candidate;
+  }
+  candidate.setDate(candidate.getDate() + 1);
+  return candidate;
+}
+
+function nextWeeklyRun(task: ScriptTask, now: Date) {
+  const time = parseTimeOfDay(task.timeOfDay);
+  const weekdays = task.weekdays ?? [];
+  if (!time || weekdays.length === 0) {
+    return null;
+  }
+  const today = startOfLocalDay(now);
+  const todayWeekday = localWeekdayNumber(now);
+  for (let offset = 0; offset <= 7; offset += 1) {
+    const weekday = ((todayWeekday + offset - 1) % 7) + 1;
+    if (!weekdays.includes(weekday)) {
+      continue;
+    }
+    const candidate = new Date(today);
+    candidate.setDate(today.getDate() + offset);
+    candidate.setHours(time.hour, time.minute, 0, 0);
+    if (candidate.getTime() > now.getTime()) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function parseTimeOfDay(value?: string | null) {
+  const match = /^(\d{2}):(\d{2})$/.exec(value ?? "");
+  if (!match) {
+    return null;
+  }
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) {
+    return null;
+  }
+  return { hour, minute };
+}
+
+function withLocalTime(date: Date, hour: number, minute: number) {
+  const next = new Date(date);
+  next.setHours(hour, minute, 0, 0);
+  return next;
+}
+
+function startOfLocalDay(date: Date) {
+  const value = new Date(date);
+  value.setHours(0, 0, 0, 0);
+  return value;
+}
+
+function localWeekdayNumber(date: Date) {
+  const day = date.getDay();
+  return day === 0 ? 7 : day;
+}
+
+function formatDateTime(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  const hour = String(value.getHours()).padStart(2, "0");
+  const minute = String(value.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
 function splitCommandLine(value: string): { program: string; args: string[] } | null {

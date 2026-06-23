@@ -44,29 +44,6 @@ export interface TranslationResult {
   translatedText: string;
 }
 
-export interface PingRequest {
-  host: string;
-}
-
-export interface PingResult {
-  host: string;
-  reachable: boolean;
-  packetsTransmitted?: number | null;
-  packetsReceived?: number | null;
-  lossPercent?: number | null;
-  minTimeMs?: number | null;
-  maxTimeMs?: number | null;
-  avgTimeMs?: number | null;
-  ttl?: number | null;
-  replies: PingReply[];
-}
-
-export interface PingReply {
-  bytes?: number | null;
-  timeMs?: number | null;
-  ttl?: number | null;
-}
-
 export interface PortCheckRequest {
   host: string;
   port: number;

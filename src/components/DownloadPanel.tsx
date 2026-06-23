@@ -234,16 +234,6 @@ export function DownloadPanel() {
           <h1>下载工具</h1>
           <p>支持 HTTP/HTTPS 地址、本地文件路径和局域网共享文件。</p>
         </div>
-        <button
-          className="primary-action download-create-button"
-          onClick={() => {
-            setError(null);
-            setIsCreateOpen(true);
-          }}
-          type="button"
-        >
-          新建下载
-        </button>
       </header>
 
       {error && !isCreateOpen ? (
@@ -285,6 +275,16 @@ export function DownloadPanel() {
           />
           <span aria-hidden="true">⌕</span>
         </div>
+        <button
+          className="primary-action download-create-button"
+          onClick={() => {
+            setError(null);
+            setIsCreateOpen(true);
+          }}
+          type="button"
+        >
+          新建下载
+        </button>
       </div>
 
       <div className="download-workspace">

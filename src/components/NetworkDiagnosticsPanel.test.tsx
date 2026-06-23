@@ -2,24 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { NetworkDiagnosticsPanel } from "./NetworkDiagnosticsPanel";
-import type { PingResult } from "../types";
 
 vi.mock("../lib/api", () => ({
-  pingHost: vi.fn(async () => ({
-    host: "127.0.0.1",
-    reachable: true,
-    packetsTransmitted: 4,
-    packetsReceived: 4,
-    lossPercent: 0,
-    minTimeMs: 2,
-    maxTimeMs: 12,
-    avgTimeMs: 8,
-    ttl: 64,
-    replies: [
-      { bytes: 32, timeMs: 8, ttl: 64 },
-      { bytes: 32, timeMs: 7, ttl: 64 },
-    ],
-  })),
   checkPort: vi.fn(async () => ({
     host: "127.0.0.1",
     port: 80,
@@ -45,78 +29,23 @@ it("renders the network diagnostics workspace", () => {
   render(<NetworkDiagnosticsPanel />);
 
   expect(screen.getByRole("heading", { name: "网络检测" })).toBeInTheDocument();
-  expect(screen.getByText("检查网络连通性、TCP 端口开放情况和本机端口占用。")).toBeInTheDocument();
+  expect(screen.getByText("检查 TCP 端口开放情况和本机端口占用。")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "使用说明" })).not.toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Ping 检测" })).toBeInTheDocument();
+  expect(screen.getByRole("tab", { name: "端口检测" })).toHaveAttribute("aria-selected", "true");
   expect(screen.getByRole("heading", { name: "端口检测" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "端口占用" })).not.toBeInTheDocument();
+  expect(screen.getByText(/端口检测支持域名、IPv4 地址，端口范围 1-65535。/)).toBeInTheDocument();
+});
+
+it("shows one network diagnostic tab at a time", async () => {
+  const user = userEvent.setup();
+  render(<NetworkDiagnosticsPanel />);
+
+  await user.click(screen.getByRole("tab", { name: "端口占用" }));
+
+  expect(screen.getByRole("tab", { name: "端口占用" })).toHaveAttribute("aria-selected", "true");
   expect(screen.getByRole("heading", { name: "端口占用" })).toBeInTheDocument();
-  expect(screen.getByText(/支持域名、IPv4 地址，端口范围 1-65535。/)).toBeInTheDocument();
-});
-
-it("rejects empty ping host", async () => {
-  const user = userEvent.setup();
-  render(<NetworkDiagnosticsPanel />);
-
-  await user.click(screen.getByRole("button", { name: /开始 Ping/ }));
-
-  expect(screen.getByText("请输入要 Ping 的 IP 或域名。")).toBeInTheDocument();
-});
-
-it("runs ping and shows result", async () => {
-  const user = userEvent.setup();
-  render(<NetworkDiagnosticsPanel />);
-
-  await user.type(screen.getByLabelText("Ping 目标"), "127.0.0.1");
-  await user.click(screen.getByRole("button", { name: /开始 Ping/ }));
-
-  expect(await screen.findByText("Ping 成功")).toBeInTheDocument();
-  expect(screen.getByText("平均延迟")).toBeInTheDocument();
-  expect(screen.getAllByText("8 ms").length).toBeGreaterThan(0);
-  expect(screen.getByText("丢包率")).toBeInTheDocument();
-  expect(screen.getAllByText("0%").length).toBeGreaterThan(0);
-  expect(screen.getByText("TTL")).toBeInTheDocument();
-  expect(screen.queryByText(/reply time=8ms/)).not.toBeInTheDocument();
-  expect(screen.queryByText(/历史记录/)).not.toBeInTheDocument();
-  const api = await import("../lib/api");
-  expect(api.pingHost).toHaveBeenCalledWith({ host: "127.0.0.1" });
-});
-
-it("keeps each network diagnostic action independent while one check is running", async () => {
-  const user = userEvent.setup();
-  const api = await import("../lib/api");
-  let resolvePing: (value: PingResult) => void = () => {};
-  vi.mocked(api.pingHost).mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        resolvePing = resolve;
-      }),
-  );
-  render(<NetworkDiagnosticsPanel />);
-
-  await user.type(screen.getByLabelText("Ping 目标"), "127.0.0.1");
-  await user.click(screen.getByRole("button", { name: /开始 Ping/ }));
-
-  expect(screen.getByRole("button", { name: /检测中/ })).toBeDisabled();
-  expect(screen.getByText("检测中")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /检测端口/ })).toBeEnabled();
-  expect(screen.getByRole("button", { name: /查看占用/ })).toBeEnabled();
-
-  await user.click(screen.getByRole("button", { name: /检测端口/ }));
-  expect(api.checkPort).toHaveBeenCalledWith({ host: "127.0.0.1", port: 80 });
-
-  resolvePing({
-    host: "127.0.0.1",
-    reachable: true,
-    packetsTransmitted: 4,
-    packetsReceived: 4,
-    lossPercent: 0,
-    minTimeMs: 2,
-    maxTimeMs: 12,
-    avgTimeMs: 8,
-    ttl: 64,
-    replies: [],
-  });
-  expect(await screen.findByText("Ping 成功")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "端口检测" })).not.toBeInTheDocument();
 });
 
 it("checks a tcp port and shows result", async () => {
@@ -136,6 +65,7 @@ it("inspects port occupancy and shows process details", async () => {
   const user = userEvent.setup();
   render(<NetworkDiagnosticsPanel />);
 
+  await user.click(screen.getByRole("tab", { name: "端口占用" }));
   await user.clear(screen.getByLabelText("端口号", { selector: "#occupancy-port" }));
   await user.type(screen.getByLabelText("端口号", { selector: "#occupancy-port" }), "1420");
   await user.click(screen.getByRole("button", { name: /查看占用/ }));

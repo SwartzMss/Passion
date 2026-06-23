@@ -125,7 +125,6 @@ pub fn run() {
             commands::update_ai_settings,
             commands::translate_text,
             commands::test_ai_connection,
-            commands::ping_host,
             commands::check_port,
             commands::inspect_port_occupancy,
             commands::download_file,

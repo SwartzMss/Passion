@@ -70,8 +70,12 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+function setupUser() {
+  return userEvent.setup();
+}
+
 it("loads and shows script tasks", async () => {
-  const user = userEvent.setup();
+  const user = setupUser();
   render(<ScriptTasksPanel />);
 
   expect(screen.getByRole("heading", { name: "脚本任务" })).toBeInTheDocument();
@@ -93,6 +97,7 @@ it("loads and shows script tasks", async () => {
   expect(screen.getByRole("columnheader", { name: "操作" })).toBeInTheDocument();
   expect(screen.getAllByText("C:\\tasks\\backup.ps1").length).toBeGreaterThan(0);
   expect(screen.getAllByText("每 15 分钟").length).toBeGreaterThan(0);
+  expect(screen.queryByText("下次执行：需要后端")).not.toBeInTheDocument();
   expect(screen.getByText("总任务: 4 | 运行中: 1 | 等待执行: 1 | 已停用: 1 | 失败: 1")).toBeInTheDocument();
 
   await user.type(screen.getByPlaceholderText("搜索任务名称或执行命令"), "report");
@@ -100,7 +105,7 @@ it("loads and shows script tasks", async () => {
 });
 
 it("filters script tasks by status", async () => {
-  const user = userEvent.setup();
+  const user = setupUser();
   render(<ScriptTasksPanel />);
 
   expect(await screen.findByRole("button", { name: "全部 4" })).toBeInTheDocument();
@@ -115,7 +120,7 @@ it("filters script tasks by status", async () => {
 });
 
 it("validates required fields before creating", async () => {
-  const user = userEvent.setup();
+  const user = setupUser();
   render(<ScriptTasksPanel />);
 
   await user.click(screen.getByRole("button", { name: "新增任务" }));
@@ -126,11 +131,11 @@ it("validates required fields before creating", async () => {
 });
 
 it("creates a script task", async () => {
-  const user = userEvent.setup();
+  const user = setupUser();
   render(<ScriptTasksPanel />);
 
   await user.click(screen.getByRole("button", { name: "新增任务" }));
-  expect(screen.queryByRole("button", { name: "关闭新增脚本任务" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "关闭新增脚本任务" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "选择脚本" })).not.toBeInTheDocument();
   await user.type(screen.getByLabelText("任务名"), "备份");
   expect(screen.getByRole("option", { name: "周期" })).toBeInTheDocument();
@@ -153,7 +158,7 @@ it("creates a script task", async () => {
 });
 
 it("creates daily and weekly script tasks", async () => {
-  const user = userEvent.setup();
+  const user = setupUser();
   render(<ScriptTasksPanel />);
 
   await user.click(screen.getByRole("button", { name: "新增任务" }));
@@ -184,6 +189,8 @@ it("creates daily and weekly script tasks", async () => {
   await user.type(screen.getByLabelText("执行时间"), "18:00");
   await user.click(screen.getByLabelText("周一"));
   await user.click(screen.getByLabelText("周五"));
+  expect(screen.getByLabelText("周一").closest("label")).toHaveClass("selected");
+  expect(screen.getByLabelText("周五").closest("label")).toHaveClass("selected");
   await user.click(screen.getByRole("button", { name: "创建任务" }));
 
   expect(api.createScriptTask).toHaveBeenLastCalledWith({
@@ -199,7 +206,7 @@ it("creates daily and weekly script tasks", async () => {
 });
 
 it("creates a task from a full command string", async () => {
-  const user = userEvent.setup();
+  const user = setupUser();
   render(<ScriptTasksPanel />);
 
   await user.click(screen.getByRole("button", { name: "新增任务" }));
@@ -224,14 +231,20 @@ it("creates a task from a full command string", async () => {
 });
 
 it("runs, toggles, and deletes a script task", async () => {
-  const user = userEvent.setup();
+  const user = setupUser();
   render(<ScriptTasksPanel />);
 
   await screen.findByRole("button", { name: "运行中 1" });
   const firstRow = screen.getByRole("row", { name: /备份/ });
   await user.click(within(firstRow).getByRole("button", { name: "立即运行" }));
-  await user.click(within(firstRow).getByRole("button", { name: "停用" }));
-  await user.click(within(firstRow).getByRole("button", { name: "删除" }));
+  await user.click(within(firstRow).getByLabelText("更多操作"));
+  expect(within(firstRow).queryByRole("button", { name: "查看日志" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("heading", { name: "脚本任务列表" }));
+  expect(within(firstRow).queryByRole("button", { name: "停用任务" })).not.toBeInTheDocument();
+  await user.click(within(firstRow).getByLabelText("更多操作"));
+  await user.click(within(firstRow).getByRole("button", { name: "停用任务" }));
+  await user.click(within(firstRow).getByLabelText("更多操作"));
+  await user.click(within(firstRow).getByRole("button", { name: "删除任务" }));
 
   const api = await import("../lib/api");
   expect(api.runScriptTaskNow).toHaveBeenCalledWith("task-1");
