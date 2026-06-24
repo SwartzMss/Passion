@@ -63,13 +63,7 @@ impl Scheduler {
         }
     }
 
-    pub async fn clear(&self) {
-        let mut handles = self.handles.lock().await;
-        for (_, task) in handles.drain() {
-            task.handle.abort();
-        }
-    }
-
+    #[cfg(test)]
     pub async fn is_scheduled(&self, id: &str) -> bool {
         self.handles.lock().await.contains_key(id)
     }

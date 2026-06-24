@@ -11,14 +11,12 @@ impl SettingsRepository {
         Ok(Settings {
             launch_on_startup: read_bool(conn, "launch_on_startup")?.unwrap_or(false),
             minimize_to_tray: read_bool(conn, "minimize_to_tray")?.unwrap_or(true),
-            notification_enabled: read_bool(conn, "notification_enabled")?.unwrap_or(true),
         })
     }
 
     pub fn save(conn: &Connection, settings: &Settings) -> BackendResult<()> {
         write_bool(conn, "launch_on_startup", settings.launch_on_startup)?;
         write_bool(conn, "minimize_to_tray", settings.minimize_to_tray)?;
-        write_bool(conn, "notification_enabled", settings.notification_enabled)?;
         Ok(())
     }
 }
@@ -82,7 +80,6 @@ mod tests {
         let settings = Settings {
             launch_on_startup: true,
             minimize_to_tray: false,
-            notification_enabled: false,
         };
 
         SettingsRepository::save(&conn, &settings).unwrap();
@@ -110,12 +107,10 @@ mod tests {
         let first_settings = Settings {
             launch_on_startup: true,
             minimize_to_tray: false,
-            notification_enabled: false,
         };
         let second_settings = Settings {
             launch_on_startup: false,
             minimize_to_tray: true,
-            notification_enabled: true,
         };
 
         SettingsRepository::save(&conn, &first_settings).unwrap();
@@ -130,14 +125,12 @@ mod tests {
         let settings = Settings {
             launch_on_startup: true,
             minimize_to_tray: false,
-            notification_enabled: true,
         };
 
         SettingsRepository::save(&conn, &settings).unwrap();
 
         assert_eq!(stored_setting(&conn, "launch_on_startup"), "true");
         assert_eq!(stored_setting(&conn, "minimize_to_tray"), "false");
-        assert_eq!(stored_setting(&conn, "notification_enabled"), "true");
     }
 
     fn stored_setting(conn: &rusqlite::Connection, key: &str) -> String {

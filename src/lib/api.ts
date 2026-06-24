@@ -51,10 +51,6 @@ export async function updateSettings(settings: Settings): Promise<Settings> {
   return invoke<Settings>("update_settings", { settings });
 }
 
-export async function testNotification(): Promise<void> {
-  return invoke<void>("test_notification");
-}
-
 export async function getAiSettings(): Promise<AiSettings> {
   return invoke<AiSettings>("get_ai_settings");
 }

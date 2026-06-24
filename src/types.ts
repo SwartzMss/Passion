@@ -27,7 +27,6 @@ export interface NewReminder {
 export interface Settings {
   launchOnStartup: boolean;
   minimizeToTray: boolean;
-  notificationEnabled: boolean;
 }
 
 export interface AiSettings {

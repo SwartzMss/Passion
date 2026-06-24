@@ -6,7 +6,6 @@ use crate::models::{
     PortCheckResult, PortOccupancyRequest, PortOccupancyResult, Reminder, ScriptTask, Settings,
     SystemSnapshot, TranslationRequest, TranslationResult,
 };
-use crate::notifications;
 use crate::reminders::ReminderRepository;
 use crate::script_tasks::ScriptTaskRepository;
 use crate::settings::SettingsRepository;
@@ -159,11 +158,6 @@ pub async fn update_settings(
 }
 
 #[tauri::command]
-pub async fn test_notification(app: AppHandle) -> CommandResult<()> {
-    notifications::send_test_notification(&app).map_err(ErrorPayload::from)
-}
-
-#[tauri::command]
 pub async fn get_ai_settings(state: State<'_, AppState>) -> CommandResult<AiSettings> {
     let conn = state
         .conn
@@ -236,15 +230,65 @@ pub async fn inspect_port_occupancy(
 #[tauri::command]
 pub async fn download_file(
     app: AppHandle,
+    state: State<'_, AppState>,
     input: DownloadRequest,
 ) -> CommandResult<DownloadResult> {
-    crate::downloader::download_file(&app, input)
-        .await
-        .map_err(ErrorPayload::from)
+    let task_id = input
+        .task_id
+        .clone()
+        .unwrap_or_else(|| "download-task".to_string());
+    let source = input.url.clone();
+    let save_dir = input.save_dir.clone().unwrap_or_default();
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!(
+            "download_start task_id={} source={} save_dir={}",
+            task_id,
+            source,
+            if save_dir.is_empty() {
+                "<default>"
+            } else {
+                save_dir.as_str()
+            }
+        ),
+    );
+    match crate::downloader::download_file(&app, input).await {
+        Ok(result) => {
+            crate::app_log::info(
+                state.log_path.as_path(),
+                format!(
+                    "download_completed task_id={} file={} bytes={} elapsed_ms={} saved_path={}",
+                    task_id, result.file_name, result.bytes, result.elapsed_ms, result.saved_path
+                ),
+            );
+            Ok(result)
+        }
+        Err(err) => {
+            if err.to_string() == "下载已暂停。" {
+                crate::app_log::warn(
+                    state.log_path.as_path(),
+                    format!("download_paused task_id={} source={}", task_id, source),
+                );
+            } else {
+                crate::app_log::error(
+                    state.log_path.as_path(),
+                    format!(
+                        "download_failed task_id={} source={} error={err}",
+                        task_id, source
+                    ),
+                );
+            }
+            Err(ErrorPayload::from(err))
+        }
+    }
 }
 
 #[tauri::command]
-pub fn pause_download(task_id: String) -> CommandResult<()> {
+pub fn pause_download(state: State<'_, AppState>, task_id: String) -> CommandResult<()> {
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!("download_pause_requested task_id={task_id}"),
+    );
     crate::downloader::pause_download(&task_id).map_err(ErrorPayload::from)
 }
 
@@ -518,7 +562,11 @@ fn reminder_window_label_prefix(id: &str) -> String {
 }
 
 fn reminder_window_label(id: &str) -> String {
-    format!("{}{}", reminder_window_label_prefix(id), uuid::Uuid::new_v4())
+    format!(
+        "{}{}",
+        reminder_window_label_prefix(id),
+        uuid::Uuid::new_v4()
+    )
 }
 
 fn reminder_window_path(id: &str) -> PathBuf {
@@ -585,7 +633,7 @@ mod tests {
     use chrono::{Duration, Utc};
 
     #[test]
-    fn trigger_dispatch_marks_reminder_without_native_notification_settings() {
+    fn trigger_dispatch_marks_due_reminder() {
         let conn = db::test_connection();
         let reminder = insert_raw(&conn, "Stretch", -5, true, ReminderStatus::Pending);
         SettingsRepository::save(
@@ -593,7 +641,6 @@ mod tests {
             &Settings {
                 launch_on_startup: true,
                 minimize_to_tray: false,
-                notification_enabled: false,
             },
         )
         .unwrap();
@@ -669,12 +716,10 @@ mod tests {
         let previous = Settings {
             launch_on_startup: true,
             minimize_to_tray: false,
-            notification_enabled: true,
         };
         let next = Settings {
             launch_on_startup: false,
             minimize_to_tray: true,
-            notification_enabled: false,
         };
         SettingsRepository::save(&conn, &previous).unwrap();
         let state = AppState::new(conn, Scheduler::default());

@@ -1,7 +1,7 @@
 use crate::error::{BackendError, BackendResult};
 use tauri::menu::MenuBuilder;
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 const SHOW_ID: &str = "show_passion";
 const EXIT_ID: &str = "exit";
@@ -25,7 +25,7 @@ pub fn setup(app: &AppHandle) -> BackendResult<()> {
         .tooltip("Passion")
         .on_menu_event(|app, event| match event.id().as_ref() {
             SHOW_ID => {
-                if let Err(err) = crate::notifications::show_main_window(app) {
+                if let Err(err) = show_main_window(app) {
                     eprintln!("failed to show main window from tray: {err}");
                 }
             }
@@ -34,7 +34,7 @@ pub fn setup(app: &AppHandle) -> BackendResult<()> {
         })
         .on_tray_icon_event(|tray, event| {
             if should_show_main_window_from_tray_event(&event) {
-                if let Err(err) = crate::notifications::show_main_window(tray.app_handle()) {
+                if let Err(err) = show_main_window(tray.app_handle()) {
                     eprintln!("failed to show main window from tray double click: {err}");
                 }
             }
@@ -53,6 +53,19 @@ fn should_show_main_window_from_tray_event(event: &TrayIconEvent) -> bool {
             ..
         }
     )
+}
+
+fn show_main_window(app: &AppHandle) -> BackendResult<()> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| BackendError::Window("main window was not found".to_string()))?;
+    window
+        .show()
+        .map_err(|err| BackendError::Window(err.to_string()))?;
+    window
+        .set_focus()
+        .map_err(|err| BackendError::Window(err.to_string()))?;
+    Ok(())
 }
 
 #[cfg(test)]
