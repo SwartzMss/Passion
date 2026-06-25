@@ -16,6 +16,7 @@ const DOWNLOAD_PROGRESS_EVENT: &str = "download_progress";
 const PROGRESS_EMIT_INTERVAL: Duration = Duration::from_secs(5);
 
 static PAUSED_DOWNLOADS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+static CANCELED_DOWNLOADS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 
 pub async fn download_file(
     app: &AppHandle,
@@ -67,6 +68,9 @@ pub async fn download_file(
         if is_pause_error(err) {
             return result;
         }
+        if is_cancel_error(err) {
+            clear_cancel_request(&task_id);
+        }
         let _ = app.emit(
             DOWNLOAD_PROGRESS_EVENT,
             DownloadProgressEvent {
@@ -90,11 +94,26 @@ fn is_pause_error(err: &BackendError) -> bool {
     matches!(err, BackendError::Download(message) if message == "下载已暂停。")
 }
 
+fn is_cancel_error(err: &BackendError) -> bool {
+    matches!(err, BackendError::Download(message) if message == "下载已取消。")
+}
+
 pub fn pause_download(task_id: &str) -> BackendResult<()> {
     if task_id.trim().is_empty() {
         return Err(BackendError::Download("下载任务 ID 不能为空。".to_string()));
     }
     paused_downloads()
+        .lock()
+        .map_err(|err| BackendError::Download(err.to_string()))?
+        .insert(task_id.to_string());
+    Ok(())
+}
+
+pub fn cancel_download(task_id: &str) -> BackendResult<()> {
+    if task_id.trim().is_empty() {
+        return Err(BackendError::Download("下载任务 ID 不能为空。".to_string()));
+    }
+    canceled_downloads()
         .lock()
         .map_err(|err| BackendError::Download(err.to_string()))?
         .insert(task_id.to_string());
@@ -192,10 +211,16 @@ async fn download_http_to_dir(
         .await
         .map_err(|err| BackendError::Download(err.to_string()))?
     {
+        if is_cancel_requested(task_id)? {
+            return Err(BackendError::Download("下载已取消。".to_string()));
+        }
         file.write_all(&chunk)
             .await
             .map_err(|err| BackendError::Download(err.to_string()))?;
         bytes += chunk.len() as u64;
+        if is_cancel_requested(task_id)? {
+            return Err(BackendError::Download("下载已取消。".to_string()));
+        }
         if is_pause_requested(task_id)? {
             progress.emit(
                 task_id,
@@ -305,6 +330,9 @@ fn copy_local_file_to_dir_with_progress(
         true,
     );
     loop {
+        if is_cancel_requested(task_id)? {
+            return Err(BackendError::Download("下载已取消。".to_string()));
+        }
         let read = source_file
             .read(&mut buffer)
             .map_err(|err| BackendError::Download(err.to_string()))?;
@@ -315,6 +343,9 @@ fn copy_local_file_to_dir_with_progress(
             .write_all(&buffer[..read])
             .map_err(|err| BackendError::Download(err.to_string()))?;
         bytes += read as u64;
+        if is_cancel_requested(task_id)? {
+            return Err(BackendError::Download("下载已取消。".to_string()));
+        }
         if is_pause_requested(task_id)? {
             progress.emit(
                 task_id,
@@ -468,9 +499,19 @@ fn paused_downloads() -> &'static Mutex<HashSet<String>> {
     PAUSED_DOWNLOADS.get_or_init(|| Mutex::new(HashSet::new()))
 }
 
+fn canceled_downloads() -> &'static Mutex<HashSet<String>> {
+    CANCELED_DOWNLOADS.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
 fn clear_pause_request(task_id: &str) {
     if let Ok(mut paused) = paused_downloads().lock() {
         paused.remove(task_id);
+    }
+}
+
+fn clear_cancel_request(task_id: &str) {
+    if let Ok(mut canceled) = canceled_downloads().lock() {
+        canceled.remove(task_id);
     }
 }
 
@@ -478,6 +519,13 @@ fn is_pause_requested(task_id: &str) -> BackendResult<bool> {
     paused_downloads()
         .lock()
         .map(|paused| paused.contains(task_id))
+        .map_err(|err| BackendError::Download(err.to_string()))
+}
+
+fn is_cancel_requested(task_id: &str) -> BackendResult<bool> {
+    canceled_downloads()
+        .lock()
+        .map(|canceled| canceled.contains(task_id))
         .map_err(|err| BackendError::Download(err.to_string()))
 }
 

@@ -102,7 +102,6 @@ export function ReminderList({
           />
         </div>
         <button className="primary-action reminder-add-action" onClick={onAdd}>
-          <span aria-hidden="true">+</span>
           新增提醒
         </button>
       </div>
@@ -165,6 +164,7 @@ export function ReminderList({
                                 onClick={() => onEdit(reminder)}
                                 aria-label={`编辑 ${reminder.title}`}
                               >
+                                <ActionIcon kind="edit" />
                                 编辑
                               </button>
                               <button
@@ -172,6 +172,7 @@ export function ReminderList({
                                 onClick={() => onDelete(reminder.id)}
                                 aria-label={`删除 ${reminder.title}`}
                               >
+                                <ActionIcon kind="delete" />
                                 删除
                               </button>
                             </div>
@@ -200,6 +201,25 @@ export function ReminderList({
         </section>
       </div>
     </section>
+  );
+}
+
+function ActionIcon({ kind }: { kind: "edit" | "delete" }) {
+  if (kind === "delete") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M9 4h6l1 2h4v2H4V6h4l1-2Z" />
+        <path d="M7 10h10l-1 9H8l-1-9Z" />
+        <path d="M10 12v5M14 12v5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M5 18.5 6.2 14 15.8 4.4a2 2 0 0 1 2.8 2.8L9 16.8 4.5 18l.5.5Z" />
+      <path d="m14.5 5.7 3.8 3.8" />
+    </svg>
   );
 }
 
