@@ -15,6 +15,7 @@ pub struct AppState {
 }
 
 impl AppState {
+    #[cfg(test)]
     pub fn new(conn: Connection, scheduler: Scheduler) -> Self {
         Self::new_with_log_path(conn, scheduler, std::env::temp_dir().join("passion.log"))
     }

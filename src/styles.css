@@ -1868,8 +1868,8 @@ main {
 .download-toolbar {
   grid-area: toolbar;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px) auto;
-  gap: 12px;
+  grid-template-columns: minmax(308px, auto) minmax(180px, 240px) auto;
+  gap: 10px;
   align-items: center;
   min-width: 0;
   border: 1px solid #e0e5ee;
@@ -1884,7 +1884,6 @@ main {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  overflow: hidden;
 }
 
 .download-filters button {
@@ -1895,7 +1894,7 @@ main {
   border: 0;
   border-radius: 8px;
   background: #f5f7fb;
-  padding: 8px 12px;
+  padding: 8px 10px;
   color: #475467;
   font-weight: 700;
   white-space: nowrap;
@@ -1966,67 +1965,47 @@ main {
 
 .download-table {
   width: 100%;
-  min-width: 0;
+  min-width: 680px;
   border-collapse: collapse;
   table-layout: fixed;
   color: #172033;
   font-size: 13px;
 }
 
-.download-table-running th:nth-child(1) {
+.download-col-file {
+  width: auto;
+}
+
+.download-col-path {
+  width: 31%;
+}
+
+.download-col-progress {
+  width: 150px;
+}
+
+.download-col-speed,
+.download-col-size,
+.download-col-status,
+.download-col-action {
+  width: 80px;
+}
+
+.download-col-action-pair {
+  width: 128px;
+}
+
+.download-col-remaining,
+.download-col-time {
+  width: 96px;
+}
+
+.download-col-error {
   width: 24%;
 }
 
-.download-table-running th:nth-child(2) {
-  width: 18%;
-}
-
-.download-table-running th:nth-child(3),
-.download-table-running th:nth-child(4),
-.download-table-running th:nth-child(6) {
-  width: 10%;
-}
-
-.download-table-running th:nth-child(5) {
-  width: 14%;
-}
-
-.download-table-running th:nth-child(7) {
-  width: 14%;
-}
-
-.download-table-completed th:nth-child(1) {
-  width: 30%;
-}
-
-.download-table-completed th:nth-child(2) {
-  width: 34%;
-}
-
-.download-table-completed th:nth-child(3),
-.download-table-completed th:nth-child(4) {
-  width: 13%;
-}
-
-.download-table-completed th:nth-child(5) {
-  width: 10%;
-}
-
-.download-table-failed th:nth-child(1) {
-  width: 28%;
-}
-
-.download-table-failed th:nth-child(2) {
-  width: 28%;
-}
-
-.download-table-failed th:nth-child(3) {
-  width: 24%;
-}
-
-.download-table-failed th:nth-child(4),
-.download-table-failed th:nth-child(5) {
-  width: 10%;
+.download-col-action-wide {
+  width: 128px;
 }
 
 .download-table th {
@@ -2061,9 +2040,7 @@ main {
 
 .download-file-cell {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
   min-width: 0;
 }
 
@@ -2118,7 +2095,8 @@ main {
 .download-row-actions {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 6px;
   white-space: nowrap;
 }
 
@@ -2126,7 +2104,7 @@ main {
   border: 1px solid #d8deea;
   border-radius: 7px;
   background: #ffffff;
-  padding: 6px 9px;
+  padding: 6px 8px;
   color: #1d4ed8;
   font-size: 12px;
   font-weight: 800;
@@ -3990,46 +3968,44 @@ main {
 
 .settings-panel {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   min-width: 0;
   max-width: 100%;
-  height: 100%;
-  overflow-y: auto;
-  padding: 18px 28px 28px;
+  padding: 12px 20px 22px;
 }
 
 .settings-hero {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .settings-hero h1 {
   margin: 0;
   color: #172033;
-  font-size: 34px;
+  font-size: 30px;
   line-height: 1.15;
 }
 
 .settings-hero p {
   margin: 0;
   color: #667085;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .settings-card {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   border: 1px solid #e0e5ee;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #ffffff;
-  padding: 24px;
-  box-shadow: 0 14px 34px rgba(16, 24, 40, 0.06);
+  padding: 18px 20px;
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.05);
 }
 
 .settings-card-header {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .settings-card-header h2,
@@ -4039,26 +4015,26 @@ main {
 
 .settings-card-header h2 {
   color: #172033;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1.25;
 }
 
 .settings-card-header p {
-  margin-top: 6px;
+  margin-top: 4px;
   color: #667085;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .settings-card-icon {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
   border-radius: 999px;
   background: #eaf2ff;
   color: #1d4ed8;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 900;
 }
 
@@ -4071,21 +4047,20 @@ main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 16px;
-  padding-top: 2px;
+  gap: 14px;
   color: #172033;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .settings-toggle-row + .settings-toggle-row {
   border-top: 1px solid #edf1f7;
-  padding-top: 18px;
+  padding-top: 14px;
 }
 
 .settings-switch {
   position: relative;
-  width: 52px;
-  height: 30px;
+  width: 46px;
+  height: 26px;
   appearance: none;
   border: 0 !important;
   border-radius: 999px !important;
@@ -4099,8 +4074,8 @@ main {
   position: absolute;
   top: 3px;
   left: 3px;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 2px 7px rgba(15, 23, 42, 0.22);
@@ -4112,23 +4087,23 @@ main {
 }
 
 .settings-switch:checked::after {
-  transform: translateX(22px);
+  transform: translateX(20px);
 }
 
 .settings-field-row {
   display: grid;
-  grid-template-columns: 130px minmax(0, 1fr);
+  grid-template-columns: 112px minmax(0, 1fr);
   align-items: center;
-  gap: 18px;
+  gap: 14px;
   color: #172033;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .settings-field-row input {
   width: 100%;
-  min-height: 42px;
+  min-height: 38px;
   box-sizing: border-box;
-  padding: 9px 12px;
+  padding: 8px 11px;
 }
 
 .settings-password-field {
@@ -4156,8 +4131,8 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-top: 4px;
+  gap: 14px;
+  margin-top: 2px;
 }
 
 .ai-settings-status {
@@ -4195,13 +4170,13 @@ main {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 10px;
 }
 
 .ai-settings-buttons button {
-  min-width: 136px;
-  height: 42px;
-  border-radius: 9px;
+  min-width: 126px;
+  height: 38px;
+  border-radius: 8px;
   font-weight: 800;
   white-space: nowrap;
 }

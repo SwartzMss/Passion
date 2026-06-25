@@ -186,12 +186,6 @@ export function DownloadPanel() {
     );
   }
 
-  function retryTask(task: DownloadTask) {
-    setUrl(task.url);
-    setError(null);
-    setIsCreateOpen(true);
-  }
-
   async function pauseTask(task: DownloadTask) {
     try {
       await pauseDownload(task.id);
@@ -313,7 +307,6 @@ export function DownloadPanel() {
                     onDelete={() => removeTask(task.id)}
                     onOpenFolder={() => void openTaskFolder(task)}
                     onPause={() => void pauseTask(task)}
-                    onRetry={() => retryTask(task)}
                     onResume={() => resumeTask(task)}
                     filter={activeFilter}
                     task={task}
@@ -456,44 +449,73 @@ function FilterButton({
 function DownloadTableHead({ filter }: { filter: DownloadTaskFilter }) {
   if (filter === "completed") {
     return (
-      <thead>
-        <tr>
-          <th>文件名</th>
-          <th>文件路径</th>
-          <th>大小</th>
-          <th>完成时间</th>
-          <th>操作</th>
-        </tr>
-      </thead>
+      <>
+        <colgroup>
+          <col className="download-col-file" />
+          <col className="download-col-path" />
+          <col className="download-col-size" />
+          <col className="download-col-time" />
+          <col className="download-col-action-wide" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>文件名</th>
+            <th>文件路径</th>
+            <th>大小</th>
+            <th>完成时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+      </>
     );
   }
 
   if (filter === "failed") {
     return (
-      <thead>
-        <tr>
-          <th>文件名</th>
-          <th>文件路径</th>
-          <th>失败原因</th>
-          <th>失败时间</th>
-          <th>操作</th>
-        </tr>
-      </thead>
+      <>
+        <colgroup>
+          <col className="download-col-file" />
+          <col className="download-col-path" />
+          <col className="download-col-error" />
+          <col className="download-col-time" />
+          <col className="download-col-action" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>文件名</th>
+            <th>文件路径</th>
+            <th>失败原因</th>
+            <th>失败时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+      </>
     );
   }
 
   return (
-    <thead>
-      <tr>
-        <th>文件名</th>
-        <th>进度</th>
-        <th>速度</th>
-        <th>大小</th>
-        <th>剩余时间</th>
-        <th>状态</th>
-        <th>操作</th>
-      </tr>
-    </thead>
+    <>
+      <colgroup>
+        <col className="download-col-file" />
+        <col className="download-col-progress" />
+        <col className="download-col-speed" />
+        <col className="download-col-size" />
+        <col className="download-col-remaining" />
+        <col className="download-col-status" />
+        <col className="download-col-action-pair" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>文件名</th>
+          <th>进度</th>
+          <th>速度</th>
+          <th>大小</th>
+          <th>剩余时间</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+    </>
   );
 }
 
@@ -503,7 +525,6 @@ function DownloadTaskRow({
   onDelete,
   onOpenFolder,
   onPause,
-  onRetry,
   onResume,
   task,
 }: {
@@ -512,7 +533,6 @@ function DownloadTaskRow({
   onDelete: () => void;
   onOpenFolder: () => void;
   onPause: () => void;
-  onRetry: () => void;
   onResume: () => void;
   task: DownloadTask;
 }) {
@@ -550,7 +570,6 @@ function DownloadTaskRow({
         <td>{task.finishedAt ? formatTime(task.finishedAt) : "-"}</td>
         <td>
           <div className="download-row-actions">
-            <button onClick={onRetry} type="button">重试</button>
             <button className="danger-action" onClick={onDelete} type="button">删除</button>
           </div>
         </td>
@@ -580,16 +599,16 @@ function DownloadTaskRow({
       <td>
         <div className="download-row-actions">
           {task.status === "running" ? (
-            <button onClick={onPause} type="button">暂停</button>
+            <>
+              <button onClick={onPause} type="button">暂停</button>
+              <button className="danger-action" onClick={onCancel} type="button">取消</button>
+            </>
           ) : null}
           {task.status === "paused" ? (
             <>
               <button onClick={onResume} type="button">继续</button>
               <button className="danger-action" onClick={onCancel} type="button">取消</button>
             </>
-          ) : null}
-          {task.status === "failed" ? (
-            <button onClick={onRetry} type="button">重试</button>
           ) : null}
           {task.status === "completed" ? (
             <button onClick={onOpenFolder} type="button" title={task.result?.savedPath ?? task.savedPath ?? ""}>打开文件夹</button>

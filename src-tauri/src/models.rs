@@ -101,7 +101,6 @@ pub struct NewReminder {
 pub struct Settings {
     pub launch_on_startup: bool,
     pub minimize_to_tray: bool,
-    pub notification_enabled: bool,
 }
 
 impl Default for Settings {
@@ -109,7 +108,6 @@ impl Default for Settings {
         Self {
             launch_on_startup: false,
             minimize_to_tray: true,
-            notification_enabled: true,
         }
     }
 }
@@ -276,7 +274,6 @@ mod tests {
 
         assert!(!settings.launch_on_startup);
         assert!(settings.minimize_to_tray);
-        assert!(settings.notification_enabled);
     }
 
     #[test]

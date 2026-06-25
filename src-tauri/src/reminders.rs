@@ -227,14 +227,6 @@ impl ReminderRepository {
         )
     }
 
-    pub fn mark_triggered(
-        conn: &Connection,
-        id: &str,
-        when: DateTime<Utc>,
-    ) -> BackendResult<Reminder> {
-        Self::mark_status(conn, id, ReminderStatus::Triggered, when)
-    }
-
     pub fn mark_due_pending_enabled_as_triggered(
         conn: &Connection,
         id: &str,

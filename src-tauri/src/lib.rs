@@ -7,7 +7,6 @@ mod downloader;
 mod error;
 mod models;
 mod network_diagnostics;
-mod notifications;
 mod reminders;
 mod scheduler;
 mod script_runner;
@@ -26,17 +25,11 @@ use scheduler::Scheduler;
 use settings::SettingsRepository;
 use tauri::{Manager, WindowEvent};
 
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -120,7 +113,6 @@ pub fn run() {
             commands::delete_reminder,
             commands::get_settings,
             commands::update_settings,
-            commands::test_notification,
             commands::get_ai_settings,
             commands::update_ai_settings,
             commands::translate_text,
@@ -136,7 +128,6 @@ pub fn run() {
             commands::set_script_task_enabled,
             commands::delete_script_task,
             commands::run_script_task_now,
-            greet,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

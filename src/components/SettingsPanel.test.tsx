@@ -7,7 +7,6 @@ vi.mock("../lib/api", () => ({
   getSettings: vi.fn(async () => ({
     launchOnStartup: false,
     minimizeToTray: true,
-    notificationEnabled: true,
   })),
   getAiSettings: vi.fn(async () => ({
     baseUrl: "http://localhost:11434/v1",
@@ -17,7 +16,6 @@ vi.mock("../lib/api", () => ({
   updateSettings: vi.fn(async (settings) => settings),
   updateAiSettings: vi.fn(async (settings) => settings),
   testAiConnection: vi.fn(async () => undefined),
-  testNotification: vi.fn(async () => undefined),
 }));
 
 beforeEach(() => {
@@ -37,7 +35,6 @@ it("loads and updates settings", async () => {
   expect(api.updateSettings).toHaveBeenCalledWith({
     launchOnStartup: true,
     minimizeToTray: true,
-    notificationEnabled: true,
   });
 });
 

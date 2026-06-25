@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { DownloadPanel } from "./DownloadPanel";
@@ -39,6 +39,12 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 vi.mock("@tauri-apps/plugin-opener", () => ({
   revealItemInDir: vi.fn(async () => undefined),
 }));
+
+function emitDownloadProgress(event: DownloadProgressEvent) {
+  act(() => {
+    downloadProgressHandler?.(event);
+  });
+}
 
 it("renders the desktop download workspace", () => {
   render(<DownloadPanel />);
@@ -105,7 +111,7 @@ it("downloads a file and shows saved path", async () => {
     saveDir: "D:\\Downloads",
   });
 
-  downloadProgressHandler?.({
+  emitDownloadProgress({
     taskId: request.taskId!,
     url: "https://example.com/file.zip",
     fileName: "file.zip",
@@ -154,7 +160,7 @@ it("formats large running downloads as GB and supports pausing", async () => {
   const api = await import("../lib/api");
   const calls = vi.mocked(api.downloadFile).mock.calls;
   const request = calls[calls.length - 1]?.[0];
-  downloadProgressHandler?.({
+  emitDownloadProgress({
     taskId: request!.taskId!,
     url: "https://example.com/movie.mkv",
     fileName: "movie.mkv",
@@ -168,12 +174,31 @@ it("formats large running downloads as GB and supports pausing", async () => {
 
   expect(await screen.findByText("23.3 GB")).toBeInTheDocument();
   expect(screen.getByText("2.4 MB/s")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "取消" })).toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "暂停" }));
   expect(api.pauseDownload).toHaveBeenCalledWith(request!.taskId);
   expect(screen.getByText("已暂停")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "继续" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "取消" })).toBeInTheDocument();
+});
+
+it("marks a canceled running download as failed with a user cancel reason", async () => {
+  const user = userEvent.setup();
+  render(<DownloadPanel />);
+
+  await user.click(screen.getByRole("button", { name: "新建下载" }));
+  await user.type(screen.getByLabelText("下载地址或本地文件路径"), "https://example.com/movie.mkv");
+  await user.click(screen.getByRole("button", { name: "开始下载" }));
+
+  await user.click(await screen.findByRole("button", { name: "取消" }));
+
+  expect(screen.getByRole("button", { name: "当前任务 0" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "失败任务 1" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "失败任务 1" }));
+  expect(screen.getByText("用户取消")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "重试" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "删除" })).toBeInTheDocument();
 });
 
 it("keeps a paused download in current tasks when the backend command rejects with pause", async () => {
@@ -187,7 +212,7 @@ it("keeps a paused download in current tasks when the backend command rejects wi
   const api = await import("../lib/api");
   const calls = vi.mocked(api.downloadFile).mock.calls;
   const request = calls[calls.length - 1]?.[0];
-  downloadProgressHandler?.({
+  emitDownloadProgress({
     taskId: request!.taskId!,
     url: "https://example.com/movie.mkv",
     fileName: "movie.mkv",
@@ -217,7 +242,7 @@ it("marks a canceled paused download as failed with a user cancel reason", async
   const api = await import("../lib/api");
   const calls = vi.mocked(api.downloadFile).mock.calls;
   const request = calls[calls.length - 1]?.[0];
-  downloadProgressHandler?.({
+  emitDownloadProgress({
     taskId: request!.taskId!,
     url: "https://example.com/movie.mkv",
     fileName: "movie.mkv",

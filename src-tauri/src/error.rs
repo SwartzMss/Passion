@@ -11,8 +11,6 @@ pub enum BackendError {
     ReminderNotFound,
     #[error("Database operation failed: {0}")]
     Database(String),
-    #[error("Notification failed: {0}")]
-    Notification(String),
     #[error("Startup setting update failed: {0}")]
     Startup(String),
     #[error("{0}")]
