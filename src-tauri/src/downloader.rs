@@ -568,18 +568,29 @@ pub fn infer_local_file_name(source: &str, override_name: Option<&str>) -> Backe
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_string)
-        .or_else(|| {
-            source_path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .map(str::to_string)
-        })
+        .or_else(|| local_source_file_name(source.trim(), &source_path))
         .unwrap_or_else(|| "download.bin".to_string());
     let sanitized = sanitize_file_name(&candidate);
     if sanitized.is_empty() {
         return Ok("download.bin".to_string());
     }
     Ok(sanitized)
+}
+
+fn local_source_file_name(source: &str, source_path: &Path) -> Option<String> {
+    source_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(|name| name.rsplit(['/', '\\']).next())
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            source
+                .rsplit(['/', '\\'])
+                .next()
+                .filter(|name| !name.is_empty())
+                .map(str::to_string)
+        })
 }
 
 fn sanitize_file_name(value: &str) -> String {
