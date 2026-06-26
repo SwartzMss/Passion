@@ -4194,6 +4194,126 @@ main {
   white-space: nowrap;
 }
 
+.ssh-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.ssh-hero,
+.ssh-settings-panel,
+.ssh-toolbar,
+.ssh-form-panel,
+.ssh-table-wrap {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.ssh-settings-panel,
+.ssh-toolbar {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.ssh-toolbar {
+  grid-template-columns: minmax(220px, auto) minmax(220px, 1fr) auto;
+}
+
+.ssh-filters,
+.ssh-row-actions,
+.ssh-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ssh-form-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.ssh-form-heading h2 {
+  margin: 0;
+}
+
+.ssh-form-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ssh-bind-field {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.ssh-bind-field label,
+.ssh-file-field span {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.ssh-file-field span input {
+  min-width: 0;
+}
+
+.ssh-form-actions {
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.ssh-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.ssh-table th,
+.ssh-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.ssh-table th:last-child,
+.ssh-table td:last-child {
+  text-align: right;
+}
+
+.ssh-status {
+  display: inline-flex;
+  font-weight: 700;
+  min-width: 64px;
+}
+
+.ssh-status.running {
+  color: #047857;
+}
+
+.ssh-status.stopped {
+  color: #56657a;
+}
+
+.ssh-status.error {
+  color: var(--danger);
+}
+
+.ssh-error-detail {
+  color: var(--danger);
+  max-width: 420px;
+  overflow-wrap: anywhere;
+}
+
 .error {
   color: #b42318;
 }
@@ -4334,6 +4454,9 @@ main {
   .diagnostics-grid,
   .diagnostics-field-row,
   .diagnostics-inline-action,
+  .ssh-settings-panel,
+  .ssh-toolbar,
+  .ssh-form-grid,
   .system-metric-grid,
   .system-dashboard-grid,
   .system-simple-grid {
