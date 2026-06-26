@@ -14,6 +14,7 @@ Version 1 supports:
 - Local port forwarding with `ssh -L`.
 - Private key authentication only.
 - SQLite persistence for tunnel configurations.
+- Configurable SSH executable path, with automatic PATH detection when unset.
 - Start, stop, restart, edit, and delete actions.
 - Optional bind address: `127.0.0.1` or `0.0.0.0`.
 - Port conflict precheck before starting.
@@ -106,6 +107,18 @@ Actions:
 
 The file picker uses the existing Tauri dialog plugin.
 
+### SSH Executable Setting
+
+The module includes a compact settings area for the SSH executable:
+
+- Label: `SSH 程序路径`
+- Shows the saved path when configured.
+- If no path is configured, the backend searches PATH for `ssh.exe` on Windows or `ssh` on Unix-like systems.
+- When auto-detection succeeds, the detected absolute path is saved to the existing `settings` table.
+- The user can manually select an executable file when auto-detection fails or when they want to use a specific OpenSSH installation.
+
+This setting belongs to the SSH tunnel module rather than the general app settings page because it is specific to tunnel execution.
+
 ## Backend Data Model
 
 Add models to `src-tauri/src/models.rs` and matching TypeScript types in `src/types.ts`.
@@ -155,6 +168,10 @@ struct SshTunnelInfo {
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
+
+struct SshTunnelSettings {
+    ssh_executable_path: Option<String>,
+}
 ```
 
 `auth_type` is persisted with default `private_key`. Version 1 only accepts `private_key`; the field exists to avoid a disruptive schema change if password authentication is added later.
@@ -184,6 +201,15 @@ ON ssh_tunnels (name);
 ```
 
 Runtime status is not stored in SQLite. The database stores reusable tunnel configuration. Process state is held in memory because child process handles are not recoverable after app restart.
+
+The SSH executable path is stored in the existing `settings` table:
+
+```text
+key: ssh_executable_path
+value: absolute path to ssh.exe or ssh
+```
+
+When the value is missing or blank, the backend detects the executable from PATH and writes the detected absolute path back to this key. This keeps later tunnel starts deterministic and lets the UI show the effective path.
 
 ## Backend Modules
 
@@ -226,12 +252,22 @@ The manager must be concurrency-safe because Tauri commands can overlap.
 Expose commands:
 
 ```typescript
+get_ssh_tunnel_settings(): Promise<SshTunnelSettings>
+update_ssh_tunnel_settings(input: SshTunnelSettings): Promise<SshTunnelSettings>
 list_ssh_tunnels(): Promise<SshTunnelInfo[]>
 create_ssh_tunnel(input: NewSshTunnel): Promise<SshTunnelInfo>
 update_ssh_tunnel(id: string, input: NewSshTunnel): Promise<SshTunnelInfo>
 delete_ssh_tunnel(id: string): Promise<void>
 start_ssh_tunnel(id: string): Promise<SshTunnelInfo>
 stop_ssh_tunnel(id: string): Promise<SshTunnelInfo>
+```
+
+Settings shape:
+
+```typescript
+interface SshTunnelSettings {
+    sshExecutablePath: string | null
+}
 ```
 
 Command behavior:
@@ -247,7 +283,7 @@ Command behavior:
 Build the command with structured args, never a shell string:
 
 ```text
-ssh
+{ssh_executable_path}
   -L {bind_address}:{local_port}:{remote_host}:{remote_port}
   -N
   -i {key_path}
@@ -258,18 +294,22 @@ ssh
 
 `BatchMode=yes` prevents password/passphrase prompts from hanging a non-interactive process. If auth fails, `ssh` exits and stderr is captured for display.
 
+The command program is the resolved SSH executable path. It is never launched through a shell.
+
 ## Start Flow
 
 1. Load config from SQLite.
 2. Validate `remote_host`, `username`, and `key_path`.
 3. Check the key file exists.
-4. Check the requested local bind address and port are available.
-5. Set runtime status to `starting`.
-6. Spawn system `ssh` with stderr captured and no shell.
-7. Wait 2 seconds.
-8. If the process exited, set status to `error` and store stderr summary.
-9. If the process is still alive, set status to `running`, store PID and `started_at`.
-10. Start background monitoring for unexpected process exit.
+4. Resolve SSH executable path from saved settings or PATH auto-detection.
+5. Save the auto-detected SSH executable path when settings were blank.
+6. Check the requested local bind address and port are available.
+7. Set runtime status to `starting`.
+8. Spawn SSH with stderr captured and no shell.
+9. Wait 2 seconds in the backend async task.
+10. If the process exited, set status to `error` and store stderr summary.
+11. If the process is still alive, set status to `running`, store PID and `started_at`.
+12. Start background monitoring for unexpected process exit.
 
 Port availability should bind the requested bind address and port. If `0.0.0.0` is selected, binding `0.0.0.0:{port}` catches broad conflicts.
 
@@ -305,6 +345,8 @@ User-facing errors should be specific:
 - Empty remote host.
 - Empty username.
 - Missing private key file.
+- SSH executable path missing or invalid.
+- SSH executable not found in PATH during auto-detection.
 - Local port already occupied.
 - System `ssh` executable missing.
 - SSH process exited during startup.
