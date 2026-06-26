@@ -1,8 +1,18 @@
 use crate::error::{BackendError, BackendResult};
 use crate::models::{NewSshTunnel, SshTunnel, SshTunnelSettings};
+use crate::models::{SshTunnelInfo, SshTunnelStatus};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Row};
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::net::TcpListener;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use std::sync::{Arc, Mutex};
+use tokio::io::AsyncReadExt;
+use tokio::process::{Child, Command as TokioCommand};
+use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
 pub struct SshTunnelRepository;
@@ -70,17 +80,17 @@ impl SshTunnelRepository {
     }
 
     pub fn get(conn: &Connection, id: &str) -> BackendResult<SshTunnel> {
-        conn.query_row("SELECT * FROM ssh_tunnels WHERE id = ?1", [id], Self::from_row)
-            .optional()
-            .map_err(|err| BackendError::Database(err.to_string()))?
-            .ok_or_else(ssh_tunnel_not_found)
+        conn.query_row(
+            "SELECT * FROM ssh_tunnels WHERE id = ?1",
+            [id],
+            Self::from_row,
+        )
+        .optional()
+        .map_err(|err| BackendError::Database(err.to_string()))?
+        .ok_or_else(ssh_tunnel_not_found)
     }
 
-    pub fn update(
-        conn: &Connection,
-        id: &str,
-        input: NewSshTunnel,
-    ) -> BackendResult<SshTunnel> {
+    pub fn update(conn: &Connection, id: &str, input: NewSshTunnel) -> BackendResult<SshTunnel> {
         Self::get(conn, id)?;
         let input = normalize_input(input)?;
         let count = conn
@@ -292,6 +302,312 @@ fn millis_to_datetime(millis: i64, column_index: usize) -> rusqlite::Result<Date
     })
 }
 
+#[derive(Clone, Default)]
+pub struct SshTunnelManager {
+    runtimes: Arc<Mutex<HashMap<String, SshTunnelRuntime>>>,
+}
+
+struct SshTunnelRuntime {
+    status: SshTunnelStatus,
+    pid: Option<u32>,
+    started_at: Option<DateTime<Utc>>,
+    error_message: Option<String>,
+    stopping: bool,
+}
+
+impl SshTunnelManager {
+    pub fn info_for(&self, tunnel: SshTunnel) -> SshTunnelInfo {
+        let runtimes = self.runtimes.lock().unwrap();
+        let runtime = runtimes.get(&tunnel.id);
+        SshTunnelInfo {
+            id: tunnel.id,
+            name: tunnel.name,
+            description: tunnel.description,
+            local_port: tunnel.local_port,
+            bind_address: tunnel.bind_address,
+            remote_host: tunnel.remote_host,
+            remote_port: tunnel.remote_port,
+            username: tunnel.username,
+            key_path: tunnel.key_path,
+            auth_type: tunnel.auth_type,
+            status: runtime
+                .map(|value| value.status)
+                .unwrap_or(SshTunnelStatus::Stopped),
+            pid: runtime.and_then(|value| value.pid),
+            started_at: runtime.and_then(|value| value.started_at),
+            error_message: runtime.and_then(|value| value.error_message.clone()),
+            created_at: tunnel.created_at,
+            updated_at: tunnel.updated_at,
+        }
+    }
+
+    pub fn is_active(&self, id: &str) -> bool {
+        let runtimes = self.runtimes.lock().unwrap();
+        matches!(
+            runtimes.get(id).map(|runtime| runtime.status),
+            Some(SshTunnelStatus::Starting | SshTunnelStatus::Running)
+        )
+    }
+
+    pub async fn start(
+        &self,
+        tunnel: SshTunnel,
+        ssh_executable_path: PathBuf,
+    ) -> BackendResult<SshTunnelInfo> {
+        if self.is_active(&tunnel.id) {
+            return Err(BackendError::NetworkDiagnostic(
+                "SSH 隧道已在运行。".to_string(),
+            ));
+        }
+        if !ssh_executable_path.is_file() {
+            return Err(BackendError::NetworkDiagnostic(format!(
+                "SSH 程序不存在: {}",
+                ssh_executable_path.display()
+            )));
+        }
+        if !Path::new(&tunnel.key_path).exists() {
+            return Err(BackendError::NetworkDiagnostic(format!(
+                "私钥文件不存在: {}",
+                tunnel.key_path
+            )));
+        }
+        if !is_port_available(&tunnel.bind_address, tunnel.local_port) {
+            return Err(BackendError::NetworkDiagnostic(format!(
+                "端口 {} 已被占用，请更换端口或先停止占用该端口的程序。",
+                tunnel.local_port
+            )));
+        }
+
+        self.set_starting(&tunnel.id);
+        let mut command = background_ssh_command(&ssh_executable_path);
+        command.args(build_ssh_args(&tunnel));
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped());
+        let mut child = command
+            .spawn()
+            .map_err(|err| BackendError::NetworkDiagnostic(format!("启动 ssh 失败: {err}")))?;
+        let pid = child.id();
+        let stderr = child.stderr.take();
+        let stderr_buffer = Arc::new(tokio::sync::Mutex::new(String::new()));
+        if let Some(mut stderr) = stderr {
+            let stderr_buffer = stderr_buffer.clone();
+            tauri::async_runtime::spawn(async move {
+                let mut bytes = Vec::new();
+                let _ = stderr.read_to_end(&mut bytes).await;
+                let text = String::from_utf8_lossy(&bytes).to_string();
+                let mut buffer = stderr_buffer.lock().await;
+                *buffer = summarize_output(&text);
+            });
+        }
+
+        sleep(Duration::from_secs(2)).await;
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let error = format!(
+                    "SSH 进程退出，退出码: {}{}",
+                    status,
+                    stderr_suffix(&stderr_buffer).await
+                );
+                self.set_error(&tunnel.id, error);
+            }
+            Ok(None) => {
+                let child = Arc::new(tokio::sync::Mutex::new(child));
+                self.set_running(&tunnel.id, pid);
+                self.spawn_monitor(tunnel.id.clone(), child, stderr_buffer);
+            }
+            Err(err) => {
+                self.set_error(&tunnel.id, format!("进程检查失败: {err}"));
+            }
+        }
+
+        Ok(self.info_for(tunnel))
+    }
+
+    pub async fn stop(&self, tunnel: SshTunnel) -> BackendResult<SshTunnelInfo> {
+        let pid = {
+            let mut runtimes = self.runtimes.lock().unwrap();
+            let runtime = runtimes
+                .entry(tunnel.id.clone())
+                .or_insert_with(stopped_runtime);
+            runtime.stopping = true;
+            runtime.pid
+        };
+        if let Some(pid) = pid {
+            kill_process_tree(pid).await?;
+        }
+        {
+            let mut runtimes = self.runtimes.lock().unwrap();
+            runtimes.insert(tunnel.id.clone(), stopped_runtime());
+        }
+        Ok(self.info_for(tunnel))
+    }
+
+    fn set_starting(&self, id: &str) {
+        let mut runtimes = self.runtimes.lock().unwrap();
+        runtimes.insert(
+            id.to_string(),
+            SshTunnelRuntime {
+                status: SshTunnelStatus::Starting,
+                pid: None,
+                started_at: None,
+                error_message: None,
+                stopping: false,
+            },
+        );
+    }
+
+    fn set_running(&self, id: &str, pid: Option<u32>) {
+        let mut runtimes = self.runtimes.lock().unwrap();
+        runtimes.insert(
+            id.to_string(),
+            SshTunnelRuntime {
+                status: SshTunnelStatus::Running,
+                pid,
+                started_at: Some(Utc::now()),
+                error_message: None,
+                stopping: false,
+            },
+        );
+    }
+
+    fn set_error(&self, id: &str, message: String) {
+        let mut runtimes = self.runtimes.lock().unwrap();
+        runtimes.insert(
+            id.to_string(),
+            SshTunnelRuntime {
+                status: SshTunnelStatus::Error,
+                pid: None,
+                started_at: None,
+                error_message: Some(message),
+                stopping: false,
+            },
+        );
+    }
+
+    fn spawn_monitor(
+        &self,
+        id: String,
+        child: Arc<tokio::sync::Mutex<Child>>,
+        stderr_buffer: Arc<tokio::sync::Mutex<String>>,
+    ) {
+        let manager = self.clone();
+        tauri::async_runtime::spawn(async move {
+            loop {
+                sleep(Duration::from_secs(3)).await;
+                let wait_result = {
+                    let mut child = child.lock().await;
+                    child.try_wait()
+                };
+                match wait_result {
+                    Ok(Some(status)) => {
+                        if !manager.is_stopping(&id) {
+                            let message = format!(
+                                "SSH 进程退出，退出码: {}{}",
+                                status,
+                                stderr_suffix(&stderr_buffer).await
+                            );
+                            manager.set_error(&id, message);
+                        }
+                        break;
+                    }
+                    Ok(None) => {}
+                    Err(err) => {
+                        if !manager.is_stopping(&id) {
+                            manager.set_error(&id, format!("进程检查失败: {err}"));
+                        }
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    fn is_stopping(&self, id: &str) -> bool {
+        let runtimes = self.runtimes.lock().unwrap();
+        runtimes
+            .get(id)
+            .map(|runtime| runtime.stopping)
+            .unwrap_or(false)
+    }
+}
+
+fn stopped_runtime() -> SshTunnelRuntime {
+    SshTunnelRuntime {
+        status: SshTunnelStatus::Stopped,
+        pid: None,
+        started_at: None,
+        error_message: None,
+        stopping: false,
+    }
+}
+
+pub fn is_port_available(bind_address: &str, port: u16) -> bool {
+    TcpListener::bind((bind_address, port)).is_ok()
+}
+
+fn background_ssh_command(ssh_executable_path: &Path) -> TokioCommand {
+    #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
+    let mut command = TokioCommand::new(ssh_executable_path);
+    #[cfg(target_os = "windows")]
+    {
+        command.creation_flags(0x08000000);
+    }
+    command
+}
+
+async fn kill_process_tree(pid: u32) -> BackendResult<()> {
+    let (program, args) = kill_process_tree_command(pid);
+    let output = TokioCommand::new(program)
+        .args(args)
+        .output()
+        .await
+        .map_err(|err| BackendError::NetworkDiagnostic(format!("停止 SSH 进程失败: {err}")))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(BackendError::NetworkDiagnostic(format!(
+            "停止 SSH 进程失败: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )))
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn kill_process_tree_command(pid: u32) -> (String, Vec<String>) {
+    (
+        "taskkill".to_string(),
+        vec![
+            "/PID".to_string(),
+            pid.to_string(),
+            "/T".to_string(),
+            "/F".to_string(),
+        ],
+    )
+}
+
+#[cfg(not(target_os = "windows"))]
+fn kill_process_tree_command(pid: u32) -> (String, Vec<String>) {
+    (
+        "kill".to_string(),
+        vec!["-TERM".to_string(), pid.to_string()],
+    )
+}
+
+fn summarize_output(value: &str) -> String {
+    value.chars().take(2000).collect()
+}
+
+async fn stderr_suffix(stderr_buffer: &Arc<tokio::sync::Mutex<String>>) -> String {
+    let stderr = stderr_buffer.lock().await;
+    if stderr.trim().is_empty() {
+        String::new()
+    } else {
+        format!("，stderr: {}", stderr.trim())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -417,5 +733,43 @@ mod tests {
         let detected = detect_ssh_executable_in_paths(vec![temp.path().to_path_buf()]).unwrap();
 
         assert_eq!(detected, executable);
+    }
+
+    #[test]
+    fn port_available_reports_false_for_bound_port() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        assert!(!is_port_available("127.0.0.1", port));
+    }
+
+    #[test]
+    fn tunnel_info_merges_stopped_runtime_by_default() {
+        let conn = db::test_connection();
+        let tunnel = SshTunnelRepository::create(&conn, sample_input()).unwrap();
+        let manager = SshTunnelManager::default();
+
+        let info = manager.info_for(tunnel);
+
+        assert_eq!(info.status, crate::models::SshTunnelStatus::Stopped);
+        assert_eq!(info.pid, None);
+        assert_eq!(info.error_message, None);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_kill_command_uses_taskkill_tree_force() {
+        assert_eq!(
+            kill_process_tree_command(1234),
+            (
+                "taskkill".to_string(),
+                vec![
+                    "/PID".to_string(),
+                    "1234".to_string(),
+                    "/T".to_string(),
+                    "/F".to_string()
+                ]
+            )
+        );
     }
 }

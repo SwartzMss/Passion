@@ -5,6 +5,7 @@ import type {
   DownloadResult,
   NewReminder,
   NewScriptTask,
+  NewSshTunnel,
   PortCheckRequest,
   PortCheckResult,
   PortOccupancyRequest,
@@ -12,6 +13,8 @@ import type {
   Reminder,
   Settings,
   ScriptTask,
+  SshTunnelInfo,
+  SshTunnelSettings,
   SystemSnapshot,
   TranslationRequest,
   TranslationResult,
@@ -79,6 +82,45 @@ export async function inspectPortOccupancy(
   input: PortOccupancyRequest,
 ): Promise<PortOccupancyResult> {
   return invoke<PortOccupancyResult>("inspect_port_occupancy", { input });
+}
+
+export async function getSshTunnelSettings(): Promise<SshTunnelSettings> {
+  return invoke<SshTunnelSettings>("get_ssh_tunnel_settings");
+}
+
+export async function updateSshTunnelSettings(
+  input: SshTunnelSettings,
+): Promise<SshTunnelSettings> {
+  return invoke<SshTunnelSettings>("update_ssh_tunnel_settings", { input });
+}
+
+export async function listSshTunnels(): Promise<SshTunnelInfo[]> {
+  return invoke<SshTunnelInfo[]>("list_ssh_tunnels");
+}
+
+export async function createSshTunnel(
+  input: NewSshTunnel,
+): Promise<SshTunnelInfo> {
+  return invoke<SshTunnelInfo>("create_ssh_tunnel", { input });
+}
+
+export async function updateSshTunnel(
+  id: string,
+  input: NewSshTunnel,
+): Promise<SshTunnelInfo> {
+  return invoke<SshTunnelInfo>("update_ssh_tunnel", { id, input });
+}
+
+export async function deleteSshTunnel(id: string): Promise<void> {
+  return invoke<void>("delete_ssh_tunnel", { id });
+}
+
+export async function startSshTunnel(id: string): Promise<SshTunnelInfo> {
+  return invoke<SshTunnelInfo>("start_ssh_tunnel", { id });
+}
+
+export async function stopSshTunnel(id: string): Promise<SshTunnelInfo> {
+  return invoke<SshTunnelInfo>("stop_ssh_tunnel", { id });
 }
 
 export async function downloadFile(

@@ -1,5 +1,6 @@
 use crate::scheduler::Scheduler;
 use crate::script_task_scheduler::ScriptTaskScheduler;
+use crate::ssh_tunnels::SshTunnelManager;
 use rusqlite::Connection;
 use std::{
     path::PathBuf,
@@ -11,6 +12,7 @@ pub struct AppState {
     pub conn: Arc<Mutex<Connection>>,
     pub scheduler: Scheduler,
     pub script_task_scheduler: ScriptTaskScheduler,
+    pub ssh_tunnel_manager: SshTunnelManager,
     pub log_path: Arc<PathBuf>,
 }
 
@@ -25,6 +27,7 @@ impl AppState {
             conn: Arc::new(Mutex::new(conn)),
             scheduler,
             script_task_scheduler: ScriptTaskScheduler::default(),
+            ssh_tunnel_manager: SshTunnelManager::default(),
             log_path: Arc::new(log_path),
         }
     }

@@ -2,13 +2,15 @@ use crate::ai_settings::AiSettingsRepository;
 use crate::app_state::AppState;
 use crate::error::{BackendError, ErrorPayload};
 use crate::models::{
-    AiSettings, DownloadRequest, DownloadResult, NewReminder, NewScriptTask, PortCheckRequest,
-    PortCheckResult, PortOccupancyRequest, PortOccupancyResult, Reminder, ScriptTask, Settings,
-    SystemSnapshot, TranslationRequest, TranslationResult,
+    AiSettings, DownloadRequest, DownloadResult, NewReminder, NewScriptTask, NewSshTunnel,
+    PortCheckRequest, PortCheckResult, PortOccupancyRequest, PortOccupancyResult, Reminder,
+    ScriptTask, Settings, SshTunnelInfo, SshTunnelSettings, SystemSnapshot, TranslationRequest,
+    TranslationResult,
 };
 use crate::reminders::ReminderRepository;
 use crate::script_tasks::ScriptTaskRepository;
 use crate::settings::SettingsRepository;
+use crate::ssh_tunnels::{self, SshTunnelRepository, SshTunnelSettingsRepository};
 use chrono::Utc;
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -281,6 +283,162 @@ pub async fn inspect_port_occupancy(
     crate::network_diagnostics::inspect_port_occupancy(input)
         .await
         .map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn get_ssh_tunnel_settings(
+    state: State<'_, AppState>,
+) -> CommandResult<SshTunnelSettings> {
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+    SshTunnelSettingsRepository::get(&conn).map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn update_ssh_tunnel_settings(
+    state: State<'_, AppState>,
+    input: SshTunnelSettings,
+) -> CommandResult<SshTunnelSettings> {
+    let path = input.ssh_executable_path.unwrap_or_default();
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+    SshTunnelSettingsRepository::save(&conn, &path).map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn list_ssh_tunnels(state: State<'_, AppState>) -> CommandResult<Vec<SshTunnelInfo>> {
+    let tunnels = {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        SshTunnelRepository::list(&conn).map_err(ErrorPayload::from)?
+    };
+    Ok(tunnels
+        .into_iter()
+        .map(|tunnel| state.ssh_tunnel_manager.info_for(tunnel))
+        .collect())
+}
+
+#[tauri::command]
+pub async fn create_ssh_tunnel(
+    state: State<'_, AppState>,
+    input: NewSshTunnel,
+) -> CommandResult<SshTunnelInfo> {
+    let ssh_executable_path =
+        resolve_ssh_executable_path(state.inner()).map_err(ErrorPayload::from)?;
+    let tunnel = {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        SshTunnelRepository::create(&conn, input).map_err(ErrorPayload::from)?
+    };
+    state
+        .ssh_tunnel_manager
+        .start(tunnel, ssh_executable_path)
+        .await
+        .map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn update_ssh_tunnel(
+    state: State<'_, AppState>,
+    id: String,
+    input: NewSshTunnel,
+) -> CommandResult<SshTunnelInfo> {
+    if state.ssh_tunnel_manager.is_active(&id) {
+        return Err(ErrorPayload::from(BackendError::NetworkDiagnostic(
+            "请先停止 SSH 隧道，再编辑。".to_string(),
+        )));
+    }
+    let tunnel = {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        SshTunnelRepository::update(&conn, &id, input).map_err(ErrorPayload::from)?
+    };
+    Ok(state.ssh_tunnel_manager.info_for(tunnel))
+}
+
+#[tauri::command]
+pub async fn delete_ssh_tunnel(state: State<'_, AppState>, id: String) -> CommandResult<()> {
+    if state.ssh_tunnel_manager.is_active(&id) {
+        return Err(ErrorPayload::from(BackendError::NetworkDiagnostic(
+            "请先停止 SSH 隧道，再删除。".to_string(),
+        )));
+    }
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+    SshTunnelRepository::delete(&conn, &id).map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn start_ssh_tunnel(
+    state: State<'_, AppState>,
+    id: String,
+) -> CommandResult<SshTunnelInfo> {
+    let ssh_executable_path =
+        resolve_ssh_executable_path(state.inner()).map_err(ErrorPayload::from)?;
+    let tunnel = {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        SshTunnelRepository::get(&conn, &id).map_err(ErrorPayload::from)?
+    };
+    state
+        .ssh_tunnel_manager
+        .start(tunnel, ssh_executable_path)
+        .await
+        .map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn stop_ssh_tunnel(
+    state: State<'_, AppState>,
+    id: String,
+) -> CommandResult<SshTunnelInfo> {
+    let tunnel = {
+        let conn = state
+            .conn
+            .lock()
+            .map_err(|err| BackendError::Database(err.to_string()))?;
+        SshTunnelRepository::get(&conn, &id).map_err(ErrorPayload::from)?
+    };
+    state
+        .ssh_tunnel_manager
+        .stop(tunnel)
+        .await
+        .map_err(ErrorPayload::from)
+}
+
+fn resolve_ssh_executable_path(state: &AppState) -> crate::error::BackendResult<PathBuf> {
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|err| BackendError::Database(err.to_string()))?;
+    let settings = SshTunnelSettingsRepository::get(&conn)?;
+    if let Some(path) = settings.ssh_executable_path {
+        let path = PathBuf::from(path);
+        if path.is_file() {
+            return Ok(path);
+        }
+        return Err(BackendError::NetworkDiagnostic(format!(
+            "SSH 程序不存在: {}",
+            path.display()
+        )));
+    }
+    let detected = ssh_tunnels::detect_ssh_executable()?;
+    SshTunnelSettingsRepository::save(&conn, &detected.to_string_lossy())?;
+    Ok(detected)
 }
 
 #[tauri::command]
