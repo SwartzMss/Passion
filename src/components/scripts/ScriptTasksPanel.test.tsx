@@ -53,7 +53,7 @@ const disabledTask = {
   lastStdout: null,
 };
 
-vi.mock("../lib/api", () => ({
+vi.mock("../../lib/api", () => ({
   listScriptTasks: vi.fn(async () => [
     sampleTask,
     runningTask,
@@ -144,7 +144,7 @@ it("creates a script task", async () => {
   await user.type(screen.getByLabelText("间隔分钟数"), "15");
   await user.click(screen.getByRole("button", { name: "创建任务" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.createScriptTask).toHaveBeenCalledWith({
     name: "备份",
     scriptPath: "C:\\tasks\\selected.ps1",
@@ -169,7 +169,7 @@ it("creates daily and weekly script tasks", async () => {
   await user.type(screen.getByLabelText("执行时间"), "09:30");
   await user.click(screen.getByRole("button", { name: "创建任务" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.createScriptTask).toHaveBeenLastCalledWith({
     name: "日报",
     scriptPath: "C:\\tasks\\daily.ps1",
@@ -217,7 +217,7 @@ it("creates a task from a full command string", async () => {
   );
   await user.click(screen.getByRole("button", { name: "创建任务" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.createScriptTask).toHaveBeenLastCalledWith({
     name: "Python任务",
     scriptPath: "C:\\Program Files\\Python\\python.exe",
@@ -246,7 +246,7 @@ it("runs, toggles, and deletes a script task", async () => {
   await user.click(within(firstRow).getByLabelText("更多操作"));
   await user.click(within(firstRow).getByRole("button", { name: "删除任务" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.runScriptTaskNow).toHaveBeenCalledWith("task-1");
   expect(api.setScriptTaskEnabled).toHaveBeenCalledWith("task-1", false);
   expect(api.deleteScriptTask).toHaveBeenCalledWith("task-1");

@@ -2,9 +2,9 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { TranslationPanel } from "./TranslationPanel";
-import { translateText } from "../lib/api";
+import { translateText } from "../../lib/api";
 
-vi.mock("../lib/api", () => ({
+vi.mock("../../lib/api", () => ({
   translateText: vi.fn(async () => ({
     translatedText: "你好，世界",
   })),

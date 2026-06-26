@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import type { NewReminder, Reminder, ReminderRepeatRule } from "../types";
+import type { NewReminder, Reminder, ReminderRepeatRule } from "../../types";
 
 interface Props {
   reminder?: Reminder | null;

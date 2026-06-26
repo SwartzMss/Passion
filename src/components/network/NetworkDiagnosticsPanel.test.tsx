@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { NetworkDiagnosticsPanel } from "./NetworkDiagnosticsPanel";
 
-vi.mock("../lib/api", () => ({
+vi.mock("../../lib/api", () => ({
   checkPort: vi.fn(async () => ({
     host: "127.0.0.1",
     port: 80,
@@ -57,7 +57,7 @@ it("checks a tcp port and shows result", async () => {
   await user.click(screen.getByRole("button", { name: /检测端口/ }));
 
   expect(await screen.findByText("未开放")).toBeInTheDocument();
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.checkPort).toHaveBeenCalledWith({ host: "127.0.0.1", port: 80 });
 });
 
@@ -74,7 +74,7 @@ it("inspects port occupancy and shows process details", async () => {
   expect(screen.getByText("node.exe")).toBeInTheDocument();
   expect(screen.getByText("PID 1234")).toBeInTheDocument();
   expect(screen.getByText("127.0.0.1:1420")).toBeInTheDocument();
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.inspectPortOccupancy).toHaveBeenCalledWith({ port: 1420 });
 });
 

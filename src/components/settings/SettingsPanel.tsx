@@ -5,8 +5,8 @@ import {
   testAiConnection,
   updateAiSettings,
   updateSettings,
-} from "../lib/api";
-import type { AiSettings, Settings } from "../types";
+} from "../../lib/api";
+import type { AiSettings, Settings } from "../../types";
 
 export function SettingsPanel() {
   const [settings, setSettings] = useState<Settings | null>(null);

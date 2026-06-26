@@ -1,6 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { MouseEvent } from "react";
-import appIcon from "../../src-tauri/icons/32x32.png";
+import appIcon from "../../../src-tauri/icons/32x32.png";
 
 export function WindowControls() {
   const appWindow = getCurrentWindow();

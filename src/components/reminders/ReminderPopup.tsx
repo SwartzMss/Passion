@@ -1,5 +1,5 @@
-import type { Reminder } from "../types";
-import appIcon from "../../src-tauri/icons/32x32.png";
+import type { Reminder } from "../../types";
+import appIcon from "../../../src-tauri/icons/32x32.png";
 
 interface Props {
   reminder: Reminder | null;

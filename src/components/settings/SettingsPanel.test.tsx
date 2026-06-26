@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { SettingsPanel } from "./SettingsPanel";
 
-vi.mock("../lib/api", () => ({
+vi.mock("../../lib/api", () => ({
   getSettings: vi.fn(async () => ({
     launchOnStartup: false,
     minimizeToTray: true,
@@ -31,7 +31,7 @@ it("loads and updates settings", async () => {
   );
   await user.click(screen.getByLabelText("开机自启动"));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.updateSettings).toHaveBeenCalledWith({
     launchOnStartup: true,
     minimizeToTray: true,
@@ -47,7 +47,7 @@ it("loads and saves ai translation settings", async () => {
   await user.type(modelInput, "deepseek-r1");
   await user.click(screen.getByRole("button", { name: "保存 AI 设置" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.updateAiSettings).toHaveBeenCalledWith({
     baseUrl: "http://localhost:11434/v1",
     model: "deepseek-r1",
@@ -61,7 +61,7 @@ it("can test ai connection", async () => {
 
   await user.click(await screen.findByRole("button", { name: "测试 AI 连接" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.testAiConnection).toHaveBeenCalled();
 });
 
@@ -89,7 +89,7 @@ it("saves current ai settings before testing and shows result in the action row"
   await user.type(baseUrlInput, "https://api.deepseek.com");
   await user.click(screen.getByRole("button", { name: "测试 AI 连接" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.updateAiSettings).toHaveBeenCalledWith({
     baseUrl: "https://api.deepseek.com",
     model: "qwen2.5:7b",
@@ -105,7 +105,7 @@ it("saves current ai settings before testing and shows result in the action row"
 });
 
 it("shows ai test failures in the action row instead of the page alert", async () => {
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   vi.mocked(api.testAiConnection).mockRejectedValueOnce({
     message: "AI provider request failed",
   });

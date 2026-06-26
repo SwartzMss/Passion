@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Reminder } from "../types";
+import type { Reminder } from "../../types";
 
 interface Props {
   reminders: Reminder[];

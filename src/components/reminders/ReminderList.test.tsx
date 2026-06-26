@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { ReminderList } from "./ReminderList";
-import type { Reminder } from "../types";
+import type { Reminder } from "../../types";
 
 const reminder: Reminder = {
   id: "1",

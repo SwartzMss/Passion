@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { translateText } from "../lib/api";
+import { translateText } from "../../lib/api";
 
 interface Props {
   onOpenSettings: () => void;

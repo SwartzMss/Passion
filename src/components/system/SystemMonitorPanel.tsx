@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getSystemSnapshot } from "../lib/api";
-import type { SystemSnapshot } from "../types";
+import { getSystemSnapshot } from "../../lib/api";
+import type { SystemSnapshot } from "../../types";
 
 type MetricTone = "blue" | "purple" | "orange" | "green";
 

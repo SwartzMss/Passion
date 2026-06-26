@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import "./styles.css";
-import { AddReminderDialog } from "./components/AddReminderDialog";
-import { DownloadPanel } from "./components/DownloadPanel";
-import { NetworkDiagnosticsPanel } from "./components/NetworkDiagnosticsPanel";
-import { ReminderList } from "./components/ReminderList";
-import { ReminderWindow } from "./components/ReminderWindow";
-import { SettingsPanel } from "./components/SettingsPanel";
-import { ScriptTasksPanel } from "./components/ScriptTasksPanel";
-import { SshTunnelsPanel } from "./components/SshTunnelsPanel";
-import { SystemMonitorPanel } from "./components/SystemMonitorPanel";
-import { TranslationPanel } from "./components/TranslationPanel";
-import { UtilitiesPanel } from "./components/UtilitiesPanel";
-import { WindowControls } from "./components/WindowControls";
-import { WorkbenchHome } from "./components/WorkbenchHome";
+import { WindowControls } from "./components/app/WindowControls";
+import { WorkbenchHome } from "./components/dashboard/WorkbenchHome";
+import { DownloadPanel } from "./components/download/DownloadPanel";
+import { NetworkDiagnosticsPanel } from "./components/network/NetworkDiagnosticsPanel";
+import { AddReminderDialog } from "./components/reminders/AddReminderDialog";
+import { ReminderList } from "./components/reminders/ReminderList";
+import { ReminderWindow } from "./components/reminders/ReminderWindow";
+import { ScriptTasksPanel } from "./components/scripts/ScriptTasksPanel";
+import { SettingsPanel } from "./components/settings/SettingsPanel";
+import { SshTunnelsPanel } from "./components/ssh/SshTunnelsPanel";
+import { SystemMonitorPanel } from "./components/system/SystemMonitorPanel";
+import { TranslationPanel } from "./components/translation/TranslationPanel";
+import { UtilitiesPanel } from "./components/utilities/UtilitiesPanel";
 import {
   createReminder,
   deleteReminder,

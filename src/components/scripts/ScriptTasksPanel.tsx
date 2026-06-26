@@ -5,8 +5,8 @@ import {
   listScriptTasks,
   runScriptTaskNow,
   setScriptTaskEnabled,
-} from "../lib/api";
-import type { ScriptTask, ScriptTaskScheduleType } from "../types";
+} from "../../lib/api";
+import type { ScriptTask, ScriptTaskScheduleType } from "../../types";
 
 const WEEKDAYS = [
   { value: 1, label: "周一" },

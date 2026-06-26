@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { cancelDownload, downloadFile, getDefaultDownloadDir, pauseDownload } from "../lib/api";
-import { onDownloadProgress } from "../lib/events";
-import type { DownloadResult } from "../types";
-import type { DownloadProgressEvent } from "../types";
+import { cancelDownload, downloadFile, getDefaultDownloadDir, pauseDownload } from "../../lib/api";
+import { onDownloadProgress } from "../../lib/events";
+import type { DownloadResult } from "../../types";
+import type { DownloadProgressEvent } from "../../types";
 
 type DownloadTaskStatus = "running" | "paused" | "completed" | "failed";
 type DownloadTaskFilter = DownloadTaskStatus;

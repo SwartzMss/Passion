@@ -42,7 +42,7 @@ const errorTunnel = {
   errorMessage: "Permission denied (publickey).",
 };
 
-vi.mock("../lib/api", () => ({
+vi.mock("../../lib/api", () => ({
   getSshTunnelSettings: vi.fn(async () => ({
     sshExecutablePath: "C:\\Windows\\System32\\OpenSSH\\ssh.exe",
   })),
@@ -99,7 +99,7 @@ it("starts, stops, restarts, and deletes tunnels", async () => {
   await user.click(within(errorRow).getByRole("button", { name: "重启" }));
   await user.click(within(errorRow).getByRole("button", { name: "删除" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.startSshTunnel).toHaveBeenCalledWith("ssh-1");
   expect(api.stopSshTunnel).toHaveBeenCalledWith("ssh-2");
   expect(api.startSshTunnel).toHaveBeenCalledWith("ssh-3");
@@ -124,7 +124,7 @@ it("validates create form and submits create-and-start", async () => {
   await user.click(screen.getByRole("button", { name: "选择私钥" }));
   await user.click(screen.getByRole("button", { name: "创建并启动" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.createSshTunnel).toHaveBeenCalledWith({
     name: "QNX调试2",
     description: null,
@@ -146,7 +146,7 @@ it("updates SSH executable path setting", async () => {
   await user.type(input, "D:\\Git\\usr\\bin\\ssh.exe");
   await user.click(screen.getByRole("button", { name: "保存 SSH 路径" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.updateSshTunnelSettings).toHaveBeenCalledWith({
     sshExecutablePath: "D:\\Git\\usr\\bin\\ssh.exe",
   });

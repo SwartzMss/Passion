@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { checkPort, inspectPortOccupancy } from "../lib/api";
+import { checkPort, inspectPortOccupancy } from "../../lib/api";
 import type {
   PortCheckResult,
   PortOccupancyEntry,
   PortOccupancyResult,
-} from "../types";
+} from "../../types";
 
 type NetworkTab = "port_check" | "port_occupancy";
 

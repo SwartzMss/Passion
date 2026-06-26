@@ -1,7 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState } from "react";
-import { listReminders } from "../lib/api";
-import type { Reminder } from "../types";
+import { listReminders } from "../../lib/api";
+import type { Reminder } from "../../types";
 import { ReminderPopup } from "./ReminderPopup";
 
 interface Props {

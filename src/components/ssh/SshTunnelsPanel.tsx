@@ -9,13 +9,13 @@ import {
   stopSshTunnel,
   updateSshTunnel,
   updateSshTunnelSettings,
-} from "../lib/api";
+} from "../../lib/api";
 import type {
   NewSshTunnel,
   SshTunnelBindAddress,
   SshTunnelInfo,
   SshTunnelStatus,
-} from "../types";
+} from "../../types";
 
 type Filter = "all" | "running" | "stopped" | "error";
 type Mode = "list" | "create" | "edit";

@@ -2,7 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { DownloadPanel } from "./DownloadPanel";
-import type { DownloadProgressEvent } from "../types";
+import type { DownloadProgressEvent } from "../../types";
 
 let resolveDownload: ((value: {
   url: string;
@@ -12,7 +12,7 @@ let resolveDownload: ((value: {
   elapsedMs: number;
 }) => void) | null = null;
 
-vi.mock("../lib/api", () => ({
+vi.mock("../../lib/api", () => ({
   getDefaultDownloadDir: vi.fn(async () => "C:\\Users\\tester\\Downloads"),
   pauseDownload: vi.fn(async () => undefined),
   cancelDownload: vi.fn(async () => undefined),
@@ -26,7 +26,7 @@ vi.mock("../lib/api", () => ({
 
 let downloadProgressHandler: ((event: DownloadProgressEvent) => void) | null = null;
 
-vi.mock("../lib/events", () => ({
+vi.mock("../../lib/events", () => ({
   onDownloadProgress: vi.fn(async (handler: (event: DownloadProgressEvent) => void) => {
     downloadProgressHandler = handler;
     return vi.fn();
@@ -104,7 +104,7 @@ it("downloads a file and shows saved path", async () => {
   expect(screen.getByText("file.zip")).toBeInTheDocument();
   expect(screen.getAllByText("等待开始").length).toBeGreaterThan(0);
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   const request = vi.mocked(api.downloadFile).mock.calls[0]?.[0];
   expect(request).toEqual({
     taskId: expect.any(String),
@@ -158,7 +158,7 @@ it("formats large running downloads as GB and supports pausing", async () => {
   await user.type(screen.getByLabelText("下载地址或本地文件路径"), "https://example.com/movie.mkv");
   await user.click(screen.getByRole("button", { name: "开始下载" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   const calls = vi.mocked(api.downloadFile).mock.calls;
   const request = calls[calls.length - 1]?.[0];
   emitDownloadProgress({
@@ -192,7 +192,7 @@ it("marks a canceled running download as failed with a user cancel reason", asyn
   await user.type(screen.getByLabelText("下载地址或本地文件路径"), "https://example.com/movie.mkv");
   await user.click(screen.getByRole("button", { name: "开始下载" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   const calls = vi.mocked(api.downloadFile).mock.calls;
   const request = calls[calls.length - 1]?.[0];
   await user.click(await screen.findByRole("button", { name: "取消" }));
@@ -226,7 +226,7 @@ it("keeps a paused download in current tasks when the backend command rejects wi
   await user.type(screen.getByLabelText("下载地址或本地文件路径"), "https://example.com/movie.mkv");
   await user.click(screen.getByRole("button", { name: "开始下载" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   const calls = vi.mocked(api.downloadFile).mock.calls;
   const request = calls[calls.length - 1]?.[0];
   emitDownloadProgress({
@@ -256,7 +256,7 @@ it("marks a canceled paused download as failed with a user cancel reason", async
   await user.type(screen.getByLabelText("下载地址或本地文件路径"), "https://example.com/movie.mkv");
   await user.click(screen.getByRole("button", { name: "开始下载" }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   const calls = vi.mocked(api.downloadFile).mock.calls;
   const request = calls[calls.length - 1]?.[0];
   emitDownloadProgress({

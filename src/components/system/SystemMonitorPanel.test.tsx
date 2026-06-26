@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { SystemMonitorPanel } from "./SystemMonitorPanel";
 
-vi.mock("../lib/api", () => ({
+vi.mock("../../lib/api", () => ({
   getSystemSnapshot: vi.fn(async () => ({
     cpuUsagePercent: 27.4,
     memoryUsedBytes: 8 * 1024 * 1024 * 1024,
@@ -47,6 +47,6 @@ it("refreshes the system snapshot on demand", async () => {
   await screen.findAllByText("27.4%");
   await user.click(screen.getByRole("button", { name: /刷新/ }));
 
-  const api = await import("../lib/api");
+  const api = await import("../../lib/api");
   expect(api.getSystemSnapshot).toHaveBeenCalledTimes(2);
 });

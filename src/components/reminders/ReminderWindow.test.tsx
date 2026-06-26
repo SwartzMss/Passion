@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { ReminderWindow } from "./ReminderWindow";
-import * as api from "../lib/api";
+import * as api from "../../lib/api";
 
-vi.mock("../lib/api", () => ({
+vi.mock("../../lib/api", () => ({
   listReminders: vi.fn(),
 }));
 
