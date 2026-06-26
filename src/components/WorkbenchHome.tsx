@@ -9,6 +9,7 @@ interface Props {
   onAddReminder: () => void;
   onOpenTranslation: () => void;
   onOpenNetworkDiagnostics: () => void;
+  onOpenSshTunnels: () => void;
   onOpenDownloader: () => void;
   onOpenSystemMonitor: () => void;
   onOpenScriptTasks: () => void;
@@ -22,6 +23,7 @@ export function WorkbenchHome({
   onAddReminder,
   onOpenTranslation,
   onOpenNetworkDiagnostics,
+  onOpenSshTunnels,
   onOpenDownloader,
   onOpenSystemMonitor,
   onOpenScriptTasks,
@@ -55,6 +57,13 @@ export function WorkbenchHome({
         actions: [
           { label: "开始检测", onClick: onOpenNetworkDiagnostics, primary: true },
         ],
+      },
+      {
+        id: "ssh",
+        label: "SSH 隧道",
+        description: "管理本地端口转发隧道，支持 QNX、Linux 和内网服务访问。",
+        keywords: "ssh 隧道 端口转发 qnx linux 内网",
+        actions: [{ label: "管理隧道", onClick: onOpenSshTunnels, primary: true }],
       },
       {
         id: "download",
@@ -91,6 +100,7 @@ export function WorkbenchHome({
       onAddReminder,
       onOpenTranslation,
       onOpenNetworkDiagnostics,
+      onOpenSshTunnels,
       onOpenDownloader,
       onOpenSystemMonitor,
       onOpenScriptTasks,

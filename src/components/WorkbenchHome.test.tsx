@@ -12,6 +12,7 @@ const defaultProps = {
   onAddReminder: vi.fn(),
   onOpenTranslation: vi.fn(),
   onOpenNetworkDiagnostics: vi.fn(),
+  onOpenSshTunnels: vi.fn(),
   onOpenDownloader: vi.fn(),
   onOpenSystemMonitor: vi.fn(),
   onOpenScriptTasks: vi.fn(),
@@ -40,6 +41,26 @@ it("shows the workbench dashboard", async () => {
   expect(screen.queryByText("即将发生")).not.toBeInTheDocument();
   expect(screen.queryByText("最近活动")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "新增脚本任务" })).not.toBeInTheDocument();
+});
+
+it("searches SSH tunnel tools", async () => {
+  const user = userEvent.setup();
+  const onOpenSshTunnels = vi.fn();
+  render(
+    <WorkbenchHome
+      {...defaultProps}
+      onOpenSshTunnels={onOpenSshTunnels}
+    />,
+  );
+
+  await user.type(screen.getByLabelText("搜索工具"), "qnx");
+
+  expect(screen.getByLabelText("工具搜索结果")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "SSH 隧道" })).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "管理隧道" }));
+
+  expect(onOpenSshTunnels).toHaveBeenCalledOnce();
 });
 
 it("searches tools without showing the old card grid", async () => {

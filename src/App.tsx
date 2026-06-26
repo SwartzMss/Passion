@@ -7,6 +7,7 @@ import { ReminderList } from "./components/ReminderList";
 import { ReminderWindow } from "./components/ReminderWindow";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ScriptTasksPanel } from "./components/ScriptTasksPanel";
+import { SshTunnelsPanel } from "./components/SshTunnelsPanel";
 import { SystemMonitorPanel } from "./components/SystemMonitorPanel";
 import { TranslationPanel } from "./components/TranslationPanel";
 import { UtilitiesPanel } from "./components/UtilitiesPanel";
@@ -28,6 +29,7 @@ type View =
   | "reminders"
   | "translation"
   | "network"
+  | "ssh"
   | "download"
   | "system"
   | "scripts"
@@ -39,6 +41,7 @@ type NavIcon =
   | "bell"
   | "language"
   | "globe"
+  | "terminal"
   | "download"
   | "activity"
   | "code"
@@ -50,6 +53,7 @@ const NAV_ITEMS: Array<{ view: View; label: string; icon: NavIcon }> = [
   { view: "reminders", label: "提醒", icon: "bell" },
   { view: "translation", label: "翻译", icon: "language" },
   { view: "network", label: "网络检测", icon: "globe" },
+  { view: "ssh", label: "SSH 隧道", icon: "terminal" },
   { view: "download", label: "下载工具", icon: "download" },
   { view: "system", label: "系统监控", icon: "activity" },
   { view: "scripts", label: "脚本任务", icon: "code" },
@@ -176,6 +180,7 @@ function MainApp() {
               }}
               onOpenTranslation={() => setView("translation")}
               onOpenNetworkDiagnostics={() => setView("network")}
+              onOpenSshTunnels={() => setView("ssh")}
               onOpenDownloader={() => setView("download")}
               onOpenSystemMonitor={() => setView("system")}
               onOpenScriptTasks={() => setView("scripts")}
@@ -195,6 +200,9 @@ function MainApp() {
           ) : null}
           {view === "network" ? (
             <NetworkDiagnosticsPanel />
+          ) : null}
+          {view === "ssh" ? (
+            <SshTunnelsPanel />
           ) : null}
           {view === "download" ? (
             <DownloadPanel />
@@ -268,6 +276,7 @@ function NavIcon({ name }: { name: NavIcon }) {
       "M12 3c2.2 2.4 3.2 5.4 3.2 9S14.2 18.6 12 21",
       "M12 3C9.8 5.4 8.8 8.4 8.8 12s1 6.6 3.2 9",
     ],
+    terminal: ["m5 7 5 5-5 5", "M12 17h7"],
     download: [
       "M12 4v10",
       "m8 10 4 4 4-4",
