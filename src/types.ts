@@ -143,6 +143,35 @@ export interface ScriptTask {
   updatedAt: string;
 }
 
+export type SshTunnelStatus = "stopped" | "starting" | "running" | "error";
+export type SshTunnelBindAddress = "127.0.0.1" | "0.0.0.0";
+
+export interface NewSshTunnel {
+  name: string;
+  description?: string | null;
+  localPort: number;
+  bindAddress: SshTunnelBindAddress;
+  remoteHost: string;
+  remotePort: number;
+  username: string;
+  keyPath: string;
+}
+
+export interface SshTunnelInfo extends NewSshTunnel {
+  id: string;
+  authType: "private_key";
+  status: SshTunnelStatus;
+  pid?: number | null;
+  startedAt?: string | null;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SshTunnelSettings {
+  sshExecutablePath?: string | null;
+}
+
 export interface BackendError {
   message: string;
 }

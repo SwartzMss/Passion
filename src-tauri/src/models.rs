@@ -263,6 +263,72 @@ pub struct ScriptTask {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SshTunnelStatus {
+    Stopped,
+    Starting,
+    Running,
+    Error,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewSshTunnel {
+    pub name: String,
+    pub description: Option<String>,
+    pub local_port: u16,
+    pub bind_address: String,
+    pub remote_host: String,
+    pub remote_port: u16,
+    pub username: String,
+    pub key_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshTunnel {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub local_port: u16,
+    pub bind_address: String,
+    pub remote_host: String,
+    pub remote_port: u16,
+    pub username: String,
+    pub key_path: String,
+    pub auth_type: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshTunnelInfo {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub local_port: u16,
+    pub bind_address: String,
+    pub remote_host: String,
+    pub remote_port: u16,
+    pub username: String,
+    pub key_path: String,
+    pub auth_type: String,
+    pub status: SshTunnelStatus,
+    pub pid: Option<u32>,
+    pub started_at: Option<DateTime<Utc>>,
+    pub error_message: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshTunnelSettings {
+    pub ssh_executable_path: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

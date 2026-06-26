@@ -57,6 +57,24 @@ pub fn initialize_schema(conn: &Connection) -> BackendResult<()> {
 
         CREATE INDEX IF NOT EXISTS idx_script_tasks_enabled
         ON script_tasks (enabled);
+
+        CREATE TABLE IF NOT EXISTS ssh_tunnels (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            local_port INTEGER NOT NULL,
+            bind_address TEXT NOT NULL CHECK (bind_address IN ('127.0.0.1', '0.0.0.0')),
+            remote_host TEXT NOT NULL,
+            remote_port INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            key_path TEXT NOT NULL,
+            auth_type TEXT NOT NULL DEFAULT 'private_key' CHECK (auth_type IN ('private_key')),
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ssh_tunnels_name
+        ON ssh_tunnels (name);
         ",
     )
     .map_err(|err| BackendError::Database(err.to_string()))?;
@@ -138,5 +156,69 @@ mod tests {
             [],
         )
         .unwrap();
+    }
+
+    #[test]
+    fn initialize_schema_allows_ssh_tunnels_table() {
+        let conn = Connection::open_in_memory().unwrap();
+
+        initialize_schema(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO ssh_tunnels (
+                id, name, description, local_port, bind_address, remote_host, remote_port,
+                username, key_path, auth_type, created_at, updated_at
+             ) VALUES (
+                '1', 'QNX调试', 'debug tunnel', 8080, '127.0.0.1', '172.31.3.1', 22,
+                'root', 'C:\\keys\\8797_rsa2048', 'private_key', 1, 1
+             )",
+            [],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn initialize_schema_rejects_invalid_ssh_tunnel_bind_address() {
+        let conn = Connection::open_in_memory().unwrap();
+
+        initialize_schema(&conn).unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO ssh_tunnels (
+                id, name, local_port, bind_address, remote_host, remote_port,
+                username, key_path, auth_type, created_at, updated_at
+             ) VALUES (
+                '1', 'Bad', 8080, '192.168.1.2', '172.31.3.1', 22,
+                'root', 'C:\\keys\\8797_rsa2048', 'private_key', 1, 1
+             )",
+            [],
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn initialize_schema_rejects_duplicate_ssh_tunnel_names() {
+        let conn = Connection::open_in_memory().unwrap();
+
+        initialize_schema(&conn).unwrap();
+
+        for id in ["1", "2"] {
+            let result = conn.execute(
+                "INSERT INTO ssh_tunnels (
+                    id, name, local_port, bind_address, remote_host, remote_port,
+                    username, key_path, auth_type, created_at, updated_at
+                 ) VALUES (
+                    ?1, 'QNX调试', 8080, '127.0.0.1', '172.31.3.1', 22,
+                    'root', 'C:\\keys\\8797_rsa2048', 'private_key', 1, 1
+                 )",
+                [id],
+            );
+            if id == "1" {
+                result.unwrap();
+            } else {
+                assert!(result.is_err());
+            }
+        }
     }
 }
