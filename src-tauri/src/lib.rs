@@ -13,6 +13,7 @@ mod script_runner;
 mod script_task_scheduler;
 mod script_tasks;
 mod settings;
+mod ssh_tunnels;
 mod system_monitor;
 mod translator;
 mod tray;
