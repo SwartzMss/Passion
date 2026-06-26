@@ -15,6 +15,7 @@ let resolveDownload: ((value: {
 vi.mock("../lib/api", () => ({
   getDefaultDownloadDir: vi.fn(async () => "C:\\Users\\tester\\Downloads"),
   pauseDownload: vi.fn(async () => undefined),
+  cancelDownload: vi.fn(async () => undefined),
   downloadFile: vi.fn(
     () =>
       new Promise((resolve) => {
@@ -191,7 +192,23 @@ it("marks a canceled running download as failed with a user cancel reason", asyn
   await user.type(screen.getByLabelText("下载地址或本地文件路径"), "https://example.com/movie.mkv");
   await user.click(screen.getByRole("button", { name: "开始下载" }));
 
+  const api = await import("../lib/api");
+  const calls = vi.mocked(api.downloadFile).mock.calls;
+  const request = calls[calls.length - 1]?.[0];
   await user.click(await screen.findByRole("button", { name: "取消" }));
+
+  expect(api.cancelDownload).toHaveBeenCalledWith(request!.taskId);
+  emitDownloadProgress({
+    taskId: request!.taskId!,
+    url: "https://example.com/movie.mkv",
+    fileName: "movie.mkv",
+    savedPath: "D:\\Downloads\\movie.mkv",
+    totalBytes: 2048,
+    downloadedBytes: 1024,
+    elapsedMs: 1000,
+    bytesPerSecond: 1024,
+    status: "running",
+  });
 
   expect(screen.getByRole("button", { name: "当前任务 0" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "失败任务 1" })).toBeInTheDocument();
@@ -256,6 +273,7 @@ it("marks a canceled paused download as failed with a user cancel reason", async
 
   await user.click(await screen.findByRole("button", { name: "取消" }));
 
+  expect(api.cancelDownload).toHaveBeenCalledWith(request!.taskId);
   expect(screen.getByRole("button", { name: "当前任务 0" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "失败任务 1" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "失败任务 1" }));

@@ -121,6 +121,7 @@ pub fn run() {
             commands::inspect_port_occupancy,
             commands::download_file,
             commands::pause_download,
+            commands::cancel_download,
             commands::get_default_download_dir,
             commands::get_system_snapshot,
             commands::list_script_tasks,

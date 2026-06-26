@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { downloadFile, getDefaultDownloadDir, pauseDownload } from "../lib/api";
+import { cancelDownload, downloadFile, getDefaultDownloadDir, pauseDownload } from "../lib/api";
 import { onDownloadProgress } from "../lib/events";
 import type { DownloadResult } from "../types";
 import type { DownloadProgressEvent } from "../types";
@@ -34,6 +34,7 @@ export function DownloadPanel() {
   const [query, setQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canceledTaskIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     getDefaultDownloadDir()
@@ -44,6 +45,9 @@ export function DownloadPanel() {
   useEffect(() => {
     let unlisten: (() => void) | null = null;
     onDownloadProgress((progress) => {
+      if (canceledTaskIdsRef.current.has(progress.taskId)) {
+        return;
+      }
       setTasks((current) =>
         current.map((task) => {
           if (task.id !== progress.taskId) {
@@ -101,6 +105,9 @@ export function DownloadPanel() {
         url: trimmedUrl,
         saveDir: targetDir,
       });
+      if (canceledTaskIdsRef.current.has(taskId)) {
+        return;
+      }
       setTasks((current) =>
         current.map((task) =>
           task.id === taskId
@@ -123,6 +130,9 @@ export function DownloadPanel() {
         ),
       );
     } catch (err) {
+      if (canceledTaskIdsRef.current.has(taskId)) {
+        return;
+      }
       const message = readError(err);
       setTasks((current) =>
         current.map((task) =>
@@ -168,10 +178,15 @@ export function DownloadPanel() {
   const footerSummary = `总任务: ${tasks.length} | 活动: ${runningTasks.length} | 已完成: ${completedTasks.length} | 失败: ${failedTasks.length}`;
 
   function removeTask(id: string) {
+    canceledTaskIdsRef.current.delete(id);
     setTasks((current) => current.filter((task) => task.id !== id));
   }
 
   function cancelTask(id: string) {
+    canceledTaskIdsRef.current.add(id);
+    void cancelDownload(id).catch((err) => {
+      setError(`取消失败：${readError(err)}`);
+    });
     setTasks((current) =>
       current.map((task) =>
         task.id === id
@@ -200,6 +215,7 @@ export function DownloadPanel() {
   }
 
   function resumeTask(task: DownloadTask) {
+    canceledTaskIdsRef.current.delete(task.id);
     setError(null);
     setTasks((current) =>
       current.map((item) =>

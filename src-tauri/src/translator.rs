@@ -2,6 +2,8 @@ use crate::error::{BackendError, BackendResult};
 use crate::models::{AiSettings, TranslationRequest, TranslationResult};
 use serde::{Deserialize, Serialize};
 
+const RESPONSE_PREVIEW_LIMIT: usize = 500;
+
 pub fn chat_completions_url(base_url: &str) -> String {
     format!("{}/chat/completions", base_url.trim().trim_end_matches('/'))
 }
@@ -29,9 +31,23 @@ pub fn validate_ai_settings(settings: &AiSettings) -> BackendResult<()> {
     Ok(())
 }
 
+#[cfg(test)]
 pub fn parse_translation_response(body: &str) -> BackendResult<TranslationResult> {
-    let response: ChatCompletionResponse =
-        serde_json::from_str(body).map_err(|err| BackendError::AiProvider(err.to_string()))?;
+    parse_translation_response_with_context(body, None, None, None)
+}
+
+fn parse_translation_response_with_context(
+    body: &str,
+    status: Option<reqwest::StatusCode>,
+    url: Option<&str>,
+    model: Option<&str>,
+) -> BackendResult<TranslationResult> {
+    let response: ChatCompletionResponse = serde_json::from_str(body).map_err(|err| {
+        BackendError::AiProvider(format!(
+            "failed to parse provider response as JSON: {err}; {}",
+            provider_context(status, url, model, body)
+        ))
+    })?;
     let content = response
         .choices
         .into_iter()
@@ -54,7 +70,12 @@ pub async fn translate(
     validate_ai_settings(settings)?;
     validate_translation_request(input)?;
     let body = send_chat_completion(settings, build_messages(input)).await?;
-    parse_translation_response(&body)
+    parse_translation_response_with_context(
+        &body,
+        Some(reqwest::StatusCode::OK),
+        Some(&chat_completions_url(&settings.base_url)),
+        Some(settings.model.trim()),
+    )
 }
 
 pub async fn test_connection(settings: &AiSettings) -> BackendResult<()> {
@@ -64,7 +85,13 @@ pub async fn test_connection(settings: &AiSettings) -> BackendResult<()> {
     };
     validate_translation_request(&input)?;
     let body = send_chat_completion(settings, build_messages(&input)).await?;
-    parse_translation_response(&body).map(|_| ())
+    parse_translation_response_with_context(
+        &body,
+        Some(reqwest::StatusCode::OK),
+        Some(&chat_completions_url(&settings.base_url)),
+        Some(settings.model.trim()),
+    )
+    .map(|_| ())
 }
 
 fn build_messages(input: &TranslationRequest) -> Vec<ChatMessage> {
@@ -89,28 +116,73 @@ async fn send_chat_completion(
         messages,
         temperature: 0.2,
     };
+    let url = chat_completions_url(&settings.base_url);
     let client = reqwest::Client::new();
-    let mut builder = client
-        .post(chat_completions_url(&settings.base_url))
-        .json(&request);
+    let mut builder = client.post(&url).json(&request);
     if !settings.api_key.trim().is_empty() {
         builder = builder.bearer_auth(settings.api_key.trim());
     }
-    let response = builder
-        .send()
-        .await
-        .map_err(|err| BackendError::AiProvider(err.to_string()))?;
+    let response = builder.send().await.map_err(|err| {
+        BackendError::AiProvider(format!(
+            "request failed: {err}; url={url}; model={}",
+            settings.model.trim()
+        ))
+    })?;
     let status = response.status();
-    let text = response
-        .text()
-        .await
-        .map_err(|err| BackendError::AiProvider(err.to_string()))?;
+    let text = response.text().await.map_err(|err| {
+        BackendError::AiProvider(format!(
+            "failed to read provider response body: {err}; url={url}; model={}",
+            settings.model.trim()
+        ))
+    })?;
     if !status.is_success() {
         return Err(BackendError::AiProvider(format!(
-            "provider returned {status}: {text}"
+            "provider returned non-success status; {}",
+            provider_context(Some(status), Some(&url), Some(settings.model.trim()), &text)
         )));
     }
     Ok(text)
+}
+
+fn provider_context(
+    status: Option<reqwest::StatusCode>,
+    url: Option<&str>,
+    model: Option<&str>,
+    body: &str,
+) -> String {
+    format!(
+        "status={}; url={}; model={}; response_preview={}",
+        status
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "<unknown>".to_string()),
+        url.unwrap_or("<unknown>"),
+        model.unwrap_or("<unknown>"),
+        response_preview(body)
+    )
+}
+
+fn response_preview(body: &str) -> String {
+    let normalized = body
+        .chars()
+        .map(|ch| if ch.is_control() { ' ' } else { ch })
+        .collect::<String>();
+    let trimmed = normalized.trim();
+    let preview = if trimmed.chars().count() > RESPONSE_PREVIEW_LIMIT {
+        format!(
+            "{}...",
+            trimmed
+                .chars()
+                .take(RESPONSE_PREVIEW_LIMIT)
+                .collect::<String>()
+        )
+    } else {
+        trimmed.to_string()
+    };
+    if preview.is_empty() {
+        "<empty>".to_string()
+    } else {
+        preview
+    }
 }
 
 #[derive(Serialize)]
@@ -160,6 +232,15 @@ mod tests {
         let result = parse_translation_response(body).unwrap();
 
         assert_eq!(result.translated_text, "你好");
+    }
+
+    #[test]
+    fn parse_translation_response_includes_body_preview_for_non_json() {
+        let err = parse_translation_response("<html>not found</html>").unwrap_err();
+        let message = err.to_string();
+
+        assert!(message.contains("failed to parse provider response as JSON"));
+        assert!(message.contains("response_preview=<html>not found</html>"));
     }
 
     #[test]

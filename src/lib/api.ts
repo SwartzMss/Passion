@@ -91,6 +91,10 @@ export async function pauseDownload(taskId: string): Promise<void> {
   return invoke<void>("pause_download", { taskId });
 }
 
+export async function cancelDownload(taskId: string): Promise<void> {
+  return invoke<void>("cancel_download", { taskId });
+}
+
 export async function getDefaultDownloadDir(): Promise<string> {
   return invoke<string>("get_default_download_dir");
 }

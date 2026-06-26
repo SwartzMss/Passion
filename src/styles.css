@@ -1037,12 +1037,25 @@ main {
 }
 
 .reminder-table-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   border: 0;
   background: transparent;
-  padding: 4px 6px;
+  padding: 5px 7px;
   color: #2563eb;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
+}
+
+.reminder-table-actions button svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .reminder-table-actions .danger-action {

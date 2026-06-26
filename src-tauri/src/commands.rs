@@ -192,9 +192,39 @@ pub async fn translate_text(
             .map_err(|err| BackendError::Database(err.to_string()))?;
         AiSettingsRepository::get(&conn).map_err(ErrorPayload::from)?
     };
-    crate::translator::translate(&settings, &input)
-        .await
-        .map_err(ErrorPayload::from)
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!(
+            "ai_translate_start base_url={} model={} input_chars={}",
+            settings.base_url,
+            settings.model,
+            input.text.chars().count()
+        ),
+    );
+    match crate::translator::translate(&settings, &input).await {
+        Ok(result) => {
+            crate::app_log::info(
+                state.log_path.as_path(),
+                format!(
+                    "ai_translate_success base_url={} model={} output_chars={}",
+                    settings.base_url,
+                    settings.model,
+                    result.translated_text.chars().count()
+                ),
+            );
+            Ok(result)
+        }
+        Err(err) => {
+            crate::app_log::error(
+                state.log_path.as_path(),
+                format!(
+                    "ai_translate_failed base_url={} model={} error={err}",
+                    settings.base_url, settings.model
+                ),
+            );
+            Err(ErrorPayload::from(err))
+        }
+    }
 }
 
 #[tauri::command]
@@ -206,9 +236,35 @@ pub async fn test_ai_connection(state: State<'_, AppState>) -> CommandResult<()>
             .map_err(|err| BackendError::Database(err.to_string()))?;
         AiSettingsRepository::get(&conn).map_err(ErrorPayload::from)?
     };
-    crate::translator::test_connection(&settings)
-        .await
-        .map_err(ErrorPayload::from)
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!(
+            "ai_test_start base_url={} model={}",
+            settings.base_url, settings.model
+        ),
+    );
+    match crate::translator::test_connection(&settings).await {
+        Ok(()) => {
+            crate::app_log::info(
+                state.log_path.as_path(),
+                format!(
+                    "ai_test_success base_url={} model={}",
+                    settings.base_url, settings.model
+                ),
+            );
+            Ok(())
+        }
+        Err(err) => {
+            crate::app_log::error(
+                state.log_path.as_path(),
+                format!(
+                    "ai_test_failed base_url={} model={} error={err}",
+                    settings.base_url, settings.model
+                ),
+            );
+            Err(ErrorPayload::from(err))
+        }
+    }
 }
 
 #[tauri::command]
@@ -290,6 +346,15 @@ pub fn pause_download(state: State<'_, AppState>, task_id: String) -> CommandRes
         format!("download_pause_requested task_id={task_id}"),
     );
     crate::downloader::pause_download(&task_id).map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub fn cancel_download(state: State<'_, AppState>, task_id: String) -> CommandResult<()> {
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!("download_cancel_requested task_id={task_id}"),
+    );
+    crate::downloader::cancel_download(&task_id).map_err(ErrorPayload::from)
 }
 
 #[tauri::command]
