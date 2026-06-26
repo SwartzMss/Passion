@@ -185,6 +185,7 @@ fn parse_csv_first_field(line: &str) -> Option<String> {
 }
 
 fn background_command(program: &str) -> Command {
+    #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
     let mut command = Command::new(program);
     #[cfg(target_os = "windows")]
     {
