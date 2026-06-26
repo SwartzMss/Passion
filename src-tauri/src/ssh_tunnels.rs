@@ -248,6 +248,20 @@ pub fn build_ssh_args(tunnel: &SshTunnel) -> Vec<String> {
     ]
 }
 
+pub fn tunnel_log_context(tunnel: &SshTunnel) -> String {
+    format!(
+        "id={} name={} local={}:{} remote={}:{} username={} key_path={}",
+        tunnel.id,
+        tunnel.name,
+        tunnel.bind_address,
+        tunnel.local_port,
+        tunnel.remote_host,
+        tunnel.remote_port,
+        tunnel.username,
+        tunnel.key_path
+    )
+}
+
 pub fn detect_ssh_executable() -> BackendResult<PathBuf> {
     let paths = std::env::var_os("PATH")
         .map(|value| std::env::split_paths(&value).collect::<Vec<_>>())
@@ -353,25 +367,63 @@ impl SshTunnelManager {
         &self,
         tunnel: SshTunnel,
         ssh_executable_path: PathBuf,
+        log_path: PathBuf,
     ) -> BackendResult<SshTunnelInfo> {
+        crate::app_log::info(
+            log_path.as_path(),
+            format!(
+                "ssh_tunnel_start_requested {} ssh_path={}",
+                tunnel_log_context(&tunnel),
+                ssh_executable_path.display()
+            ),
+        );
         if self.is_active(&tunnel.id) {
+            crate::app_log::warn(
+                log_path.as_path(),
+                format!(
+                    "ssh_tunnel_start_rejected reason=already_running id={}",
+                    tunnel.id
+                ),
+            );
             return Err(BackendError::NetworkDiagnostic(
                 "SSH 隧道已在运行。".to_string(),
             ));
         }
         if !ssh_executable_path.is_file() {
+            crate::app_log::error(
+                log_path.as_path(),
+                format!(
+                    "ssh_tunnel_start_rejected reason=ssh_missing {} ssh_path={}",
+                    tunnel_log_context(&tunnel),
+                    ssh_executable_path.display()
+                ),
+            );
             return Err(BackendError::NetworkDiagnostic(format!(
                 "SSH 程序不存在: {}",
                 ssh_executable_path.display()
             )));
         }
         if !Path::new(&tunnel.key_path).exists() {
+            crate::app_log::error(
+                log_path.as_path(),
+                format!(
+                    "ssh_tunnel_start_rejected reason=key_missing {}",
+                    tunnel_log_context(&tunnel)
+                ),
+            );
             return Err(BackendError::NetworkDiagnostic(format!(
                 "私钥文件不存在: {}",
                 tunnel.key_path
             )));
         }
         if !is_port_available(&tunnel.bind_address, tunnel.local_port) {
+            crate::app_log::error(
+                log_path.as_path(),
+                format!(
+                    "ssh_tunnel_start_rejected reason=port_in_use {}",
+                    tunnel_log_context(&tunnel)
+                ),
+            );
             return Err(BackendError::NetworkDiagnostic(format!(
                 "端口 {} 已被占用，请更换端口或先停止占用该端口的程序。",
                 tunnel.local_port
@@ -385,10 +437,30 @@ impl SshTunnelManager {
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::piped());
-        let mut child = command
-            .spawn()
-            .map_err(|err| BackendError::NetworkDiagnostic(format!("启动 ssh 失败: {err}")))?;
+        let mut child = command.spawn().map_err(|err| {
+            let message = format!("启动 ssh 失败: {err}");
+            self.set_error(&tunnel.id, message.clone());
+            crate::app_log::error(
+                log_path.as_path(),
+                format!(
+                    "ssh_tunnel_spawn_failed {} ssh_path={} error={err}",
+                    tunnel_log_context(&tunnel),
+                    ssh_executable_path.display()
+                ),
+            );
+            BackendError::NetworkDiagnostic(message)
+        })?;
         let pid = child.id();
+        crate::app_log::info(
+            log_path.as_path(),
+            format!(
+                "ssh_tunnel_spawned {} ssh_path={} pid={}",
+                tunnel_log_context(&tunnel),
+                ssh_executable_path.display(),
+                pid.map(|value| value.to_string())
+                    .unwrap_or_else(|| "<unknown>".to_string())
+            ),
+        );
         let stderr = child.stderr.take();
         let stderr_buffer = Arc::new(tokio::sync::Mutex::new(String::new()));
         if let Some(mut stderr) = stderr {
@@ -410,22 +482,52 @@ impl SshTunnelManager {
                     status,
                     stderr_suffix(&stderr_buffer).await
                 );
-                self.set_error(&tunnel.id, error);
+                self.set_error(&tunnel.id, error.clone());
+                crate::app_log::error(
+                    log_path.as_path(),
+                    format!(
+                        "ssh_tunnel_start_failed {} pid={} error={}",
+                        tunnel_log_context(&tunnel),
+                        pid.map(|value| value.to_string())
+                            .unwrap_or_else(|| "<unknown>".to_string()),
+                        error
+                    ),
+                );
             }
             Ok(None) => {
                 let child = Arc::new(tokio::sync::Mutex::new(child));
                 self.set_running(&tunnel.id, pid);
-                self.spawn_monitor(tunnel.id.clone(), child, stderr_buffer);
+                crate::app_log::info(
+                    log_path.as_path(),
+                    format!(
+                        "ssh_tunnel_running {} pid={}",
+                        tunnel_log_context(&tunnel),
+                        pid.map(|value| value.to_string())
+                            .unwrap_or_else(|| "<unknown>".to_string())
+                    ),
+                );
+                self.spawn_monitor(tunnel.id.clone(), child, stderr_buffer, log_path);
             }
             Err(err) => {
-                self.set_error(&tunnel.id, format!("进程检查失败: {err}"));
+                let error = format!("进程检查失败: {err}");
+                self.set_error(&tunnel.id, error.clone());
+                crate::app_log::error(
+                    log_path.as_path(),
+                    format!(
+                        "ssh_tunnel_start_check_failed {} pid={} error={}",
+                        tunnel_log_context(&tunnel),
+                        pid.map(|value| value.to_string())
+                            .unwrap_or_else(|| "<unknown>".to_string()),
+                        error
+                    ),
+                );
             }
         }
 
         Ok(self.info_for(tunnel))
     }
 
-    pub async fn stop(&self, tunnel: SshTunnel) -> BackendResult<SshTunnelInfo> {
+    pub async fn stop(&self, tunnel: SshTunnel, log_path: PathBuf) -> BackendResult<SshTunnelInfo> {
         let pid = {
             let mut runtimes = self.runtimes.lock().unwrap();
             let runtime = runtimes
@@ -434,13 +536,36 @@ impl SshTunnelManager {
             runtime.stopping = true;
             runtime.pid
         };
+        crate::app_log::info(
+            log_path.as_path(),
+            format!(
+                "ssh_tunnel_stop_requested {} pid={}",
+                tunnel_log_context(&tunnel),
+                pid.map(|value| value.to_string())
+                    .unwrap_or_else(|| "<none>".to_string())
+            ),
+        );
         if let Some(pid) = pid {
-            kill_process_tree(pid).await?;
+            if let Err(err) = kill_process_tree(pid).await {
+                crate::app_log::error(
+                    log_path.as_path(),
+                    format!(
+                        "ssh_tunnel_stop_failed {} pid={} error={err}",
+                        tunnel_log_context(&tunnel),
+                        pid
+                    ),
+                );
+                return Err(err);
+            }
         }
         {
             let mut runtimes = self.runtimes.lock().unwrap();
             runtimes.insert(tunnel.id.clone(), stopped_runtime());
         }
+        crate::app_log::info(
+            log_path.as_path(),
+            format!("ssh_tunnel_stopped {}", tunnel_log_context(&tunnel)),
+        );
         Ok(self.info_for(tunnel))
     }
 
@@ -491,6 +616,7 @@ impl SshTunnelManager {
         id: String,
         child: Arc<tokio::sync::Mutex<Child>>,
         stderr_buffer: Arc<tokio::sync::Mutex<String>>,
+        log_path: PathBuf,
     ) {
         let manager = self.clone();
         tauri::async_runtime::spawn(async move {
@@ -508,6 +634,10 @@ impl SshTunnelManager {
                                 status,
                                 stderr_suffix(&stderr_buffer).await
                             );
+                            crate::app_log::error(
+                                log_path.as_path(),
+                                format!("ssh_tunnel_exited id={} error={}", id, message),
+                            );
                             manager.set_error(&id, message);
                         }
                         break;
@@ -515,7 +645,12 @@ impl SshTunnelManager {
                     Ok(None) => {}
                     Err(err) => {
                         if !manager.is_stopping(&id) {
-                            manager.set_error(&id, format!("进程检查失败: {err}"));
+                            let message = format!("进程检查失败: {err}");
+                            crate::app_log::error(
+                                log_path.as_path(),
+                                format!("ssh_tunnel_monitor_failed id={} error={}", id, message),
+                            );
+                            manager.set_error(&id, message);
                         }
                         break;
                     }
@@ -704,6 +839,21 @@ mod tests {
                 "root@172.31.3.1",
             ]
         );
+    }
+
+    #[test]
+    fn tunnel_log_context_includes_diagnostic_fields() {
+        let conn = db::test_connection();
+        let tunnel = SshTunnelRepository::create(&conn, sample_input()).unwrap();
+
+        let context = tunnel_log_context(&tunnel);
+
+        assert!(context.contains(&format!("id={}", tunnel.id)));
+        assert!(context.contains("name=QNX调试"));
+        assert!(context.contains("local=127.0.0.1:8080"));
+        assert!(context.contains("remote=172.31.3.1:22"));
+        assert!(context.contains("username=root"));
+        assert!(context.contains("key_path=C:\\keys\\8797_rsa2048"));
     }
 
     #[test]

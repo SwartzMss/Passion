@@ -10,7 +10,9 @@ use crate::models::{
 use crate::reminders::ReminderRepository;
 use crate::script_tasks::ScriptTaskRepository;
 use crate::settings::SettingsRepository;
-use crate::ssh_tunnels::{self, SshTunnelRepository, SshTunnelSettingsRepository};
+use crate::ssh_tunnels::{
+    self, tunnel_log_context, SshTunnelRepository, SshTunnelSettingsRepository,
+};
 use chrono::Utc;
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -302,11 +304,30 @@ pub async fn update_ssh_tunnel_settings(
     input: SshTunnelSettings,
 ) -> CommandResult<SshTunnelSettings> {
     let path = input.ssh_executable_path.unwrap_or_default();
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!("ssh_tunnel_settings_update_requested ssh_path={path}"),
+    );
     let conn = state
         .conn
         .lock()
         .map_err(|err| BackendError::Database(err.to_string()))?;
-    SshTunnelSettingsRepository::save(&conn, &path).map_err(ErrorPayload::from)
+    match SshTunnelSettingsRepository::save(&conn, &path) {
+        Ok(settings) => {
+            crate::app_log::info(
+                state.log_path.as_path(),
+                format!("ssh_tunnel_settings_updated ssh_path={path}"),
+            );
+            Ok(settings)
+        }
+        Err(err) => {
+            crate::app_log::error(
+                state.log_path.as_path(),
+                format!("ssh_tunnel_settings_update_failed ssh_path={path} error={err}"),
+            );
+            Err(ErrorPayload::from(err))
+        }
+    }
 }
 
 #[tauri::command]
@@ -329,6 +350,19 @@ pub async fn create_ssh_tunnel(
     state: State<'_, AppState>,
     input: NewSshTunnel,
 ) -> CommandResult<SshTunnelInfo> {
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!(
+            "ssh_tunnel_create_requested name={} local={}:{} remote={}:{} username={} key_path={}",
+            input.name,
+            input.bind_address,
+            input.local_port,
+            input.remote_host,
+            input.remote_port,
+            input.username,
+            input.key_path
+        ),
+    );
     let ssh_executable_path =
         resolve_ssh_executable_path(state.inner()).map_err(ErrorPayload::from)?;
     let tunnel = {
@@ -336,11 +370,30 @@ pub async fn create_ssh_tunnel(
             .conn
             .lock()
             .map_err(|err| BackendError::Database(err.to_string()))?;
-        SshTunnelRepository::create(&conn, input).map_err(ErrorPayload::from)?
+        match SshTunnelRepository::create(&conn, input) {
+            Ok(tunnel) => {
+                crate::app_log::info(
+                    state.log_path.as_path(),
+                    format!("ssh_tunnel_created {}", tunnel_log_context(&tunnel)),
+                );
+                tunnel
+            }
+            Err(err) => {
+                crate::app_log::error(
+                    state.log_path.as_path(),
+                    format!("ssh_tunnel_create_failed error={err}"),
+                );
+                return Err(ErrorPayload::from(err));
+            }
+        }
     };
     state
         .ssh_tunnel_manager
-        .start(tunnel, ssh_executable_path)
+        .start(
+            tunnel,
+            ssh_executable_path,
+            state.log_path.as_path().to_path_buf(),
+        )
         .await
         .map_err(ErrorPayload::from)
 }
@@ -352,6 +405,10 @@ pub async fn update_ssh_tunnel(
     input: NewSshTunnel,
 ) -> CommandResult<SshTunnelInfo> {
     if state.ssh_tunnel_manager.is_active(&id) {
+        crate::app_log::warn(
+            state.log_path.as_path(),
+            format!("ssh_tunnel_update_rejected reason=active id={id}"),
+        );
         return Err(ErrorPayload::from(BackendError::NetworkDiagnostic(
             "请先停止 SSH 隧道，再编辑。".to_string(),
         )));
@@ -361,7 +418,22 @@ pub async fn update_ssh_tunnel(
             .conn
             .lock()
             .map_err(|err| BackendError::Database(err.to_string()))?;
-        SshTunnelRepository::update(&conn, &id, input).map_err(ErrorPayload::from)?
+        match SshTunnelRepository::update(&conn, &id, input) {
+            Ok(tunnel) => {
+                crate::app_log::info(
+                    state.log_path.as_path(),
+                    format!("ssh_tunnel_updated {}", tunnel_log_context(&tunnel)),
+                );
+                tunnel
+            }
+            Err(err) => {
+                crate::app_log::error(
+                    state.log_path.as_path(),
+                    format!("ssh_tunnel_update_failed id={id} error={err}"),
+                );
+                return Err(ErrorPayload::from(err));
+            }
+        }
     };
     Ok(state.ssh_tunnel_manager.info_for(tunnel))
 }
@@ -369,6 +441,10 @@ pub async fn update_ssh_tunnel(
 #[tauri::command]
 pub async fn delete_ssh_tunnel(state: State<'_, AppState>, id: String) -> CommandResult<()> {
     if state.ssh_tunnel_manager.is_active(&id) {
+        crate::app_log::warn(
+            state.log_path.as_path(),
+            format!("ssh_tunnel_delete_rejected reason=active id={id}"),
+        );
         return Err(ErrorPayload::from(BackendError::NetworkDiagnostic(
             "请先停止 SSH 隧道，再删除。".to_string(),
         )));
@@ -377,7 +453,22 @@ pub async fn delete_ssh_tunnel(state: State<'_, AppState>, id: String) -> Comman
         .conn
         .lock()
         .map_err(|err| BackendError::Database(err.to_string()))?;
-    SshTunnelRepository::delete(&conn, &id).map_err(ErrorPayload::from)
+    match SshTunnelRepository::delete(&conn, &id) {
+        Ok(()) => {
+            crate::app_log::info(
+                state.log_path.as_path(),
+                format!("ssh_tunnel_deleted id={id}"),
+            );
+            Ok(())
+        }
+        Err(err) => {
+            crate::app_log::error(
+                state.log_path.as_path(),
+                format!("ssh_tunnel_delete_failed id={id} error={err}"),
+            );
+            Err(ErrorPayload::from(err))
+        }
+    }
 }
 
 #[tauri::command]
@@ -396,7 +487,11 @@ pub async fn start_ssh_tunnel(
     };
     state
         .ssh_tunnel_manager
-        .start(tunnel, ssh_executable_path)
+        .start(
+            tunnel,
+            ssh_executable_path,
+            state.log_path.as_path().to_path_buf(),
+        )
         .await
         .map_err(ErrorPayload::from)
 }
@@ -415,7 +510,7 @@ pub async fn stop_ssh_tunnel(
     };
     state
         .ssh_tunnel_manager
-        .stop(tunnel)
+        .stop(tunnel, state.log_path.as_path().to_path_buf())
         .await
         .map_err(ErrorPayload::from)
 }
@@ -429,15 +524,54 @@ fn resolve_ssh_executable_path(state: &AppState) -> crate::error::BackendResult<
     if let Some(path) = settings.ssh_executable_path {
         let path = PathBuf::from(path);
         if path.is_file() {
+            crate::app_log::info(
+                state.log_path.as_path(),
+                format!(
+                    "ssh_tunnel_ssh_path_resolved source=settings ssh_path={}",
+                    path.display()
+                ),
+            );
             return Ok(path);
         }
+        crate::app_log::error(
+            state.log_path.as_path(),
+            format!(
+                "ssh_tunnel_ssh_path_invalid source=settings ssh_path={}",
+                path.display()
+            ),
+        );
         return Err(BackendError::NetworkDiagnostic(format!(
             "SSH 程序不存在: {}",
             path.display()
         )));
     }
-    let detected = ssh_tunnels::detect_ssh_executable()?;
-    SshTunnelSettingsRepository::save(&conn, &detected.to_string_lossy())?;
+    let detected = match ssh_tunnels::detect_ssh_executable() {
+        Ok(path) => path,
+        Err(err) => {
+            crate::app_log::error(
+                state.log_path.as_path(),
+                format!("ssh_tunnel_ssh_path_resolve_failed source=path_autodetect error={err}"),
+            );
+            return Err(err);
+        }
+    };
+    if let Err(err) = SshTunnelSettingsRepository::save(&conn, &detected.to_string_lossy()) {
+        crate::app_log::error(
+            state.log_path.as_path(),
+            format!(
+                "ssh_tunnel_ssh_path_save_failed source=path_autodetect ssh_path={} error={err}",
+                detected.display()
+            ),
+        );
+        return Err(err);
+    }
+    crate::app_log::info(
+        state.log_path.as_path(),
+        format!(
+            "ssh_tunnel_ssh_path_resolved source=path_autodetect ssh_path={}",
+            detected.display()
+        ),
+    );
     Ok(detected)
 }
 
