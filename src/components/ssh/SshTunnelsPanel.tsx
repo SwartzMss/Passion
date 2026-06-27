@@ -3,12 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   createSshTunnel,
   deleteSshTunnel,
-  getSshTunnelSettings,
   listSshTunnels,
   startSshTunnel,
   stopSshTunnel,
   updateSshTunnel,
-  updateSshTunnelSettings,
 } from "../../lib/api";
 import type {
   NewSshTunnel,
@@ -17,7 +15,7 @@ import type {
   SshTunnelStatus,
 } from "../../types";
 
-type Filter = "all" | "running" | "stopped" | "error";
+type Filter = "all" | "running" | "stopped";
 type Mode = "list" | "create" | "edit";
 
 const DEFAULT_FORM = {
@@ -33,7 +31,6 @@ const DEFAULT_FORM = {
 
 export function SshTunnelsPanel() {
   const [tunnels, setTunnels] = useState<SshTunnelInfo[]>([]);
-  const [sshExecutablePath, setSshExecutablePath] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<Mode>("list");
@@ -46,14 +43,8 @@ export function SshTunnelsPanel() {
     setTunnels(await listSshTunnels());
   }
 
-  async function loadSettings() {
-    const settings = await getSshTunnelSettings();
-    setSshExecutablePath(settings.sshExecutablePath ?? "");
-  }
-
   useEffect(() => {
     refresh().catch((err) => setError(readError(err)));
-    loadSettings().catch((err) => setError(readError(err)));
   }, []);
 
   const counts = useMemo(
@@ -61,7 +52,6 @@ export function SshTunnelsPanel() {
       all: tunnels.length,
       running: tunnels.filter((tunnel) => tunnel.status === "running").length,
       stopped: tunnels.filter((tunnel) => tunnel.status === "stopped").length,
-      error: tunnels.filter((tunnel) => tunnel.status === "error").length,
     }),
     [tunnels],
   );
@@ -102,22 +92,6 @@ export function SshTunnelsPanel() {
     }
   }
 
-  async function saveSshExecutablePath() {
-    await mutate(async () => {
-      const settings = await updateSshTunnelSettings({
-        sshExecutablePath: sshExecutablePath.trim(),
-      });
-      setSshExecutablePath(settings.sshExecutablePath ?? "");
-    });
-  }
-
-  async function chooseSshExecutable() {
-    const selected = await open({ directory: false, multiple: false });
-    if (typeof selected === "string") {
-      setSshExecutablePath(selected);
-    }
-  }
-
   async function choosePrivateKey() {
     const selected = await open({ directory: false, multiple: false });
     if (typeof selected === "string") {
@@ -148,6 +122,13 @@ export function SshTunnelsPanel() {
     setMode("edit");
   }
 
+  function closeForm() {
+    setError(null);
+    setMode("list");
+    setEditingTunnel(null);
+    setForm(DEFAULT_FORM);
+  }
+
   async function submitForm() {
     const validation = validateForm(form);
     if (validation) {
@@ -176,257 +157,312 @@ export function SshTunnelsPanel() {
     });
   }
 
-  if (mode !== "list") {
-    return (
-      <section className="ssh-panel">
-        <Header />
-        {error ? <p className="error" role="alert">{error}</p> : null}
-        <article className="ssh-form-panel">
-          <div className="ssh-form-heading">
-            <h2>{mode === "edit" ? "编辑隧道" : "新建隧道"}</h2>
-            <button type="button" onClick={() => setMode("list")}>取消</button>
-          </div>
-          <div className="ssh-form-grid">
-            <label className="field-label">
-              隧道名称
-              <input
-                aria-label="隧道名称"
-                value={form.name}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
-              />
-            </label>
-            <label className="field-label">
-              描述
-              <input
-                aria-label="描述"
-                value={form.description}
-                onChange={(event) =>
-                  setForm({ ...form, description: event.target.value })
-                }
-              />
-            </label>
-            <label className="field-label">
-              本地端口
-              <input
-                aria-label="本地端口"
-                inputMode="numeric"
-                type="number"
-                value={form.localPort}
-                onChange={(event) =>
-                  setForm({ ...form, localPort: event.target.value })
-                }
-              />
-            </label>
-            <fieldset className="ssh-bind-field">
-              <legend>绑定地址</legend>
-              <label>
-                <input
-                  checked={form.bindAddress === "127.0.0.1"}
-                  name="bind-address"
-                  onChange={() => setForm({ ...form, bindAddress: "127.0.0.1" })}
-                  type="radio"
-                />
-                仅本机访问
-              </label>
-              <label>
-                <input
-                  checked={form.bindAddress === "0.0.0.0"}
-                  name="bind-address"
-                  onChange={() => setForm({ ...form, bindAddress: "0.0.0.0" })}
-                  type="radio"
-                />
-                允许外部访问
-              </label>
-            </fieldset>
-            <label className="field-label">
-              远程地址
-              <input
-                aria-label="远程地址"
-                value={form.remoteHost}
-                onChange={(event) =>
-                  setForm({ ...form, remoteHost: event.target.value })
-                }
-              />
-            </label>
-            <label className="field-label">
-              远程端口
-              <input
-                aria-label="远程端口"
-                inputMode="numeric"
-                type="number"
-                value={form.remotePort}
-                onChange={(event) =>
-                  setForm({ ...form, remotePort: event.target.value })
-                }
-              />
-            </label>
-            <label className="field-label">
-              用户名
-              <input
-                aria-label="用户名"
-                value={form.username}
-                onChange={(event) =>
-                  setForm({ ...form, username: event.target.value })
-                }
-              />
-            </label>
-            <label className="field-label ssh-file-field">
-              私钥文件
-              <span>
-                <input
-                  aria-label="私钥文件"
-                  value={form.keyPath}
-                  onChange={(event) =>
-                    setForm({ ...form, keyPath: event.target.value })
-                  }
-                />
-                <button type="button" onClick={choosePrivateKey}>
-                  选择私钥
-                </button>
-              </span>
-            </label>
-          </div>
-          <div className="ssh-form-actions">
-            <button type="button" onClick={() => setMode("list")}>
-              取消
-            </button>
-            <button
-              className="primary-action"
-              disabled={isBusy}
-              onClick={submitForm}
-              type="button"
-            >
-              {mode === "edit" ? "保存" : "创建并启动"}
-            </button>
-          </div>
-        </article>
-      </section>
-    );
-  }
-
   return (
     <section className="ssh-panel">
       <Header />
-      {error ? <p className="error" role="alert">{error}</p> : null}
-
-      <article className="ssh-settings-panel">
-        <label className="field-label">
-          SSH 程序路径
-          <input
-            aria-label="SSH 程序路径"
-            placeholder="未配置时自动检测 PATH 中的 ssh.exe"
-            value={sshExecutablePath}
-            onChange={(event) => setSshExecutablePath(event.target.value)}
-          />
-        </label>
-        <div className="ssh-row-actions">
-          <button disabled={isBusy} onClick={chooseSshExecutable} type="button">
-            选择 SSH 程序
-          </button>
-          <button disabled={isBusy} onClick={saveSshExecutablePath} type="button">
-            保存 SSH 路径
-          </button>
-        </div>
-      </article>
+      {error && mode === "list" ? <p className="error" role="alert">{error}</p> : null}
 
       <div className="ssh-toolbar">
         <div className="ssh-filters" aria-label="SSH 隧道筛选">
           <FilterButton active={filter === "all"} count={counts.all} label="全部" onClick={() => setFilter("all")} />
           <FilterButton active={filter === "running"} count={counts.running} label="运行中" onClick={() => setFilter("running")} />
           <FilterButton active={filter === "stopped"} count={counts.stopped} label="已停止" onClick={() => setFilter("stopped")} />
-          <FilterButton active={filter === "error"} count={counts.error} label="异常" onClick={() => setFilter("error")} />
         </div>
-        <input
-          aria-label="搜索 SSH 隧道"
-          placeholder="搜索名称、地址、用户或端口"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
+        <label className="ssh-search">
+          <span aria-hidden="true">⌕</span>
+          <input
+            aria-label="搜索 SSH 隧道"
+            placeholder="搜索隧道名称、目标或用户名"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
         <button className="primary-action" onClick={openCreate} type="button">
           新建隧道
         </button>
       </div>
 
       <div className="ssh-table-wrap">
+        <h2>隧道列表</h2>
         {visibleTunnels.length === 0 ? (
-          <div className="empty-state">没有 SSH 隧道</div>
+          <div className="ssh-empty-state">
+            <div className="ssh-empty-icon" aria-hidden="true">⌂</div>
+            <strong>暂无 SSH 隧道</strong>
+            <p>点击右上角“新建隧道”创建一个本地端口转发。</p>
+          </div>
         ) : (
-          <table aria-label="SSH 隧道列表" className="ssh-table">
-            <thead>
-              <tr>
-                <th>名称</th>
-                <th>本地端口</th>
-                <th>目标</th>
-                <th>用户</th>
-                <th>状态</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleTunnels.map((tunnel) => (
-                <tr key={tunnel.id}>
-                  <td>
-                    <strong>{tunnel.name}</strong>
-                    {tunnel.description ? <p>{tunnel.description}</p> : null}
-                    {tunnel.errorMessage ? (
-                      <p className="ssh-error-detail">{tunnel.errorMessage}</p>
-                    ) : null}
-                  </td>
-                  <td>{tunnel.bindAddress}:{tunnel.localPort}</td>
-                  <td>{tunnel.remoteHost}:{tunnel.remotePort}</td>
-                  <td>{tunnel.username}</td>
-                  <td>
-                    <span className={`ssh-status ${tunnel.status}`}>
-                      {statusLabel(tunnel.status)}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="ssh-row-actions">
-                      {tunnel.status === "running" ? (
-                        <button disabled={isBusy} onClick={() => mutate(() => stopSshTunnel(tunnel.id).then(() => undefined))} type="button">
-                          停止
-                        </button>
-                      ) : null}
-                      {tunnel.status === "stopped" ? (
-                        <>
-                          <button disabled={isBusy} onClick={() => mutate(() => startSshTunnel(tunnel.id).then(() => undefined))} type="button">
-                            启动
-                          </button>
-                          <button disabled={isBusy} onClick={() => openEdit(tunnel)} type="button">
-                            编辑
-                          </button>
-                          <button disabled={isBusy} onClick={() => mutate(() => deleteSshTunnel(tunnel.id))} type="button">
-                            删除
-                          </button>
-                        </>
-                      ) : null}
-                      {tunnel.status === "error" ? (
-                        <>
-                          <button disabled={isBusy} onClick={() => mutate(() => startSshTunnel(tunnel.id).then(() => undefined))} type="button">
-                            重启
-                          </button>
-                          <button disabled={isBusy} onClick={() => openEdit(tunnel)} type="button">
-                            编辑
-                          </button>
-                          <button disabled={isBusy} onClick={() => mutate(() => deleteSshTunnel(tunnel.id))} type="button">
-                            删除
-                          </button>
-                        </>
-                      ) : null}
-                      {tunnel.status === "starting" ? (
-                        <button disabled={isBusy} onClick={() => mutate(() => stopSshTunnel(tunnel.id).then(() => undefined))} type="button">
-                          取消
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="ssh-table-shell">
+            <table aria-label="SSH 隧道列表" className="ssh-table">
+              <SshTunnelTableHead />
+              <tbody>
+                {visibleTunnels.map((tunnel) => (
+                  <SshTunnelRow
+                    isBusy={isBusy}
+                    key={tunnel.id}
+                    onDelete={() => mutate(() => deleteSshTunnel(tunnel.id))}
+                    onEdit={() => openEdit(tunnel)}
+                    onStart={() => mutate(() => startSshTunnel(tunnel.id).then(() => undefined))}
+                    onStop={() => mutate(() => stopSshTunnel(tunnel.id).then(() => undefined))}
+                    tunnel={tunnel}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
+        <div className="ssh-table-summary">
+          共 {visibleTunnels.length} 条
+          <span>|</span>
+          运行中: {counts.running}
+          <span>|</span>
+          已停止: {counts.stopped}
+        </div>
       </div>
+
+      {mode !== "list" ? (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            aria-labelledby="ssh-tunnel-form-title"
+            aria-modal="true"
+            className="modal ssh-tunnel-modal"
+            role="dialog"
+          >
+            <div className="modal-title ssh-form-heading">
+              <h2 id="ssh-tunnel-form-title">
+                {mode === "edit" ? "编辑隧道" : "新建隧道"}
+              </h2>
+              <button
+                aria-label={mode === "edit" ? "关闭编辑隧道" : "关闭新建隧道"}
+                onClick={closeForm}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            {error ? <p className="error" role="alert">{error}</p> : null}
+            <div className="ssh-form-grid">
+              <label className="field-label">
+                <span><RequiredMark />隧道名称</span>
+                <input
+                  aria-label="隧道名称"
+                  placeholder="请输入隧道名称"
+                  value={form.name}
+                  onChange={(event) => setForm({ ...form, name: event.target.value })}
+                />
+              </label>
+              <label className="field-label">
+                <span><RequiredMark />本地端口</span>
+                <input
+                  aria-label="本地端口"
+                  inputMode="numeric"
+                  type="number"
+                  value={form.localPort}
+                  onChange={(event) =>
+                    setForm({ ...form, localPort: event.target.value })
+                  }
+                />
+              </label>
+              <label className="field-label">
+                <span><RequiredMark />远程地址</span>
+                <input
+                  aria-label="远程地址"
+                  placeholder="如：192.168.1.10"
+                  value={form.remoteHost}
+                  onChange={(event) =>
+                    setForm({ ...form, remoteHost: event.target.value })
+                  }
+                />
+              </label>
+              <label className="field-label">
+                <span><RequiredMark />远程端口</span>
+                <input
+                  aria-label="远程端口"
+                  inputMode="numeric"
+                  type="number"
+                  value={form.remotePort}
+                  onChange={(event) =>
+                    setForm({ ...form, remotePort: event.target.value })
+                  }
+                />
+              </label>
+              <label className="field-label">
+                <span><RequiredMark />用户名</span>
+                <input
+                  aria-label="用户名"
+                  placeholder="如：root"
+                  value={form.username}
+                  onChange={(event) =>
+                    setForm({ ...form, username: event.target.value })
+                  }
+                />
+              </label>
+              <label className="field-label ssh-file-field">
+                <span><RequiredMark />私钥文件</span>
+                <span>
+                  <input
+                    aria-label="私钥文件"
+                    placeholder="选择私钥文件（如：id_rsa）"
+                    value={form.keyPath}
+                    onChange={(event) =>
+                      setForm({ ...form, keyPath: event.target.value })
+                    }
+                  />
+                  <button type="button" onClick={choosePrivateKey}>
+                    选择文件
+                  </button>
+                </span>
+              </label>
+            </div>
+            <div className="modal-actions ssh-form-actions">
+              <button type="button" onClick={closeForm}>
+                取消
+              </button>
+              <button
+                className="primary-action"
+                disabled={isBusy}
+                onClick={submitForm}
+                type="button"
+              >
+                {mode === "edit" ? (
+                  "保存"
+                ) : (
+                  <>
+                    <span aria-hidden="true">▷</span>
+                    保存并启动
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+function RequiredMark() {
+  return <span className="ssh-required-mark" aria-hidden="true">*</span>;
+}
+
+function SshTunnelTableHead() {
+  return (
+    <>
+      <colgroup>
+        <col className="ssh-col-name" />
+        <col className="ssh-col-local-port" />
+        <col className="ssh-col-remote-target" />
+        <col className="ssh-col-username" />
+        <col className="ssh-col-status" />
+        <col className="ssh-col-actions" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>名称</th>
+          <th>本地端口</th>
+          <th>远程目标</th>
+          <th>用户名</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+    </>
+  );
+}
+
+function SshTunnelRow({
+  isBusy,
+  onDelete,
+  onEdit,
+  onStart,
+  onStop,
+  tunnel,
+}: {
+  isBusy: boolean;
+  onDelete: () => void;
+  onEdit: () => void;
+  onStart: () => void;
+  onStop: () => void;
+  tunnel: SshTunnelInfo;
+}) {
+  const remoteTarget = `${tunnel.remoteHost}:${tunnel.remotePort}`;
+  return (
+    <tr>
+      <td>
+        <SshTunnelNameCell tunnel={tunnel} />
+      </td>
+      <td>{tunnel.localPort}</td>
+      <td className="ssh-text-cell" title={remoteTarget}>{remoteTarget}</td>
+      <td className="ssh-text-cell" title={tunnel.username}>{tunnel.username}</td>
+      <td>
+        <span className={`ssh-status ${tunnel.status}`}>
+          {statusLabel(tunnel.status)}
+        </span>
+      </td>
+      <td>
+        <SshTunnelActions
+          isBusy={isBusy}
+          onDelete={onDelete}
+          onEdit={onEdit}
+          onStart={onStart}
+          onStop={onStop}
+          status={tunnel.status}
+        />
+      </td>
+    </tr>
+  );
+}
+
+function SshTunnelNameCell({ tunnel }: { tunnel: SshTunnelInfo }) {
+  return (
+    <div className="ssh-name-cell" title={tunnel.name}>
+      <strong>{tunnel.name}</strong>
+      {tunnel.description ? <small>{tunnel.description}</small> : null}
+      {tunnel.errorMessage ? (
+        <small className="ssh-error-detail">{tunnel.errorMessage}</small>
+      ) : null}
+    </div>
+  );
+}
+
+function SshTunnelActions({
+  isBusy,
+  onDelete,
+  onEdit,
+  onStart,
+  onStop,
+  status,
+}: {
+  isBusy: boolean;
+  onDelete: () => void;
+  onEdit: () => void;
+  onStart: () => void;
+  onStop: () => void;
+  status: SshTunnelStatus;
+}) {
+  const isRunning = status === "running";
+  const isStarting = status === "starting";
+  const mainLabel = isRunning ? "停止" : isStarting ? "取消" : status === "error" ? "重启" : "启动";
+  const mainAction = isRunning || isStarting ? onStop : onStart;
+  const lockMutatingActions = isRunning || isStarting;
+
+  return (
+    <div className="ssh-row-actions">
+      <span className="ssh-action-slot">
+        <button disabled={isBusy} onClick={mainAction} type="button">
+          {mainLabel}
+        </button>
+      </span>
+      <span className="ssh-action-slot">
+        <button disabled={isBusy || lockMutatingActions} onClick={onEdit} type="button">
+          编辑
+        </button>
+      </span>
+      <span className="ssh-action-slot">
+        <button disabled={isBusy || lockMutatingActions} onClick={onDelete} type="button">
+          删除
+        </button>
+      </span>
+    </div>
   );
 }
 
@@ -435,7 +471,7 @@ function Header() {
     <div className="ssh-hero">
       <div>
         <h1>SSH 隧道</h1>
-        <p className="muted">管理本地端口转发隧道。</p>
+        <p className="muted">通过 SSH 端口转发访问远程设备和服务。</p>
       </div>
     </div>
   );
@@ -459,7 +495,8 @@ function FilterButton({
       onClick={onClick}
       type="button"
     >
-      {label} {count}
+      <span>{label}</span>
+      <strong>{count}</strong>
     </button>
   );
 }
