@@ -216,17 +216,6 @@ pub struct DownloadProgressEvent {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SystemSnapshot {
-    pub cpu_usage_percent: f32,
-    pub memory_used_bytes: u64,
-    pub memory_total_bytes: u64,
-    pub disk_used_bytes: u64,
-    pub disk_total_bytes: u64,
-    pub uptime_seconds: u64,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NewScriptTask {

@@ -10,13 +10,13 @@ import { ReminderWindow } from "./components/reminders/ReminderWindow";
 import { ScriptTasksPanel } from "./components/scripts/ScriptTasksPanel";
 import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { SshTunnelsPanel } from "./components/ssh/SshTunnelsPanel";
-import { SystemMonitorPanel } from "./components/system/SystemMonitorPanel";
 import { TranslationPanel } from "./components/translation/TranslationPanel";
 import { UtilitiesPanel } from "./components/utilities/UtilitiesPanel";
 import {
   createReminder,
   deleteReminder,
   listScriptTasks,
+  listSshTunnels,
   listReminders,
   updateReminder,
 } from "./lib/api";
@@ -31,7 +31,6 @@ type View =
   | "network"
   | "ssh"
   | "download"
-  | "system"
   | "scripts"
   | "utilities"
   | "settings";
@@ -43,7 +42,6 @@ type NavIcon =
   | "globe"
   | "terminal"
   | "download"
-  | "activity"
   | "code"
   | "toolbox"
   | "settings";
@@ -55,7 +53,6 @@ const NAV_ITEMS: Array<{ view: View; label: string; icon: NavIcon }> = [
   { view: "network", label: "网络检测", icon: "globe" },
   { view: "ssh", label: "SSH 隧道", icon: "terminal" },
   { view: "download", label: "下载工具", icon: "download" },
-  { view: "system", label: "系统监控", icon: "activity" },
   { view: "scripts", label: "脚本任务", icon: "code" },
   { view: "utilities", label: "实用工具", icon: "toolbox" },
   { view: "settings", label: "设置", icon: "settings" },
@@ -73,6 +70,7 @@ function MainApp() {
   const [view, setView] = useState<View>("home");
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [scriptTasks, setScriptTasks] = useState<ScriptTask[]>([]);
+  const [runningSshTunnelCount, setRunningSshTunnelCount] = useState(0);
   const [showAdd, setShowAdd] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -85,9 +83,17 @@ function MainApp() {
     setScriptTasks(await listScriptTasks());
   }
 
+  async function refreshSshTunnels() {
+    const tunnels = await listSshTunnels();
+    setRunningSshTunnelCount(
+      tunnels.filter((tunnel) => tunnel.status === "running").length,
+    );
+  }
+
   useEffect(() => {
     refresh().catch((err) => setError(readError(err)));
     refreshScriptTasks().catch((err) => setError(readError(err)));
+    refreshSshTunnels().catch((err) => setError(readError(err)));
     const unlisten = onReminderTriggered(() => {
       refresh().catch((err) => setError(readError(err)));
     });
@@ -172,6 +178,7 @@ function MainApp() {
                   (task) => task.lastStartedAt && !task.lastFinishedAt,
                 ).length
               }
+              runningSshTunnelCount={runningSshTunnelCount}
               totalScriptTaskCount={scriptTasks.length}
               onOpenReminders={() => setView("reminders")}
               onAddReminder={() => {
@@ -182,7 +189,6 @@ function MainApp() {
               onOpenNetworkDiagnostics={() => setView("network")}
               onOpenSshTunnels={() => setView("ssh")}
               onOpenDownloader={() => setView("download")}
-              onOpenSystemMonitor={() => setView("system")}
               onOpenScriptTasks={() => setView("scripts")}
               onOpenUtilities={() => setView("utilities")}
             />
@@ -206,9 +212,6 @@ function MainApp() {
           ) : null}
           {view === "download" ? (
             <DownloadPanel />
-          ) : null}
-          {view === "system" ? (
-            <SystemMonitorPanel />
           ) : null}
           {view === "scripts" ? (
             <ScriptTasksPanel />
@@ -283,10 +286,6 @@ function NavIcon({ name }: { name: NavIcon }) {
       "M5 18h14",
       "M6 14v4",
       "M18 14v4",
-    ],
-    activity: [
-      "M4 13h4l2-7 4 12 2-5h4",
-      "M5 20h14",
     ],
     code: [
       "m9 7-5 5 5 5",

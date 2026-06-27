@@ -23,6 +23,26 @@ vi.mock("./lib/api", () => ({
       updatedAt: "2026-06-11T09:00:00.000Z",
     },
   ]),
+  listSshTunnels: vi.fn(async () => [
+    {
+      id: "ssh-1",
+      name: "Dev tunnel",
+      description: null,
+      localPort: 8080,
+      bindAddress: "127.0.0.1",
+      remoteHost: "192.168.1.10",
+      remotePort: 22,
+      username: "root",
+      keyPath: "C:\\keys\\id_rsa",
+      authType: "private_key",
+      status: "running",
+      pid: 1234,
+      startedAt: "2026-06-11T10:00:00.000Z",
+      errorMessage: null,
+      createdAt: "2026-06-11T09:00:00.000Z",
+      updatedAt: "2026-06-11T09:00:00.000Z",
+    },
+  ]),
   createReminder: vi.fn(),
   deleteReminder: vi.fn(),
   toggleReminder: vi.fn(),
@@ -56,6 +76,7 @@ it("shows a left navigation without removing workbench search", async () => {
   );
   expect(within(navigation).getByRole("button", { name: "提醒" })).toBeInTheDocument();
   expect(within(navigation).getByRole("button", { name: "翻译" })).toBeInTheDocument();
+  expect(within(navigation).queryByRole("button", { name: "系统监控" })).not.toBeInTheDocument();
   expect(
     screen.getByPlaceholderText(
       "搜索功能或输入命令，例如：翻译、端口、下载、脚本任务...",

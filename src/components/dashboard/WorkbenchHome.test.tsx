@@ -7,6 +7,7 @@ const defaultProps = {
   pendingReminderCount: 2,
   enabledScriptTaskCount: 1,
   runningScriptTaskCount: 1,
+  runningSshTunnelCount: 1,
   totalScriptTaskCount: 3,
   onOpenReminders: vi.fn(),
   onAddReminder: vi.fn(),
@@ -14,7 +15,6 @@ const defaultProps = {
   onOpenNetworkDiagnostics: vi.fn(),
   onOpenSshTunnels: vi.fn(),
   onOpenDownloader: vi.fn(),
-  onOpenSystemMonitor: vi.fn(),
   onOpenScriptTasks: vi.fn(),
   onOpenUtilities: vi.fn(),
 };
@@ -35,7 +35,11 @@ it("shows the workbench dashboard", async () => {
   expect(screen.getByText("2")).toBeInTheDocument();
   expect(screen.getByText("下载中")).toBeInTheDocument();
   expect(screen.getByText("运行中脚本")).toBeInTheDocument();
-  expect(screen.getByText("系统状态")).toBeInTheDocument();
+  expect(screen.getByText("SSH 隧道")).toBeInTheDocument();
+  expect(screen.getByText("运行中隧道")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "查看 SSH 隧道" })).toBeInTheDocument();
+  expect(screen.queryByText("系统状态")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "查看系统监控" })).not.toBeInTheDocument();
   expect(container.querySelectorAll(".workbench-status-icon svg")).toHaveLength(4);
   expect(screen.queryByText("快速操作")).not.toBeInTheDocument();
   expect(screen.queryByText("即将发生")).not.toBeInTheDocument();

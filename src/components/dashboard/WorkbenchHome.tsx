@@ -4,6 +4,7 @@ interface Props {
   pendingReminderCount: number;
   enabledScriptTaskCount: number;
   runningScriptTaskCount: number;
+  runningSshTunnelCount: number;
   totalScriptTaskCount: number;
   onOpenReminders: () => void;
   onAddReminder: () => void;
@@ -11,7 +12,6 @@ interface Props {
   onOpenNetworkDiagnostics: () => void;
   onOpenSshTunnels: () => void;
   onOpenDownloader: () => void;
-  onOpenSystemMonitor: () => void;
   onOpenScriptTasks: () => void;
   onOpenUtilities: () => void;
 }
@@ -19,13 +19,13 @@ interface Props {
 export function WorkbenchHome({
   pendingReminderCount,
   runningScriptTaskCount,
+  runningSshTunnelCount,
   onOpenReminders,
   onAddReminder,
   onOpenTranslation,
   onOpenNetworkDiagnostics,
   onOpenSshTunnels,
   onOpenDownloader,
-  onOpenSystemMonitor,
   onOpenScriptTasks,
   onOpenUtilities,
 }: Props) {
@@ -73,13 +73,6 @@ export function WorkbenchHome({
         actions: [{ label: "开始下载", onClick: onOpenDownloader, primary: true }],
       },
       {
-        id: "system",
-        label: "系统监控",
-        description: "查看 CPU、内存、磁盘和系统运行时长。",
-        keywords: "系统 监控 cpu 内存 磁盘 运行时长",
-        actions: [{ label: "查看状态", onClick: onOpenSystemMonitor, primary: true }],
-      },
-      {
         id: "scripts",
         label: "脚本任务",
         description: "定期执行本机脚本，并查看最近一次输出。",
@@ -102,7 +95,6 @@ export function WorkbenchHome({
       onOpenNetworkDiagnostics,
       onOpenSshTunnels,
       onOpenDownloader,
-      onOpenSystemMonitor,
       onOpenScriptTasks,
       onOpenUtilities,
     ],
@@ -147,14 +139,14 @@ export function WorkbenchHome({
       onClick: onOpenScriptTasks,
     },
     {
-      id: "system",
-      icon: "activity",
-      label: "系统状态",
-      value: "正常",
-      description: "基础资源入口",
-      meta: "查看系统监控",
+      id: "ssh",
+      icon: "network",
+      label: "SSH 隧道",
+      value: String(runningSshTunnelCount),
+      description: "运行中隧道",
+      meta: "查看 SSH 隧道",
       tone: "orange",
-      onClick: onOpenSystemMonitor,
+      onClick: onOpenSshTunnels,
     },
   ];
   return (
@@ -260,6 +252,16 @@ function StatusIcon({ name }: { name: string }) {
       return (
         <svg viewBox="0 0 24 24" focusable="false">
           <path d="M4 13h4l2-6 4 12 2-6h4" />
+        </svg>
+      );
+    case "network":
+      return (
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M7 8h4v4H7z" />
+          <path d="M16 4h3v3h-3z" />
+          <path d="M16 17h3v3h-3z" />
+          <path d="M11 10h3.5c1.2 0 1.8-.6 1.8-1.8V7" />
+          <path d="M11 10h3.5c1.2 0 1.8.6 1.8 1.8V17" />
         </svg>
       );
     default:

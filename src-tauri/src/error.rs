@@ -23,8 +23,6 @@ pub enum BackendError {
     Download(String),
     #[error("{0}")]
     ScriptTask(String),
-    #[error("{0}")]
-    SystemMonitor(String),
     #[error("Window operation failed: {0}")]
     Window(String),
 }

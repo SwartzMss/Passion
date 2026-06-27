@@ -15,7 +15,6 @@ import type {
   ScriptTask,
   SshTunnelInfo,
   SshTunnelSettings,
-  SystemSnapshot,
   TranslationRequest,
   TranslationResult,
 } from "../types";
@@ -139,10 +138,6 @@ export async function cancelDownload(taskId: string): Promise<void> {
 
 export async function getDefaultDownloadDir(): Promise<string> {
   return invoke<string>("get_default_download_dir");
-}
-
-export async function getSystemSnapshot(): Promise<SystemSnapshot> {
-  return invoke<SystemSnapshot>("get_system_snapshot");
 }
 
 export async function listScriptTasks(): Promise<ScriptTask[]> {

@@ -14,7 +14,6 @@ mod script_task_scheduler;
 mod script_tasks;
 mod settings;
 mod ssh_tunnels;
-mod system_monitor;
 mod translator;
 mod tray;
 mod workday_calendar;
@@ -132,7 +131,6 @@ pub fn run() {
             commands::pause_download,
             commands::cancel_download,
             commands::get_default_download_dir,
-            commands::get_system_snapshot,
             commands::list_script_tasks,
             commands::create_script_task,
             commands::set_script_task_enabled,

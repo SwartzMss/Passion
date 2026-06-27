@@ -4,8 +4,7 @@ use crate::error::{BackendError, ErrorPayload};
 use crate::models::{
     AiSettings, DownloadRequest, DownloadResult, NewReminder, NewScriptTask, NewSshTunnel,
     PortCheckRequest, PortCheckResult, PortOccupancyRequest, PortOccupancyResult, Reminder,
-    ScriptTask, Settings, SshTunnelInfo, SshTunnelSettings, SystemSnapshot, TranslationRequest,
-    TranslationResult,
+    ScriptTask, Settings, SshTunnelInfo, SshTunnelSettings, TranslationRequest, TranslationResult,
 };
 use crate::reminders::ReminderRepository;
 use crate::script_tasks::ScriptTaskRepository;
@@ -652,13 +651,6 @@ pub fn cancel_download(state: State<'_, AppState>, task_id: String) -> CommandRe
 #[tauri::command]
 pub fn get_default_download_dir(app: AppHandle) -> CommandResult<String> {
     crate::downloader::default_download_dir(&app).map_err(ErrorPayload::from)
-}
-
-#[tauri::command]
-pub async fn get_system_snapshot() -> CommandResult<SystemSnapshot> {
-    tauri::async_runtime::spawn_blocking(crate::system_monitor::get_system_snapshot)
-        .await
-        .map_err(|err| ErrorPayload::from(BackendError::SystemMonitor(err.to_string())))
 }
 
 #[tauri::command]

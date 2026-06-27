@@ -101,15 +101,6 @@ export interface DownloadProgressEvent {
   error?: string | null;
 }
 
-export interface SystemSnapshot {
-  cpuUsagePercent: number;
-  memoryUsedBytes: number;
-  memoryTotalBytes: number;
-  diskUsedBytes: number;
-  diskTotalBytes: number;
-  uptimeSeconds: number;
-}
-
 export type ScriptTaskScheduleType = "interval" | "daily" | "weekly";
 
 export interface NewScriptTask {
