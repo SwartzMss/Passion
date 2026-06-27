@@ -71,17 +71,37 @@ it("loads and shows SSH tunnels", async () => {
   render(<SshTunnelsPanel />);
 
   expect(screen.getByRole("heading", { name: "SSH 隧道" })).toBeInTheDocument();
-  expect(
-    await screen.findByDisplayValue("C:\\Windows\\System32\\OpenSSH\\ssh.exe"),
-  ).toBeInTheDocument();
-  expect(await screen.findByRole("button", { name: "全部 3" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "运行中 1" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "已停止 1" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "异常 1" })).toBeInTheDocument();
+  expect(screen.getByText("通过 SSH 端口转发访问远程设备和服务。")).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: /全部\s*3/ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /运行中\s*1/ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /已停止\s*1/ })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /异常/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "隧道列表" })).toBeInTheDocument();
   expect(screen.getByRole("table", { name: "SSH 隧道列表" })).toBeInTheDocument();
+  expect(document.querySelector(".ssh-col-name")).toBeInTheDocument();
+  expect(document.querySelector(".ssh-col-actions")).toBeInTheDocument();
+  expect(screen.getByText(/共 3 条/)).toBeInTheDocument();
+  expect(screen.getByText(/运行中: 1/)).toBeInTheDocument();
+  expect(screen.getByText(/已停止: 1/)).toBeInTheDocument();
+  expect(screen.queryByText(/异常: 1/)).not.toBeInTheDocument();
+  expect(screen.getByText("⌕")).toBeInTheDocument();
+  expect(screen.queryByLabelText("SSH 程序路径")).not.toBeInTheDocument();
   expect(screen.getByText("QNX调试")).toBeInTheDocument();
-  expect(screen.getByText("127.0.0.1:8080")).toBeInTheDocument();
+  expect(screen.getByText("8080")).toBeInTheDocument();
   expect(screen.getAllByText("172.31.3.1:22").length).toBeGreaterThan(0);
+});
+
+it("shows a detailed empty state when no tunnel matches", async () => {
+  const user = userEvent.setup();
+  render(<SshTunnelsPanel />);
+
+  await user.type(await screen.findByLabelText("搜索 SSH 隧道"), "not found");
+
+  expect(screen.getByText("暂无 SSH 隧道")).toBeInTheDocument();
+  expect(
+    screen.getByText("点击右上角“新建隧道”创建一个本地端口转发。"),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("table", { name: "SSH 隧道列表" })).not.toBeInTheDocument();
 });
 
 it("starts, stops, restarts, and deletes tunnels", async () => {
@@ -89,11 +109,14 @@ it("starts, stops, restarts, and deletes tunnels", async () => {
   render(<SshTunnelsPanel />);
 
   const stoppedRow = await screen.findByRole("row", { name: /QNX调试/ });
+  expect(stoppedRow.querySelectorAll(".ssh-action-slot")).toHaveLength(3);
   await user.click(within(stoppedRow).getByRole("button", { name: "启动" }));
 
   const runningRow = screen.getByRole("row", { name: /Web访问/ });
+  expect(runningRow.querySelectorAll(".ssh-action-slot")).toHaveLength(3);
+  expect(within(runningRow).getByRole("button", { name: "编辑" })).toBeDisabled();
+  expect(within(runningRow).getByRole("button", { name: "删除" })).toBeDisabled();
   await user.click(within(runningRow).getByRole("button", { name: "停止" }));
-  expect(within(runningRow).queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
 
   const errorRow = screen.getByRole("row", { name: /失败隧道/ });
   await user.click(within(errorRow).getByRole("button", { name: "重启" }));
@@ -111,18 +134,29 @@ it("validates create form and submits create-and-start", async () => {
   render(<SshTunnelsPanel />);
 
   await user.click(await screen.findByRole("button", { name: "新建隧道" }));
-  await user.click(screen.getByRole("button", { name: "创建并启动" }));
-  expect(screen.getByText("隧道名称不能为空。")).toBeInTheDocument();
+  const dialog = screen.getByRole("dialog", { name: "新建隧道" });
+  expect(screen.getByRole("table", { name: "SSH 隧道列表" })).toBeInTheDocument();
+  expect(within(dialog).queryByLabelText("描述")).not.toBeInTheDocument();
+  expect(within(dialog).queryByRole("group", { name: "绑定地址" })).not.toBeInTheDocument();
+  expect(within(dialog).getAllByText("*")).toHaveLength(6);
+  expect(within(dialog).getByPlaceholderText("请输入隧道名称")).toBeInTheDocument();
+  expect(within(dialog).getByPlaceholderText("如：192.168.1.10")).toBeInTheDocument();
+  expect(within(dialog).getByPlaceholderText("如：root")).toBeInTheDocument();
+  expect(within(dialog).getByPlaceholderText("选择私钥文件（如：id_rsa）")).toBeInTheDocument();
+  expect(within(dialog).getByRole("button", { name: "保存并启动" })).toBeInTheDocument();
 
-  await user.type(screen.getByLabelText("隧道名称"), "QNX调试2");
-  await user.clear(screen.getByLabelText("本地端口"));
-  await user.type(screen.getByLabelText("本地端口"), "8088");
-  await user.type(screen.getByLabelText("远程地址"), "172.31.3.1");
-  await user.clear(screen.getByLabelText("远程端口"));
-  await user.type(screen.getByLabelText("远程端口"), "22");
-  await user.type(screen.getByLabelText("用户名"), "root");
-  await user.click(screen.getByRole("button", { name: "选择私钥" }));
-  await user.click(screen.getByRole("button", { name: "创建并启动" }));
+  await user.click(within(dialog).getByRole("button", { name: "保存并启动" }));
+  expect(within(dialog).getByText("隧道名称不能为空。")).toBeInTheDocument();
+
+  await user.type(within(dialog).getByLabelText("隧道名称"), "QNX调试2");
+  await user.clear(within(dialog).getByLabelText("本地端口"));
+  await user.type(within(dialog).getByLabelText("本地端口"), "8088");
+  await user.type(within(dialog).getByLabelText("远程地址"), "172.31.3.1");
+  await user.clear(within(dialog).getByLabelText("远程端口"));
+  await user.type(within(dialog).getByLabelText("远程端口"), "22");
+  await user.type(within(dialog).getByLabelText("用户名"), "root");
+  await user.click(within(dialog).getByRole("button", { name: "选择文件" }));
+  await user.click(within(dialog).getByRole("button", { name: "保存并启动" }));
 
   const api = await import("../../lib/api");
   expect(api.createSshTunnel).toHaveBeenCalledWith({
@@ -135,21 +169,19 @@ it("validates create form and submits create-and-start", async () => {
     username: "root",
     keyPath: "C:\\keys\\selected_key",
   });
+  expect(screen.queryByRole("dialog", { name: "新建隧道" })).not.toBeInTheDocument();
 });
 
-it("updates SSH executable path setting", async () => {
+it("opens edit form in a dialog", async () => {
   const user = userEvent.setup();
   render(<SshTunnelsPanel />);
 
-  const input = await screen.findByLabelText("SSH 程序路径");
-  await user.clear(input);
-  await user.type(input, "D:\\Git\\usr\\bin\\ssh.exe");
-  await user.click(screen.getByRole("button", { name: "保存 SSH 路径" }));
+  const stoppedRow = await screen.findByRole("row", { name: /QNX调试/ });
+  await user.click(within(stoppedRow).getByRole("button", { name: "编辑" }));
 
-  const api = await import("../../lib/api");
-  expect(api.updateSshTunnelSettings).toHaveBeenCalledWith({
-    sshExecutablePath: "D:\\Git\\usr\\bin\\ssh.exe",
-  });
+  const dialog = screen.getByRole("dialog", { name: "编辑隧道" });
+  expect(within(dialog).getByLabelText("隧道名称")).toHaveValue("QNX调试");
+  expect(screen.getByRole("table", { name: "SSH 隧道列表" })).toBeInTheDocument();
 });
 
 it("shows error details", async () => {

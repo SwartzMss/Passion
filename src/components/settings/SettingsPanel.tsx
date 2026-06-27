@@ -1,16 +1,20 @@
+import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
 import {
   getAiSettings,
   getSettings,
+  getSshTunnelSettings,
   testAiConnection,
   updateAiSettings,
   updateSettings,
+  updateSshTunnelSettings,
 } from "../../lib/api";
-import type { AiSettings, Settings } from "../../types";
+import type { AiSettings, Settings, SshTunnelSettings } from "../../types";
 
 export function SettingsPanel() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
+  const [sshSettings, setSshSettings] = useState<SshTunnelSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aiFeedback, setAiFeedback] = useState<{
     type: "success" | "error";
@@ -24,6 +28,9 @@ export function SettingsPanel() {
       .catch((err) => setError(readError(err)));
     getAiSettings()
       .then(setAiSettings)
+      .catch((err) => setError(readError(err)));
+    getSshTunnelSettings()
+      .then(setSshSettings)
       .catch((err) => setError(readError(err)));
   }, []);
 
@@ -74,7 +81,30 @@ export function SettingsPanel() {
     }
   }
 
-  if (!settings || !aiSettings) {
+  async function chooseSshExecutable() {
+    const selected = await open({ directory: false, multiple: false });
+    if (typeof selected === "string") {
+      setSshSettings({ sshExecutablePath: selected });
+    }
+  }
+
+  async function saveSshSettings() {
+    if (!sshSettings) {
+      return;
+    }
+    setError(null);
+    try {
+      setSshSettings(
+        await updateSshTunnelSettings({
+          sshExecutablePath: sshSettings.sshExecutablePath?.trim() || null,
+        }),
+      );
+    } catch (err) {
+      setError(readError(err));
+    }
+  }
+
+  if (!settings || !aiSettings || !sshSettings) {
     return <p>正在加载设置...</p>;
   }
 
@@ -82,7 +112,7 @@ export function SettingsPanel() {
     <section className="settings-panel">
       <div className="settings-hero">
         <h1>设置</h1>
-        <p>管理应用启动和 AI 翻译配置。</p>
+        <p>管理应用启动、AI 翻译和 SSH 工具配置。</p>
       </div>
       {error ? (
         <p className="error" role="alert">
@@ -178,6 +208,47 @@ export function SettingsPanel() {
             </button>
             <button className="primary-action" onClick={saveAiSettings}>
               保存 AI 设置
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="settings-card">
+        <div className="settings-card-header">
+          <span className="settings-card-icon" aria-hidden="true">⌘</span>
+          <div>
+            <h2>SSH 隧道设置</h2>
+            <p>配置 ssh.exe 路径，用于启动本地端口转发隧道。</p>
+          </div>
+        </div>
+
+        <label className="settings-field-row">
+          <span>SSH 程序路径</span>
+          <span className="settings-path-field">
+            <input
+              aria-label="SSH 程序路径"
+              placeholder="未配置时自动检测 PATH 中的 ssh.exe"
+              value={sshSettings.sshExecutablePath ?? ""}
+              onChange={(event) =>
+                setSshSettings({
+                  ...sshSettings,
+                  sshExecutablePath: event.target.value,
+                })
+              }
+            />
+            <button type="button" onClick={chooseSshExecutable}>
+              选择 SSH 程序
+            </button>
+          </span>
+        </label>
+
+        <div className="ai-settings-actions">
+          <span className="settings-muted">
+            留空时启动隧道会自动查找 PATH 中的 ssh.exe。
+          </span>
+          <div className="ai-settings-buttons">
+            <button className="primary-action" onClick={saveSshSettings}>
+              保存 SSH 设置
             </button>
           </div>
         </div>

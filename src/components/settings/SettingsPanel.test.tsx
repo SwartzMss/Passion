@@ -13,9 +13,17 @@ vi.mock("../../lib/api", () => ({
     model: "qwen2.5:7b",
     apiKey: "",
   })),
+  getSshTunnelSettings: vi.fn(async () => ({
+    sshExecutablePath: "C:\\Windows\\System32\\OpenSSH\\ssh.exe",
+  })),
   updateSettings: vi.fn(async (settings) => settings),
   updateAiSettings: vi.fn(async (settings) => settings),
+  updateSshTunnelSettings: vi.fn(async (settings) => settings),
   testAiConnection: vi.fn(async () => undefined),
+}));
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: vi.fn(async () => "D:\\Git\\usr\\bin\\ssh.exe"),
 }));
 
 beforeEach(() => {
@@ -53,6 +61,34 @@ it("loads and saves ai translation settings", async () => {
     model: "deepseek-r1",
     apiKey: "",
   });
+});
+
+it("loads and saves ssh executable settings", async () => {
+  const user = userEvent.setup();
+  render(<SettingsPanel />);
+
+  const sshInput = await screen.findByLabelText("SSH 程序路径");
+  expect(sshInput).toHaveValue("C:\\Windows\\System32\\OpenSSH\\ssh.exe");
+
+  await user.clear(sshInput);
+  await user.type(sshInput, "D:\\Git\\usr\\bin\\ssh.exe");
+  await user.click(screen.getByRole("button", { name: "保存 SSH 设置" }));
+
+  const api = await import("../../lib/api");
+  expect(api.updateSshTunnelSettings).toHaveBeenCalledWith({
+    sshExecutablePath: "D:\\Git\\usr\\bin\\ssh.exe",
+  });
+});
+
+it("can choose ssh executable from settings", async () => {
+  const user = userEvent.setup();
+  render(<SettingsPanel />);
+
+  await user.click(await screen.findByRole("button", { name: "选择 SSH 程序" }));
+
+  expect(screen.getByLabelText("SSH 程序路径")).toHaveValue(
+    "D:\\Git\\usr\\bin\\ssh.exe",
+  );
 });
 
 it("can test ai connection", async () => {
