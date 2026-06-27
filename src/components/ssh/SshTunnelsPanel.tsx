@@ -50,8 +50,8 @@ export function SshTunnelsPanel() {
   const counts = useMemo(
     () => ({
       all: tunnels.length,
-      running: tunnels.filter((tunnel) => tunnel.status === "running").length,
-      stopped: tunnels.filter((tunnel) => tunnel.status === "stopped").length,
+      running: tunnels.filter((tunnel) => visualStatus(tunnel.status) === "running").length,
+      stopped: tunnels.filter((tunnel) => visualStatus(tunnel.status) === "stopped").length,
     }),
     [tunnels],
   );
@@ -59,7 +59,7 @@ export function SshTunnelsPanel() {
   const visibleTunnels = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return tunnels.filter((tunnel) => {
-      if (filter !== "all" && tunnel.status !== filter) {
+      if (filter !== "all" && visualStatus(tunnel.status) !== filter) {
         return false;
       }
       if (!normalizedQuery) {
@@ -394,7 +394,7 @@ function SshTunnelRow({
       <td className="ssh-text-cell" title={remoteTarget}>{remoteTarget}</td>
       <td className="ssh-text-cell" title={tunnel.username}>{tunnel.username}</td>
       <td>
-        <span className={`ssh-status ${tunnel.status}`}>
+        <span className={`ssh-status ${visualStatus(tunnel.status)}`}>
           {statusLabel(tunnel.status)}
         </span>
       </td>
@@ -417,9 +417,6 @@ function SshTunnelNameCell({ tunnel }: { tunnel: SshTunnelInfo }) {
     <div className="ssh-name-cell" title={tunnel.name}>
       <strong>{tunnel.name}</strong>
       {tunnel.description ? <small>{tunnel.description}</small> : null}
-      {tunnel.errorMessage ? (
-        <small className="ssh-error-detail">{tunnel.errorMessage}</small>
-      ) : null}
     </div>
   );
 }
@@ -441,7 +438,7 @@ function SshTunnelActions({
 }) {
   const isRunning = status === "running";
   const isStarting = status === "starting";
-  const mainLabel = isRunning ? "停止" : isStarting ? "取消" : status === "error" ? "重启" : "启动";
+  const mainLabel = isRunning ? "停止" : isStarting ? "取消" : "启动";
   const mainAction = isRunning || isStarting ? onStop : onStart;
   const lockMutatingActions = isRunning || isStarting;
 
@@ -534,16 +531,11 @@ function validatePort(value: string, label: string) {
 }
 
 function statusLabel(status: SshTunnelStatus) {
-  switch (status) {
-    case "running":
-      return "运行中";
-    case "starting":
-      return "启动中";
-    case "error":
-      return "异常";
-    case "stopped":
-      return "已停止";
-  }
+  return visualStatus(status) === "running" ? "运行中" : "已停止";
+}
+
+function visualStatus(status: SshTunnelStatus): "running" | "stopped" {
+  return status === "running" || status === "starting" ? "running" : "stopped";
 }
 
 function readError(err: unknown) {

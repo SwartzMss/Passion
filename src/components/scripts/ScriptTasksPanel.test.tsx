@@ -84,9 +84,9 @@ it("loads and shows script tasks", async () => {
   expect(screen.getByRole("button", { name: "新增任务" })).toBeInTheDocument();
   expect(await screen.findByRole("button", { name: "全部 4" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "运行中 1" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "等待执行 1" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "等待执行 2" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "已停用 1" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "失败 1" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /失败/ })).not.toBeInTheDocument();
   expect(screen.queryByLabelText("脚本任务详情")).not.toBeInTheDocument();
   expect(screen.getByRole("table", { name: "脚本任务列表" })).toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "任务名" })).toBeInTheDocument();
@@ -98,7 +98,8 @@ it("loads and shows script tasks", async () => {
   expect(screen.getAllByText("C:\\tasks\\backup.ps1").length).toBeGreaterThan(0);
   expect(screen.getAllByText("每 15 分钟").length).toBeGreaterThan(0);
   expect(screen.queryByText("下次执行：需要后端")).not.toBeInTheDocument();
-  expect(screen.getByText("总任务: 4 | 运行中: 1 | 等待执行: 1 | 已停用: 1 | 失败: 1")).toBeInTheDocument();
+  expect(screen.getByText("总任务: 4 | 运行中: 1 | 等待执行: 2 | 已停用: 1")).toBeInTheDocument();
+  expect(screen.queryByText(/失败: 1/)).not.toBeInTheDocument();
 
   await user.type(screen.getByPlaceholderText("搜索任务名称或执行命令"), "report");
   expect(screen.queryByText("备份")).not.toBeInTheDocument();
@@ -112,10 +113,13 @@ it("filters script tasks by status", async () => {
   expect(screen.getByText("生成报表")).toBeInTheDocument();
   expect(screen.getByText("备份")).toBeInTheDocument();
 
-  await user.click(screen.getByRole("button", { name: "失败 1" }));
+  await user.click(screen.getByRole("button", { name: "等待执行 2" }));
 
   expect(screen.getByText("检查更新")).toBeInTheDocument();
   expect(screen.queryByText("生成报表")).not.toBeInTheDocument();
+  const failedRow = screen.getByRole("row", { name: /检查更新/ });
+  expect(within(failedRow).getByText("等待执行")).toBeInTheDocument();
+  expect(screen.queryByText("失败")).not.toBeInTheDocument();
   expect(screen.getByText("exit code 1")).toBeInTheDocument();
 });
 

@@ -9,6 +9,9 @@ it("shows one utility tab at a time", async () => {
 
   expect(screen.getByRole("tab", { name: "Base64" })).toHaveAttribute("aria-selected", "true");
   expect(screen.getByLabelText("Base64 输入")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Base64" })).not.toBeInTheDocument();
+  expect(screen.queryByText("文本和 Base64 内容互相转换。")).not.toBeInTheDocument();
+  expect(screen.queryByText("UTF-8")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("Hex 输入")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("时间戳输入")).not.toBeInTheDocument();
 
@@ -16,12 +19,18 @@ it("shows one utility tab at a time", async () => {
 
   expect(screen.getByRole("tab", { name: "Hex" })).toHaveAttribute("aria-selected", "true");
   expect(screen.getByLabelText("Hex 输入")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Hex" })).not.toBeInTheDocument();
+  expect(screen.queryByText("文本和十六进制字节互相转换。")).not.toBeInTheDocument();
+  expect(screen.queryByText("UTF-8")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("Base64 输入")).not.toBeInTheDocument();
 
   await user.click(screen.getByRole("tab", { name: "时间戳" }));
 
   expect(screen.getByRole("tab", { name: "时间戳" })).toHaveAttribute("aria-selected", "true");
   expect(screen.getByLabelText("时间戳输入")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "时间戳转换" })).not.toBeInTheDocument();
+  expect(screen.queryByText("自动识别秒级和毫秒级时间戳。")).not.toBeInTheDocument();
+  expect(screen.queryByText("Local / ISO")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("Hex 输入")).not.toBeInTheDocument();
 });
 

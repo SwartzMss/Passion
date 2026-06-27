@@ -228,6 +228,7 @@ main {
 }
 
 .app-main-reminders,
+.app-main-ssh,
 .app-main-download,
 .app-main-scripts {
   overflow: hidden;
@@ -1444,39 +1445,6 @@ main {
 
 .utility-card-wide {
   grid-column: 1 / -1;
-}
-
-.utility-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.utility-card-header h2,
-.utility-card-header p {
-  margin: 0;
-}
-
-.utility-card-header h2 {
-  color: #172033;
-  font-size: 18px;
-}
-
-.utility-card-header p {
-  margin-top: 4px;
-  color: #667085;
-  font-size: 13px;
-}
-
-.utility-card-header > span {
-  border-radius: 999px;
-  background: #eef3fb;
-  padding: 5px 9px;
-  color: #475467;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
 }
 
 .utility-textarea-grid {
@@ -3259,16 +3227,6 @@ main {
   content: "";
 }
 
-.script-filter-icon.failed {
-  color: #ef4444;
-}
-
-.script-filter-icon.failed::before {
-  content: "×";
-  font-size: 16px;
-  line-height: 1;
-}
-
 .script-open-create-button {
   display: inline-flex;
   align-items: center;
@@ -4208,8 +4166,12 @@ main {
 
 .ssh-panel {
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 18px;
+  height: 100%;
+  min-height: 0;
   max-width: 980px;
+  overflow: hidden;
 }
 
 .ssh-hero {
@@ -4410,11 +4372,11 @@ main {
 
 .ssh-table-shell {
   margin: 0;
+  min-height: 0;
   overflow-x: hidden;
-  overflow-y: hidden;
+  overflow-y: auto;
   border: 0;
   border-radius: 0;
-  align-self: start;
   padding: 0 24px;
 }
 
@@ -4528,11 +4490,6 @@ main {
   color: #56657a;
 }
 
-.ssh-status.error {
-  background: #fee2e2;
-  color: var(--danger);
-}
-
 .ssh-row-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(38px, 1fr));
@@ -4617,12 +4574,6 @@ main {
 .ssh-table-summary span {
   margin: 0 10px;
   color: #98a2b3;
-}
-
-.ssh-error-detail {
-  color: var(--danger);
-  max-width: 420px;
-  overflow-wrap: anywhere;
 }
 
 .error {

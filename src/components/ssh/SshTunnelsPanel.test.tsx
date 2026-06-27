@@ -74,7 +74,7 @@ it("loads and shows SSH tunnels", async () => {
   expect(screen.getByText("通过 SSH 端口转发访问远程设备和服务。")).toBeInTheDocument();
   expect(await screen.findByRole("button", { name: /全部\s*3/ })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /运行中\s*1/ })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /已停止\s*1/ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /已停止\s*2/ })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /异常/ })).not.toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "隧道列表" })).toBeInTheDocument();
   expect(screen.getByRole("table", { name: "SSH 隧道列表" })).toBeInTheDocument();
@@ -82,7 +82,7 @@ it("loads and shows SSH tunnels", async () => {
   expect(document.querySelector(".ssh-col-actions")).toBeInTheDocument();
   expect(screen.getByText(/共 3 条/)).toBeInTheDocument();
   expect(screen.getByText(/运行中: 1/)).toBeInTheDocument();
-  expect(screen.getByText(/已停止: 1/)).toBeInTheDocument();
+  expect(screen.getByText(/已停止: 2/)).toBeInTheDocument();
   expect(screen.queryByText(/异常: 1/)).not.toBeInTheDocument();
   expect(screen.getByText("⌕")).toBeInTheDocument();
   expect(screen.queryByLabelText("SSH 程序路径")).not.toBeInTheDocument();
@@ -119,7 +119,9 @@ it("starts, stops, restarts, and deletes tunnels", async () => {
   await user.click(within(runningRow).getByRole("button", { name: "停止" }));
 
   const errorRow = screen.getByRole("row", { name: /失败隧道/ });
-  await user.click(within(errorRow).getByRole("button", { name: "重启" }));
+  expect(within(errorRow).getByText("已停止")).toBeInTheDocument();
+  expect(within(errorRow).queryByText("异常")).not.toBeInTheDocument();
+  await user.click(within(errorRow).getByRole("button", { name: "启动" }));
   await user.click(within(errorRow).getByRole("button", { name: "删除" }));
 
   const api = await import("../../lib/api");
@@ -184,8 +186,10 @@ it("opens edit form in a dialog", async () => {
   expect(screen.getByRole("table", { name: "SSH 隧道列表" })).toBeInTheDocument();
 });
 
-it("shows error details", async () => {
+it("hides tunnel error details in the list", async () => {
   render(<SshTunnelsPanel />);
 
-  expect(await screen.findByText("Permission denied (publickey).")).toBeInTheDocument();
+  await screen.findByText("失败隧道");
+
+  expect(screen.queryByText("Permission denied (publickey).")).not.toBeInTheDocument();
 });

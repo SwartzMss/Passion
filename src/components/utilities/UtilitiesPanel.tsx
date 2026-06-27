@@ -137,13 +137,6 @@ export function UtilitiesPanel() {
           id="utility-panel-base64"
           aria-labelledby="utility-tab-base64"
         >
-          <div className="utility-card-header">
-            <div>
-              <h2>Base64</h2>
-              <p>文本和 Base64 内容互相转换。</p>
-            </div>
-            <span>UTF-8</span>
-          </div>
           <UtilityTextareas
             inputLabel="Base64 输入"
             inputPlaceholder="输入原文或 Base64 内容"
@@ -185,13 +178,6 @@ export function UtilitiesPanel() {
           id="utility-panel-hex"
           aria-labelledby="utility-tab-hex"
         >
-          <div className="utility-card-header">
-            <div>
-              <h2>Hex</h2>
-              <p>文本和十六进制字节互相转换。</p>
-            </div>
-            <span>UTF-8</span>
-          </div>
           <UtilityTextareas
             inputLabel="Hex 输入"
             inputPlaceholder="输入文本或 Hex，例如：48 69"
@@ -233,13 +219,6 @@ export function UtilitiesPanel() {
           id="utility-panel-timestamp"
           aria-labelledby="utility-tab-timestamp"
         >
-          <div className="utility-card-header">
-            <div>
-              <h2>时间戳转换</h2>
-              <p>自动识别秒级和毫秒级时间戳。</p>
-            </div>
-            <span>Local / ISO</span>
-          </div>
           <div className="timestamp-tool">
             <label className="field-label">
               时间戳输入

@@ -18,7 +18,7 @@ const WEEKDAYS = [
   { value: 7, label: "周日" },
 ];
 
-type ScriptFilter = "all" | "running" | "waiting" | "disabled" | "failed";
+type ScriptFilter = "all" | "running" | "waiting" | "disabled";
 
 export function ScriptTasksPanel() {
   const [tasks, setTasks] = useState<ScriptTask[]>([]);
@@ -47,7 +47,6 @@ export function ScriptTasksPanel() {
   const runningTasks = useMemo(() => tasks.filter(isRunningTask), [tasks]);
   const waitingTasks = useMemo(() => tasks.filter(isWaitingTask), [tasks]);
   const disabledTasks = useMemo(() => tasks.filter((task) => !task.enabled), [tasks]);
-  const failedTasks = useMemo(() => tasks.filter(isFailedTask), [tasks]);
   const visibleTasks = useMemo(() => {
     const trimmedQuery = query.trim().toLowerCase();
     const filteredByStatus = tasks.filter((task) => {
@@ -58,8 +57,6 @@ export function ScriptTasksPanel() {
           return isWaitingTask(task);
         case "disabled":
           return !task.enabled;
-        case "failed":
-          return isFailedTask(task);
         case "all":
           return true;
       }
@@ -92,12 +89,10 @@ export function ScriptTasksPanel() {
         return "当前没有等待执行的脚本。";
       case "disabled":
         return "当前没有已停用的脚本。";
-      case "failed":
-        return "当前没有失败的脚本。";
     }
   })();
 
-  const footerSummary = `总任务: ${tasks.length} | 运行中: ${runningTasks.length} | 等待执行: ${waitingTasks.length} | 已停用: ${disabledTasks.length} | 失败: ${failedTasks.length}`;
+  const footerSummary = `总任务: ${tasks.length} | 运行中: ${runningTasks.length} | 等待执行: ${waitingTasks.length} | 已停用: ${disabledTasks.length}`;
 
   async function createTask() {
     const trimmedName = name.trim();
@@ -233,12 +228,6 @@ export function ScriptTasksPanel() {
             count={disabledTasks.length}
             label="已停用"
             onClick={() => setActiveFilter("disabled")}
-          />
-          <FilterButton
-            active={activeFilter === "failed"}
-            count={failedTasks.length}
-            label="失败"
-            onClick={() => setActiveFilter("failed")}
           />
         </div>
         <input
@@ -525,8 +514,6 @@ function labelToFilterIcon(label: string) {
       return "waiting";
     case "已停用":
       return "disabled";
-    case "失败":
-      return "failed";
     default:
       return "all";
   }
@@ -634,9 +621,6 @@ function scriptTaskStatus(task: ScriptTask) {
   if (task.lastStartedAt && !task.lastFinishedAt) {
     return "running";
   }
-  if (isFailedTask(task)) {
-    return "failed";
-  }
   return "waiting";
 }
 
@@ -648,8 +632,6 @@ function scriptTaskStatusLabel(task: ScriptTask) {
       return "等待执行";
     case "disabled":
       return "已停用";
-    case "failed":
-      return "失败";
   }
 }
 
@@ -657,19 +639,8 @@ function isRunningTask(task: ScriptTask) {
   return Boolean(task.enabled && task.lastStartedAt && !task.lastFinishedAt);
 }
 
-function isFailedTask(task: ScriptTask) {
-  return Boolean(
-    task.enabled &&
-      !isRunningTask(task) &&
-      (task.lastError ||
-        (task.lastExitCode !== null &&
-          task.lastExitCode !== undefined &&
-          task.lastExitCode !== 0)),
-  );
-}
-
 function isWaitingTask(task: ScriptTask) {
-  return Boolean(task.enabled && !isRunningTask(task) && !isFailedTask(task));
+  return Boolean(task.enabled && !isRunningTask(task));
 }
 
 function scheduleLabel(task: ScriptTask) {
