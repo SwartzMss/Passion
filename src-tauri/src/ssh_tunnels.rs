@@ -5,8 +5,6 @@ use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use std::collections::HashMap;
 use std::net::TcpListener;
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
@@ -683,18 +681,27 @@ pub fn is_port_available(bind_address: &str, port: u16) -> bool {
 }
 
 fn background_ssh_command(ssh_executable_path: &Path) -> TokioCommand {
+    background_process_command(ssh_executable_path)
+}
+
+fn background_process_command(program: impl AsRef<Path>) -> TokioCommand {
     #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
-    let mut command = TokioCommand::new(ssh_executable_path);
+    let mut command = TokioCommand::new(program.as_ref());
     #[cfg(target_os = "windows")]
     {
-        command.creation_flags(0x08000000);
+        command.creation_flags(background_process_creation_flags());
     }
     command
 }
 
+#[cfg(target_os = "windows")]
+fn background_process_creation_flags() -> u32 {
+    0x08000000
+}
+
 async fn kill_process_tree(pid: u32) -> BackendResult<()> {
     let (program, args) = kill_process_tree_command(pid);
-    let output = TokioCommand::new(program)
+    let output = background_process_command(program)
         .args(args)
         .output()
         .await
@@ -921,5 +928,11 @@ mod tests {
                 ]
             )
         );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_background_commands_use_no_window_flag() {
+        assert_eq!(background_process_creation_flags(), 0x08000000);
     }
 }
