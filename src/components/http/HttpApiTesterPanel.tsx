@@ -78,8 +78,8 @@ export function HttpApiTesterPanel() {
     <section className="http-panel">
       <header className="http-hero">
         <div>
-          <h1>HTTP 接口测试</h1>
-          <p>轻量级 HTTP 接口测试工具，支持 GET、POST、PUT、PATCH、DELETE 等常见请求。</p>
+          <h1>接口测试</h1>
+          <p>轻量级接口测试工具，支持 GET、POST、PUT、PATCH、DELETE 等常见请求。</p>
         </div>
       </header>
 

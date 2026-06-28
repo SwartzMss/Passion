@@ -229,6 +229,7 @@ main {
 
 .app-main-reminders,
 .app-main-ssh,
+.app-main-http,
 .app-main-download,
 .app-main-scripts {
   overflow: hidden;
@@ -1340,10 +1341,12 @@ main {
 
 .http-panel {
   display: grid;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 14px;
   min-width: 0;
+  height: 100%;
   min-height: 100%;
+  overflow: hidden;
 }
 
 .http-hero {

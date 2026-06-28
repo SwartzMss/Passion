@@ -55,7 +55,7 @@ const NAV_ITEMS: Array<{ view: View; label: string; icon: NavIcon }> = [
   { view: "translation", label: "翻译", icon: "language" },
   { view: "network", label: "网络检测", icon: "globe" },
   { view: "ssh", label: "SSH 隧道", icon: "terminal" },
-  { view: "http", label: "HTTP 接口测试", icon: "api" },
+  { view: "http", label: "接口测试", icon: "api" },
   { view: "download", label: "下载工具", icon: "download" },
   { view: "scripts", label: "脚本任务", icon: "code" },
   { view: "utilities", label: "实用工具", icon: "toolbox" },

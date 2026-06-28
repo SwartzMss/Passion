@@ -18,8 +18,8 @@ vi.mock("../../lib/api", () => ({
 it("renders the lightweight http api tester", () => {
   render(<HttpApiTesterPanel />);
 
-  expect(screen.getByRole("heading", { name: "HTTP 接口测试" })).toBeInTheDocument();
-  expect(screen.getByText("轻量级 HTTP 接口测试工具，支持 GET、POST、PUT、PATCH、DELETE 等常见请求。")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "接口测试" })).toBeInTheDocument();
+  expect(screen.getByText("轻量级接口测试工具，支持 GET、POST、PUT、PATCH、DELETE 等常见请求。")).toBeInTheDocument();
   expect(screen.getByLabelText("请求方法")).toHaveValue("GET");
   expect(screen.getByLabelText("请求地址")).toHaveValue("https://api.github.com/users/octocat");
   expect(screen.getByRole("tab", { name: "Headers" })).toHaveAttribute("aria-selected", "true");

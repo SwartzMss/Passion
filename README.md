@@ -50,7 +50,7 @@ Passion 是一个 Windows 桌面个人助理应用，基于 Tauri + React 构建
 - 启动前检查本地端口占用和私钥文件是否存在。
 - 关键操作和异常会写入 `passion.log`，便于定位 SSH 路径、端口占用、私钥、认证和进程退出问题。
 
-### HTTP 接口测试
+### 接口测试
 
 - 支持 GET、POST、PUT、PATCH、DELETE 常见 HTTP 方法。
 - 支持配置请求 URL、Headers、Query 参数和 Body。
