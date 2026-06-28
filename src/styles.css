@@ -1376,12 +1376,12 @@ main {
 .http-request-bar {
   display: grid;
   grid-template-columns: minmax(96px, 0.18fr) minmax(0, 1fr) minmax(88px, 0.18fr) minmax(78px, 0.15fr);
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   border: 1px solid #e0e5ee;
   border-radius: 10px;
   background: #ffffff;
-  padding: 12px;
+  padding: 10px;
   box-shadow: 0 10px 26px rgba(16, 24, 40, 0.05);
 }
 
@@ -1390,12 +1390,13 @@ main {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  min-height: 38px;
+  min-height: 34px;
   border: 1px solid #d8deea;
   border-radius: 8px;
   background: #ffffff;
-  padding: 0 11px;
+  padding: 0 10px;
   color: #172033;
+  font-size: 13px;
 }
 
 .http-method-select {
@@ -1409,8 +1410,10 @@ main {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-height: 38px;
+  min-height: 34px;
   border-radius: 8px;
+  padding: 7px 11px;
+  font-size: 13px;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -1439,19 +1442,20 @@ main {
   display: flex;
   align-items: end;
   gap: 24px;
-  min-height: 46px;
+  min-height: 40px;
   border-bottom: 1px solid #e5e9f2;
   padding: 0 18px;
 }
 
 .http-tabs button {
-  height: 46px;
+  height: 40px;
   border: 0;
   border-bottom: 3px solid transparent;
   border-radius: 0;
   background: transparent;
   padding: 0 2px;
   color: #172033;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -1462,8 +1466,8 @@ main {
 
 .http-pair-panel {
   display: grid;
-  gap: 10px;
-  padding: 14px 18px 16px;
+  gap: 8px;
+  padding: 12px 16px 14px;
 }
 
 .http-pair-table {
@@ -1473,13 +1477,13 @@ main {
   overflow: hidden;
   border: 1px solid #e0e5ee;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .http-pair-table th,
 .http-pair-table td {
   border-bottom: 1px solid #e5e9f2;
-  padding: 8px 10px;
+  padding: 6px 9px;
   text-align: left;
 }
 
@@ -1510,8 +1514,9 @@ main {
   min-width: 0;
   border: 0;
   background: transparent;
-  padding: 5px 4px;
+  padding: 4px 3px;
   color: #172033;
+  font-size: 12px;
 }
 
 .http-pair-table input[type="checkbox"] {
@@ -1529,8 +1534,8 @@ main {
 .http-row-actions button {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   border: 1px solid transparent;
   background: transparent;
   padding: 0;
@@ -1543,8 +1548,8 @@ main {
 }
 
 .http-row-actions svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .http-row-actions path {
@@ -1565,6 +1570,7 @@ main {
   background: transparent;
   padding: 4px 0;
   color: #155eef;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -1601,15 +1607,15 @@ main {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  min-height: 50px;
+  min-height: 44px;
   border-bottom: 1px solid #e5e9f2;
-  padding: 10px 18px;
+  padding: 8px 16px;
 }
 
 .http-response-header h2 {
   margin: 0;
   color: #172033;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .http-response-meta {
@@ -1619,7 +1625,7 @@ main {
   min-width: 0;
   overflow: hidden;
   color: #52617a;
-  font-size: 12px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -1633,10 +1639,10 @@ main {
 }
 
 .http-response-tools button {
-  min-height: 32px;
-  padding: 6px 11px;
+  min-height: 30px;
+  padding: 5px 10px;
   color: #344054;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -1649,11 +1655,11 @@ main {
 .http-code-view pre {
   margin: 0;
   min-height: 100%;
-  padding: 12px 18px;
+  padding: 10px 16px;
   color: #155eef;
   font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 13px;
-  line-height: 1.65;
+  font-size: 12px;
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
 }
