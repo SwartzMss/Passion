@@ -2034,9 +2034,9 @@ main {
 .diagnostics-card {
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: 0;
   min-width: 0;
-  padding: 14px;
+  padding: 18px 24px;
   border: 1px solid #e0e5ee;
   border-radius: 10px;
   background: #ffffff;
@@ -2054,7 +2054,7 @@ main {
 }
 
 .diagnostics-card-wide {
-  max-width: 760px;
+  max-width: none;
 }
 
 .diagnostics-card h3 {
@@ -2067,20 +2067,6 @@ main {
   margin: 0;
   color: #172033;
   font-size: 14px;
-}
-
-.diagnostics-card-header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.diagnostics-card-header p {
-  margin: 8px 0 0;
-  color: #667085;
-  font-size: 12px;
-  line-height: 1.45;
 }
 
 .diagnostics-field-row {
@@ -2102,44 +2088,96 @@ main {
   min-height: 45px;
 }
 
-.diagnostics-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 999px;
-  padding: 5px 9px;
-  background: #edf1f7;
-  color: #475467;
-  font-size: 12px;
-  font-weight: 700;
+.occupancy-panel {
+  padding-top: 18px;
+}
+
+.occupancy-panel .diagnostics-inline-action {
+  grid-template-columns: minmax(180px, 0.46fr) minmax(132px, 0.24fr) minmax(0, 1fr);
+  align-items: end;
+  padding: 0 0 16px;
+}
+
+.occupancy-panel .diagnostics-inline-action .field-label {
+  grid-column: 1;
+}
+
+.occupancy-panel .diagnostics-inline-action .diagnostics-button {
+  grid-column: 2;
+  min-height: 38px;
+  padding-inline: 14px;
   white-space: nowrap;
 }
 
-.diagnostics-status span {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: currentColor;
+.occupancy-panel .diagnostics-inline-action input {
+  min-height: 38px;
+  border: 1px solid #d8deea;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 13px;
 }
 
-.diagnostics-status.success {
-  background: #dcfae6;
-  color: #067647;
+.port-check-toolbar {
+  display: grid;
+  align-items: end;
+  gap: 8px;
+  min-width: 0;
+  padding: 18px 0;
 }
 
-.diagnostics-status.failure {
-  background: #fee4e2;
-  color: #b42318;
+.port-check-toolbar.single {
+  grid-template-columns: minmax(210px, 1fr) minmax(120px, 0.44fr) minmax(118px, 0.34fr);
 }
 
-.diagnostics-status.idle {
-  background: #eef3fb;
-  color: #475467;
+.port-check-toolbar.range {
+  grid-template-columns: minmax(180px, 1fr) minmax(86px, 0.4fr) minmax(86px, 0.4fr) minmax(118px, 0.34fr);
 }
 
-.diagnostics-status.running {
-  background: #dbeafe;
-  color: #1d4ed8;
+.port-check-toolbar .diagnostics-button {
+  min-height: 38px;
+  padding-inline: 12px;
+  white-space: nowrap;
+}
+
+.port-check-toolbar > .field-label > input {
+  min-height: 38px;
+  border: 1px solid #d8deea;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.port-mode-toggle {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(72px, 1fr));
+  min-width: 0;
+  height: 38px;
+  border: 1px solid #d8deea;
+  border-radius: 9px;
+  background: #ffffff;
+  padding: 3px;
+}
+
+.port-mode-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #344054;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.port-mode-toggle button[aria-pressed="true"] {
+  border: 1px solid #bcd2ff;
+  background: #eef4ff;
+  color: #155eef;
+  box-shadow: inset 0 0 0 1px rgba(21, 94, 239, 0.06);
 }
 
 .diagnostics-button {
@@ -2174,6 +2212,17 @@ main {
   box-shadow: 0 8px 18px rgba(22, 163, 74, 0.22);
 }
 
+.diagnostics-button.secondary {
+  border-color: #d0d5dd;
+  background: #ffffff;
+  color: #172033;
+}
+
+.diagnostics-button.secondary:hover:not(:disabled) {
+  background: #f7f9fc;
+  box-shadow: 0 8px 18px rgba(16, 24, 40, 0.12);
+}
+
 .diagnostics-button span {
   font-size: 16px;
   line-height: 1;
@@ -2186,9 +2235,13 @@ main {
   font-size: 12px;
 }
 
+.field-hint.warning {
+  color: #c2410c;
+}
+
 .diagnostics-divider {
   height: 1px;
-  margin-top: 4px;
+  margin: 0 -24px 20px;
   background: #e5e9f2;
 }
 
@@ -2216,6 +2269,202 @@ main {
 
 .diagnostics-result p {
   margin: 0;
+}
+
+.network-input-with-icon {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid #d8deea;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 0 10px;
+}
+
+.network-input-with-icon > span {
+  color: #667085;
+  font-size: 18px;
+}
+
+.network-input-with-icon input {
+  border: 0;
+  min-height: 34px;
+  padding: 0;
+}
+
+.network-input-with-icon input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.network-input-with-icon button {
+  border: 0;
+  background: transparent;
+  color: #667085;
+  padding: 4px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.port-check-result-panel {
+  display: grid;
+  gap: 18px;
+  border: 1px solid #d8deea;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.port-check-result-panel.success {
+  border-color: #abefc6;
+  background: #f0fdf4;
+  color: #067647;
+}
+
+.port-check-result-panel.failure {
+  border-color: #fecdca;
+  background: #fff5f5;
+  color: #b42318;
+}
+
+.port-check-result-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 22px;
+}
+
+.port-check-result-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.port-check-result-panel.failure .port-check-result-icon {
+  background: #ef4444;
+}
+
+.port-check-result-main strong {
+  color: currentColor;
+  font-size: 20px;
+}
+
+.port-check-result-main p {
+  margin-top: 6px;
+  color: #172033;
+  font-size: 14px;
+}
+
+.port-check-result-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  border-top: 1px solid rgba(102, 112, 133, 0.22);
+  padding-top: 18px;
+  color: #344054;
+  font-size: 14px;
+}
+
+.port-check-result-meta strong {
+  color: #16a34a;
+}
+
+.port-scan-panel {
+  overflow: hidden;
+  border: 1px solid #d8deea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.port-scan-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px 10px;
+  color: #52617a;
+  font-size: 14px;
+}
+
+.port-scan-summary strong {
+  color: #155eef;
+  white-space: nowrap;
+}
+
+.port-scan-progress {
+  overflow: hidden;
+  height: 8px;
+  margin: 0 18px 16px 54px;
+  border-radius: 999px;
+  background: #e9edf5;
+}
+
+.port-scan-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #155eef;
+}
+
+.port-scan-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #172033;
+  font-size: 14px;
+}
+
+.port-scan-table th,
+.port-scan-table td {
+  border-top: 1px solid #e5e9f2;
+  padding: 12px 20px;
+  text-align: left;
+}
+
+.port-scan-table th {
+  color: #52617a;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.port-scan-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  border-top: 1px solid #e5e9f2;
+  padding: 28px 16px 30px;
+  color: #667085;
+  text-align: center;
+}
+
+.port-scan-empty span {
+  color: #98a2b3;
+  font-size: 28px;
+}
+
+.port-scan-empty strong {
+  color: #172033;
+  font-size: 16px;
+}
+
+.port-scan-empty p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.open-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-right: 8px;
+  background: #16a34a;
 }
 
 .diagnostics-history {
@@ -3350,11 +3599,76 @@ main {
   padding: 16px 28px 20px;
 }
 
+.port-occupancy-result-panel {
+  display: grid;
+  gap: 16px;
+  border: 1px solid #d8deea;
+  border-radius: 8px;
+  padding: 22px;
+}
+
+.port-occupancy-result-panel.available {
+  border-color: #abefc6;
+  background: #f0fdf4;
+  color: #067647;
+}
+
+.port-occupancy-result-panel.occupied {
+  border-color: #fecdca;
+  background: #fff5f5;
+  color: #b42318;
+}
+
+.port-occupancy-result-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+
+.port-occupancy-result-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.port-occupancy-result-panel.occupied .port-occupancy-result-icon {
+  background: #ef4444;
+}
+
+.port-occupancy-result-main strong {
+  color: currentColor;
+  font-size: 17px;
+}
+
+.port-occupancy-result-main p {
+  margin: 5px 0 0;
+  color: #172033;
+  font-size: 13px;
+}
+
+.port-occupancy-list {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid rgba(102, 112, 133, 0.22);
+  padding-top: 14px;
+}
+
 .port-occupancy-row {
   display: grid;
-  gap: 4px;
-  padding-top: 8px;
-  border-top: 1px solid #e0e5ee;
+  grid-template-columns: minmax(0, 1fr) auto minmax(160px, auto);
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(180, 35, 24, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 10px 12px;
 }
 
 .port-occupancy-row p {
@@ -4285,8 +4599,14 @@ main {
   .diagnostics-grid,
   .diagnostics-field-row,
   .diagnostics-inline-action,
+  .port-check-toolbar.single,
+  .port-check-toolbar.range,
   .ssh-toolbar,
   .ssh-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .port-mode-toggle {
+    width: 100%;
   }
 }
