@@ -3,6 +3,7 @@ import "./styles.css";
 import { WindowControls } from "./components/app/WindowControls";
 import { WorkbenchHome } from "./components/dashboard/WorkbenchHome";
 import { DownloadPanel } from "./components/download/DownloadPanel";
+import { HttpApiTesterPanel } from "./components/http/HttpApiTesterPanel";
 import { NetworkDiagnosticsPanel } from "./components/network/NetworkDiagnosticsPanel";
 import { AddReminderDialog } from "./components/reminders/AddReminderDialog";
 import { ReminderList } from "./components/reminders/ReminderList";
@@ -30,6 +31,7 @@ type View =
   | "translation"
   | "network"
   | "ssh"
+  | "http"
   | "download"
   | "scripts"
   | "utilities"
@@ -41,6 +43,7 @@ type NavIcon =
   | "language"
   | "globe"
   | "terminal"
+  | "api"
   | "download"
   | "code"
   | "toolbox"
@@ -52,6 +55,7 @@ const NAV_ITEMS: Array<{ view: View; label: string; icon: NavIcon }> = [
   { view: "translation", label: "翻译", icon: "language" },
   { view: "network", label: "网络检测", icon: "globe" },
   { view: "ssh", label: "SSH 隧道", icon: "terminal" },
+  { view: "http", label: "HTTP 接口测试", icon: "api" },
   { view: "download", label: "下载工具", icon: "download" },
   { view: "scripts", label: "脚本任务", icon: "code" },
   { view: "utilities", label: "实用工具", icon: "toolbox" },
@@ -210,6 +214,9 @@ function MainApp() {
           {view === "ssh" ? (
             <SshTunnelsPanel />
           ) : null}
+          {view === "http" ? (
+            <HttpApiTesterPanel />
+          ) : null}
           {view === "download" ? (
             <DownloadPanel />
           ) : null}
@@ -280,6 +287,12 @@ function NavIcon({ name }: { name: NavIcon }) {
       "M12 3C9.8 5.4 8.8 8.4 8.8 12s1 6.6 3.2 9",
     ],
     terminal: ["m5 7 5 5-5 5", "M12 17h7"],
+    api: [
+      "M7 8h10",
+      "M7 12h6",
+      "M7 16h4",
+      "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z",
+    ],
     download: [
       "M12 4v10",
       "m8 10 4 4 4-4",

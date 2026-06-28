@@ -2,9 +2,10 @@ use crate::ai_settings::AiSettingsRepository;
 use crate::app_state::AppState;
 use crate::error::{BackendError, ErrorPayload};
 use crate::models::{
-    AiSettings, DownloadRequest, DownloadResult, NewReminder, NewScriptTask, NewSshTunnel,
-    PortCheckRequest, PortCheckResult, PortOccupancyRequest, PortOccupancyResult, Reminder,
-    ScriptTask, Settings, SshTunnelInfo, SshTunnelSettings, TranslationRequest, TranslationResult,
+    AiSettings, DownloadRequest, DownloadResult, HttpApiRequest, HttpApiResponse, NewReminder,
+    NewScriptTask, NewSshTunnel, PortCheckRequest, PortCheckResult, PortOccupancyRequest,
+    PortOccupancyResult, Reminder, ScriptTask, Settings, SshTunnelInfo, SshTunnelSettings,
+    TranslationRequest, TranslationResult,
 };
 use crate::reminders::ReminderRepository;
 use crate::script_tasks::ScriptTaskRepository;
@@ -282,6 +283,13 @@ pub async fn inspect_port_occupancy(
     input: PortOccupancyRequest,
 ) -> CommandResult<PortOccupancyResult> {
     crate::network_diagnostics::inspect_port_occupancy(input)
+        .await
+        .map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn send_http_request(input: HttpApiRequest) -> CommandResult<HttpApiResponse> {
+    crate::http_tester::send_http_request(input)
         .await
         .map_err(ErrorPayload::from)
 }

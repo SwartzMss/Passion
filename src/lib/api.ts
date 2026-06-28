@@ -3,6 +3,8 @@ import type {
   AiSettings,
   DownloadRequest,
   DownloadResult,
+  HttpApiRequest,
+  HttpApiResponse,
   NewReminder,
   NewScriptTask,
   NewSshTunnel,
@@ -81,6 +83,12 @@ export async function inspectPortOccupancy(
   input: PortOccupancyRequest,
 ): Promise<PortOccupancyResult> {
   return invoke<PortOccupancyResult>("inspect_port_occupancy", { input });
+}
+
+export async function sendHttpRequest(
+  input: HttpApiRequest,
+): Promise<HttpApiResponse> {
+  return invoke<HttpApiResponse>("send_http_request", { input });
 }
 
 export async function getSshTunnelSettings(): Promise<SshTunnelSettings> {

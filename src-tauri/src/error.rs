@@ -20,6 +20,8 @@ pub enum BackendError {
     #[error("{0}")]
     NetworkDiagnostic(String),
     #[error("{0}")]
+    HttpApi(String),
+    #[error("{0}")]
     Download(String),
     #[error("{0}")]
     ScriptTask(String),

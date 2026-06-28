@@ -184,6 +184,35 @@ pub struct PortOccupancyResult {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct HttpApiHeader {
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HttpApiRequest {
+    pub method: String,
+    pub url: String,
+    pub headers: Vec<HttpApiHeader>,
+    pub query: Vec<HttpApiHeader>,
+    pub body: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HttpApiResponse {
+    pub status: u16,
+    pub status_text: String,
+    pub elapsed_ms: u128,
+    pub size_bytes: usize,
+    pub received_at: DateTime<Utc>,
+    pub headers: Vec<HttpApiHeader>,
+    pub body: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DownloadRequest {
     pub task_id: Option<String>,
     pub url: String,

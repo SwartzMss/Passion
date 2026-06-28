@@ -5,6 +5,7 @@ mod commands;
 mod db;
 mod downloader;
 mod error;
+mod http_tester;
 mod models;
 mod network_diagnostics;
 mod reminders;
@@ -119,6 +120,7 @@ pub fn run() {
             commands::test_ai_connection,
             commands::check_port,
             commands::inspect_port_occupancy,
+            commands::send_http_request,
             commands::get_ssh_tunnel_settings,
             commands::update_ssh_tunnel_settings,
             commands::list_ssh_tunnels,

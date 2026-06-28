@@ -73,6 +73,31 @@ export interface PortOccupancyResult {
   entries: PortOccupancyEntry[];
 }
 
+export type HttpApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+export interface HttpApiPair {
+  key: string;
+  value: string;
+}
+
+export interface HttpApiRequest {
+  method: HttpApiMethod;
+  url: string;
+  headers: HttpApiPair[];
+  query: HttpApiPair[];
+  body?: string | null;
+}
+
+export interface HttpApiResponse {
+  status: number;
+  statusText: string;
+  elapsedMs: number;
+  sizeBytes: number;
+  receivedAt: string;
+  headers: HttpApiPair[];
+  body: string;
+}
+
 export interface DownloadRequest {
   taskId?: string | null;
   url: string;
