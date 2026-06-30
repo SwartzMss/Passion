@@ -655,7 +655,7 @@ main {
 }
 
 .workbench-status-icon.green {
-  background: #dcfae6;
+  background: #ecfdf3;
   color: #16a34a;
 }
 
@@ -764,7 +764,7 @@ main {
 
 .reminder-panel {
   display: grid;
-  gap: 16px;
+  gap: 14px;
   grid-template-rows: auto auto auto minmax(0, 1fr);
   height: 100%;
   min-width: 0;
@@ -774,7 +774,7 @@ main {
 
 .reminder-hero {
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .reminder-hero h1,
@@ -783,13 +783,13 @@ main {
 }
 
 .reminder-hero h1 {
-  color: #172033;
-  font-size: 24px;
+  color: #0f172a;
+  font-size: 28px;
   line-height: 1.2;
 }
 
 .reminder-hero p {
-  color: #667085;
+  color: #475569;
   font-size: 14px;
 }
 
@@ -800,42 +800,57 @@ main {
 }
 
 .reminder-filters {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  width: min(500px, 100%);
+  display: inline-grid;
+  grid-template-columns: repeat(3, minmax(96px, 1fr));
+  width: fit-content;
+  max-width: 100%;
   overflow: hidden;
-  border: 1px solid #d8deea;
-  border-radius: 12px;
+  border: 1px solid #d8e0ec;
+  border-radius: 10px;
   background: #ffffff;
+  padding: 3px;
 }
 
 .reminder-filters button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  border-color: transparent;
-  border-radius: 0;
+  gap: 8px;
+  min-height: 34px;
+  border: 0;
+  border-radius: 7px;
   background: transparent;
-  padding: 10px 16px;
-  color: #475467;
-  font-weight: 600;
+  padding: 7px 12px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .reminder-filters button:hover {
   background: #f8fafc;
-  color: #172033;
+  color: #0f172a;
 }
 
 .reminder-filters button.active {
-  border-color: transparent;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  box-shadow: inset 0 -3px 0 #12336b;
-  color: #12336b;
+  background: #eef4ff;
+  color: #2563eb;
 }
 
 .reminder-filters strong {
-  font-size: 14px;
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.reminder-filters button.active strong {
+  background: #eef4ff;
+  color: #2563eb;
 }
 
 .reminder-toolbar {
@@ -858,7 +873,7 @@ main {
   width: 18px;
   height: 18px;
   transform: translateY(-50%);
-  color: #667085;
+  color: #94a3b8;
   pointer-events: none;
 }
 
@@ -872,11 +887,19 @@ main {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  border: 1px solid #d8deea;
-  border-radius: 10px;
+  min-height: 40px;
+  border: 1px solid #d8e0ec;
+  border-radius: 8px;
   background: #ffffff;
-  padding: 12px 14px 12px 42px;
+  padding: 9px 14px 9px 42px;
+  color: #0f172a;
   font-size: 14px;
+}
+
+.reminder-search input:focus {
+  border-color: #2563eb;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .reminder-add-action {
@@ -885,9 +908,16 @@ main {
   justify-content: center;
   gap: 8px;
   min-width: 132px;
-  border-radius: 10px;
-  font-weight: 700;
+  min-height: 40px;
+  border-radius: 8px;
+  background: #111827;
+  font-size: 14px;
+  font-weight: 800;
   white-space: nowrap;
+}
+
+.reminder-add-action:hover {
+  background: #1e293b;
 }
 
 .reminder-add-action span {
@@ -909,21 +939,31 @@ main {
 
 .reminder-card {
   display: grid;
-  grid-template-rows: minmax(0, 1fr);
-  gap: 12px;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
   min-width: 0;
   min-height: 0;
-  border: 1px solid #e0e5ee;
+  border: 1px solid #d8e0ec;
   border-radius: 10px;
   background: #ffffff;
-  padding: 16px;
+  padding: 0;
   overflow: hidden;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
-.reminder-card h2 {
+.reminder-card-title {
+  display: flex;
+  align-items: center;
+  min-height: 54px;
+  border-bottom: 1px solid #e6edf5;
+  padding: 0 18px;
+}
+
+.reminder-card-title h2 {
   margin: 0;
-  color: #172033;
+  color: #0f172a;
   font-size: 16px;
+  font-weight: 800;
 }
 
 .reminder-list {
@@ -933,11 +973,12 @@ main {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid #edf1f7;
-  border-radius: 10px;
+  border: 0;
+  border-radius: 0;
 }
 
 .reminder-table-scroll {
+  position: relative;
   min-width: 0;
   min-height: 0;
   overflow: auto;
@@ -949,27 +990,28 @@ main {
   min-width: 660px;
   border-collapse: collapse;
   background: #ffffff;
+  table-layout: fixed;
 }
 
 .reminder-table th,
 .reminder-table td {
-  border-bottom: 1px solid #edf1f7;
-  padding: 14px 16px;
-  color: #344054;
+  border-bottom: 1px solid #e6edf5;
+  padding: 12px 14px;
+  color: #475569;
   font-size: 13px;
   text-align: left;
   vertical-align: middle;
 }
 
 .reminder-table th {
-  background: #ffffff;
-  color: #52617a;
+  background: #f8fafc;
+  color: #475569;
   font-size: 12px;
   font-weight: 800;
 }
 
 .reminder-table tbody tr:hover {
-  background: #f7f4ff;
+  background: #f8fafc;
 }
 
 .reminder-table tbody tr:last-child td {
@@ -986,8 +1028,9 @@ main {
 
 .reminder-name-cell strong {
   overflow: hidden;
-  color: #172033;
+  color: #0f172a;
   font-size: 14px;
+  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -997,57 +1040,63 @@ main {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  padding: 5px 10px;
+  padding: 4px 9px;
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
 }
 
 .repeat-once {
-  background: #d5f7f0;
-  color: #0f766e;
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 .repeat-daily,
 .repeat-custom {
-  background: #dbeafe;
+  background: #eef4ff;
   color: #2563eb;
 }
 
 .repeat-cn_workday {
-  background: #e7f7ed;
-  color: #15803d;
+  background: #ecfdf3;
+  color: #16a34a;
 }
 
 .priority-high {
-  background: #fee4e2;
-  color: #e11d48;
+  background: #fef2f2;
+  color: #ef4444;
 }
 
 .priority-medium {
-  background: #ffedd5;
-  color: #ea580c;
+  background: #fffbeb;
+  color: #f59e0b;
 }
 
 .priority-low {
-  background: #dcfae6;
+  background: #ecfdf3;
   color: #16a34a;
 }
 
 .reminder-table-actions {
   justify-content: flex-start;
+  gap: 8px;
 }
 
 .reminder-table-actions button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 7px;
   background: transparent;
-  padding: 5px 7px;
+  padding: 0;
   color: #2563eb;
-  font-size: 14px;
-  font-weight: 700;
+}
+
+.reminder-table-actions button:hover {
+  border-color: #d8e0ec;
+  background: #f8fafc;
 }
 
 .reminder-table-actions button svg {
@@ -1070,71 +1119,46 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border-top: 1px solid #edf1f7;
-  background: #ffffff;
-  padding: 12px 16px;
-  color: #52617a;
+  border-top: 1px solid #e6edf5;
+  background: #fbfcff;
+  padding: 10px 16px;
+  color: #475569;
   font-size: 13px;
+  font-weight: 700;
 }
 
-.reminder-table-pager {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 
-.reminder-table-pager button,
-.reminder-table-pager strong,
-.reminder-table-pager span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 30px;
-  height: 30px;
-  border-radius: 8px;
-}
-
-.reminder-table-pager strong {
-  background: #6d4aff;
-  color: #ffffff;
-}
-
-.reminder-table-pager span {
-  border: 1px solid #e0e5ee;
-  padding: 0 10px;
-}
-
-.reminder-list-empty,
-.reminder-detail-empty {
+.reminder-list-empty {
+  position: absolute;
+  inset: 39px 16px 16px;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 10px;
-  min-height: 250px;
-  border: 1px solid #e5e9f2;
+  gap: 9px;
+  min-height: 230px;
+  border: 1px dashed #d8e0ec;
   border-radius: 10px;
-  background: #ffffff;
-  color: #667085;
+  background: #f8fafc;
+  color: #475569;
   padding: 22px;
   text-align: center;
 }
 
 .reminder-list-empty h3,
-.reminder-list-empty p,
-.reminder-detail-empty h3,
-.reminder-detail-empty p {
+.reminder-list-empty p {
   margin: 0;
 }
 
-.reminder-list-empty h3,
-.reminder-detail-empty h3 {
-  color: #172033;
+.reminder-list-empty h3 {
+  color: #0f172a;
   font-size: 18px;
+  line-height: 1.3;
 }
 
-.reminder-list-empty p,
-.reminder-detail-empty p {
-  max-width: 280px;
+.reminder-list-empty p {
+  max-width: 360px;
+  color: #475569;
+  font-size: 13px;
   line-height: 1.55;
 }
 
@@ -1144,8 +1168,8 @@ main {
   width: 84px;
   height: 84px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #eef3fb 0%, #f8fafc 100%);
-  color: #8fa3c8;
+  background: #eef4ff;
+  color: #2563eb;
 }
 
 .reminder-empty-illustration svg {
@@ -1163,7 +1187,19 @@ main {
 }
 
 .reminder-empty-bell {
-  color: #6f89bd;
+  color: #2563eb;
+}
+
+.reminder-empty-action {
+  min-height: 34px;
+  margin-top: 8px;
+  border-color: #d8e0ec;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 7px 14px;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .enabled,
@@ -1216,7 +1252,7 @@ main {
 }
 
 .status-triggered {
-  background: #e7f7ed;
+  background: #ecfdf3;
 }
 
 .status-expired {
@@ -1640,7 +1676,7 @@ main {
 
 .http-response-tools button {
   min-height: 30px;
-  padding: 5px 10px;
+  padding: 4px 9px;
   color: #344054;
   font-size: 12px;
   font-weight: 800;
@@ -2162,6 +2198,7 @@ main {
 }
 
 .download-table-scroll {
+  position: relative;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
@@ -2235,12 +2272,6 @@ main {
 
 .download-table tbody tr:hover {
   background: #f8fbff;
-}
-
-.download-table-empty {
-  height: 100%;
-  color: #667085;
-  text-align: center;
 }
 
 .download-file-cell {
@@ -2335,6 +2366,51 @@ main {
   font-weight: 700;
 }
 
+.download-empty-state,
+.script-empty-state {
+  position: absolute;
+  inset: 39px 0 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 9px;
+  padding: 24px;
+  color: #667085;
+  text-align: center;
+  pointer-events: none;
+}
+
+.download-empty-state strong,
+.script-empty-state strong {
+  color: #172033;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.download-empty-state p,
+.script-empty-state p {
+  max-width: 360px;
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.table-empty-icon {
+  width: 52px;
+  height: 52px;
+  margin-bottom: 2px;
+  color: #b8c2d0;
+}
+
+.table-empty-icon path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.2;
+}
+
 .translation-stack {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -2409,8 +2485,9 @@ main {
 
 .diagnostics-card h3 {
   margin: 0;
-  color: #172033;
+  color: #0f172a;
   font-size: 18px;
+  line-height: 1.3;
 }
 
 .diagnostics-card h4 {
@@ -3039,17 +3116,17 @@ main {
 }
 
 .download-status-running {
-  background: #dbeafe;
+  background: #eef4ff;
   color: #1d4ed8;
 }
 
 .download-status-completed {
-  background: #dcfae6;
+  background: #ecfdf3;
   color: #067647;
 }
 
 .download-status-failed {
-  background: #fee4e2;
+  background: #fef2f2;
   color: #b42318;
 }
 
@@ -3423,7 +3500,7 @@ main {
   min-width: 0;
   height: 100%;
   min-height: 0;
-  overflow: visible;
+  overflow: hidden;
   border: 1px solid #e0e5ee;
   border-radius: 10px;
   background: #ffffff;
@@ -3444,9 +3521,10 @@ main {
 }
 
 .script-table-scroll {
+  position: relative;
   min-width: 0;
   min-height: 0;
-  overflow: visible;
+  overflow: auto;
 }
 
 .script-table {
@@ -3509,12 +3587,6 @@ main {
 
 .script-table tbody tr:hover {
   background: #f8fbff;
-}
-
-.script-table-empty {
-  height: 100%;
-  color: #667085;
-  text-align: center;
 }
 
 .script-task-name-cell {
@@ -3681,12 +3753,12 @@ main {
 }
 
 .script-task-icon.waiting {
-  background: #dcfae6;
+  background: #ecfdf3;
   color: #067647;
 }
 
 .script-task-icon.running {
-  background: #dbeafe;
+  background: #eef4ff;
   color: #1d4ed8;
 }
 
@@ -3696,7 +3768,7 @@ main {
 }
 
 .script-task-icon.failed {
-  background: #fee4e2;
+  background: #fef2f2;
   color: #b42318;
 }
 
@@ -4605,8 +4677,9 @@ main {
   margin: 0;
   padding: 22px 24px;
   border-bottom: 1px solid #e4e9f2;
-  color: #172033;
+  color: #0f172a;
   font-size: 18px;
+  line-height: 1.3;
 }
 
 .ssh-table-shell {
@@ -4772,35 +4845,47 @@ main {
 .ssh-empty-state {
   display: grid;
   place-items: center;
-  align-content: center;
-  gap: 12px;
   min-height: 0;
-  height: min(360px, 100%);
-  margin: 36px min(8vw, 96px);
-  border: 1px dashed #cfd8e6;
-  border-radius: 8px;
+  height: 100%;
+  padding: 26px 24px;
   color: #667085;
   text-align: center;
 }
 
-.ssh-empty-icon {
+.ssh-empty-content {
   display: grid;
-  place-items: center;
-  width: 72px;
-  height: 72px;
-  color: #c6ccd7;
-  font-size: 48px;
-  line-height: 1;
+  justify-items: center;
+  gap: 10px;
+  width: min(360px, 100%);
+  margin: auto;
+}
+
+.ssh-empty-icon {
+  width: 58px;
+  height: 58px;
+  margin-bottom: 2px;
+  color: #b8c2d0;
+}
+
+.ssh-empty-icon path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.2;
 }
 
 .ssh-empty-state strong {
   color: #172033;
-  font-size: 22px;
+  font-size: 20px;
+  line-height: 1.3;
 }
 
 .ssh-empty-state p {
   margin: 0;
   color: #667085;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .ssh-table-summary {

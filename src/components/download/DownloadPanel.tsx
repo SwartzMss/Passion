@@ -309,13 +309,6 @@ export function DownloadPanel() {
             >
               <DownloadTableHead filter={activeFilter} />
               <tbody>
-                {visibleTasks.length === 0 ? (
-                  <tr>
-                    <td className="download-table-empty" colSpan={downloadColumnCount(activeFilter)}>
-                      {emptyListMessage}
-                    </td>
-                  </tr>
-                ) : null}
                 {visibleTasks.map((task) => (
                   <DownloadTaskRow
                     key={task.id}
@@ -330,6 +323,13 @@ export function DownloadPanel() {
                 ))}
               </tbody>
             </table>
+            {visibleTasks.length === 0 ? (
+              <div className="download-empty-state">
+                <DownloadEmptyIcon />
+                <strong>{downloadEmptyTitle(activeFilter, Boolean(normalizedQuery))}</strong>
+                <p>{emptyListMessage}</p>
+              </div>
+            ) : null}
           </div>
           <div className="download-status-bar">{footerSummary}</div>
         </div>
@@ -436,6 +436,30 @@ function DownloadTaskForm({
       </div>
     </div>
   );
+}
+
+function DownloadEmptyIcon() {
+  return (
+    <svg aria-hidden="true" className="table-empty-icon" viewBox="0 0 64 64">
+      <path d="M32 12v26" />
+      <path d="m22 29 10 10 10-10" />
+      <path d="M16 46h32" />
+      <path d="M20 52h24" />
+    </svg>
+  );
+}
+
+function downloadEmptyTitle(filter: DownloadTaskFilter, hasQuery: boolean) {
+  if (hasQuery) {
+    return "没有匹配的下载任务";
+  }
+  if (filter === "completed") {
+    return "暂无已完成下载";
+  }
+  if (filter === "failed") {
+    return "暂无失败下载";
+  }
+  return "暂无下载任务";
 }
 
 function FilterButton({
@@ -644,10 +668,6 @@ function DownloadFileCell({ title }: { title: string }) {
       <strong>{title}</strong>
     </div>
   );
-}
-
-function downloadColumnCount(filter: DownloadTaskFilter) {
-  return filter === "running" ? 7 : 5;
 }
 
 function downloadTaskTitle(task: DownloadTask) {

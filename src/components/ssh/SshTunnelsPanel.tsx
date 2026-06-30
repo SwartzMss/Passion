@@ -78,6 +78,7 @@ export function SshTunnelsPanel() {
         .includes(normalizedQuery);
     });
   }, [filter, query, tunnels]);
+  const isFilteredEmpty = tunnels.length > 0 && visibleTunnels.length === 0;
 
   async function mutate(action: () => Promise<void>) {
     setError(null);
@@ -186,9 +187,15 @@ export function SshTunnelsPanel() {
         <h2>隧道列表</h2>
         {visibleTunnels.length === 0 ? (
           <div className="ssh-empty-state">
-            <div className="ssh-empty-icon" aria-hidden="true">⌂</div>
-            <strong>暂无 SSH 隧道</strong>
-            <p>点击右上角“新建隧道”创建一个本地端口转发。</p>
+            <div className="ssh-empty-content">
+              <SshEmptyIcon />
+              <strong>{isFilteredEmpty ? "没有匹配的隧道" : "暂无 SSH 隧道"}</strong>
+              <p>
+                {isFilteredEmpty
+                  ? "调整搜索条件或切换筛选状态后再试。"
+                  : "创建一个本地端口转发后，隧道会显示在这里。"}
+              </p>
+            </div>
           </div>
         ) : (
           <div className="ssh-table-shell">
@@ -532,6 +539,17 @@ function validatePort(value: string, label: string) {
 
 function statusLabel(status: SshTunnelStatus) {
   return visualStatus(status) === "running" ? "运行中" : "已停止";
+}
+
+function SshEmptyIcon() {
+  return (
+    <svg aria-hidden="true" className="ssh-empty-icon" viewBox="0 0 64 64">
+      <path d="M18 36 32 24l14 12v15H18V36Z" />
+      <path d="M12 31 32 14l20 17" />
+      <path d="M26 51V39h12v12" />
+      <path d="M14 51h36" />
+    </svg>
+  );
 }
 
 function visualStatus(status: SshTunnelStatus): "running" | "stopped" {

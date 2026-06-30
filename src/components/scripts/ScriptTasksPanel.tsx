@@ -266,13 +266,6 @@ export function ScriptTasksPanel() {
                 </tr>
               </thead>
               <tbody>
-                {visibleTasks.length === 0 ? (
-                  <tr>
-                    <td className="script-table-empty" colSpan={6}>
-                      {emptyListMessage}
-                    </td>
-                  </tr>
-                ) : null}
                 {visibleTasks.map((task) => (
                   <ScriptTaskRow
                     isBusy={isBusy}
@@ -285,6 +278,13 @@ export function ScriptTasksPanel() {
                 ))}
               </tbody>
             </table>
+            {visibleTasks.length === 0 ? (
+              <div className="script-empty-state">
+                <ScriptEmptyIcon />
+                <strong>{scriptEmptyTitle(activeFilter, Boolean(query.trim()))}</strong>
+                <p>{emptyListMessage}</p>
+              </div>
+            ) : null}
           </div>
           <div className="script-status-bar">{footerSummary}</div>
         </div>
@@ -622,6 +622,33 @@ function scriptTaskStatus(task: ScriptTask) {
     return "running";
   }
   return "waiting";
+}
+
+function ScriptEmptyIcon() {
+  return (
+    <svg aria-hidden="true" className="table-empty-icon" viewBox="0 0 64 64">
+      <path d="m24 23-9 9 9 9" />
+      <path d="m40 23 9 9-9 9" />
+      <path d="m35 18-6 28" />
+      <path d="M16 52h32" />
+    </svg>
+  );
+}
+
+function scriptEmptyTitle(filter: ScriptFilter, hasQuery: boolean) {
+  if (hasQuery) {
+    return "没有匹配的脚本任务";
+  }
+  if (filter === "running") {
+    return "暂无运行中脚本";
+  }
+  if (filter === "waiting") {
+    return "暂无等待执行脚本";
+  }
+  if (filter === "disabled") {
+    return "暂无已停用脚本";
+  }
+  return "暂无脚本任务";
 }
 
 function scriptTaskStatusLabel(task: ScriptTask) {

@@ -55,6 +55,10 @@ export function ReminderList({
     : activeFilter === "completed"
       ? "还没有已完成提醒。"
       : "暂无提醒";
+  const footerSummary =
+    reminders.length === 0
+      ? "共 0 条"
+      : `共 ${reminders.length} 条｜待提醒 ${pendingReminders.length}｜已完成 ${completedReminders.length}`;
 
   return (
     <section className="reminder-panel">
@@ -108,95 +112,90 @@ export function ReminderList({
 
       <div className="reminder-content reminder-content-single">
         <section className="reminder-card" aria-label="提醒列表">
+          <div className="reminder-card-title">
+            <h2>提醒列表</h2>
+          </div>
           <div className="reminder-list" aria-label="提醒条目列表">
-            {visibleReminders.length === 0 ? (
-              <div className="reminder-list-empty">
-                <div className="reminder-empty-illustration reminder-empty-bell">
-                  <svg aria-hidden="true" viewBox="0 0 64 64">
-                    <path d="M18 44h28l-3-5V28c0-7-4-12-10-13V12a3 3 0 0 0-6 0v3c-6 1-10 6-10 13v11l-3 5Z" />
-                    <path d="M27 48a5 5 0 0 0 10 0" />
-                  </svg>
-                </div>
-                <h3>{emptyListMessage}</h3>
-              </div>
-            ) : null}
-            {visibleReminders.length > 0 ? (
-              <>
-                <div className="reminder-table-scroll">
-                  <table className="reminder-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">名称</th>
-                        <th scope="col">类型</th>
-                        <th scope="col">优先级</th>
-                        <th scope="col">下次触发时间</th>
-                        <th scope="col">状态</th>
-                        <th scope="col">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleReminders.map((reminder) => (
-                        <tr key={reminder.id}>
-                          <td>
-                            <div className="reminder-name-cell">
-                              <strong>{reminder.title}</strong>
-                            </div>
-                          </td>
-                          <td>
-                            <span className={`repeat-badge repeat-${repeatKind(reminder.repeatRule)}`}>
-                              {repeatRuleLabel(reminder.repeatRule)}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`priority-badge priority-${reminder.priority}`}>
-                              {priorityLabel(reminder.priority)}
-                            </span>
-                          </td>
-                          <td>{formatTime(reminder.remindAt)}</td>
-                          <td>
-                            <span className={`status status-${reminder.status}`}>
-                              {statusLabel(reminder.status)}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="reminder-table-actions">
-                              <button
-                                onClick={() => onEdit(reminder)}
-                                aria-label={`编辑 ${reminder.title}`}
-                              >
-                                <ActionIcon kind="edit" />
-                                编辑
-                              </button>
-                              <button
-                                className="danger-action"
-                                onClick={() => onDelete(reminder.id)}
-                                aria-label={`删除 ${reminder.title}`}
-                              >
-                                <ActionIcon kind="delete" />
-                                删除
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="reminder-table-footer">
-                  <span>共 {visibleReminders.length} 条</span>
-                  <div className="reminder-table-pager" aria-label="分页">
-                    <button aria-label="上一页" disabled>
-                      ‹
-                    </button>
-                    <strong>1</strong>
-                    <button aria-label="下一页" disabled>
-                      ›
-                    </button>
-                    <span>20条/页</span>
+            <div className="reminder-table-scroll">
+              <table className="reminder-table">
+                <thead>
+                  <tr>
+                    <th scope="col">标题</th>
+                    <th scope="col">类型</th>
+                    <th scope="col">时间或规则</th>
+                    <th scope="col">优先级</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleReminders.map((reminder) => (
+                    <tr key={reminder.id}>
+                      <td>
+                        <div className="reminder-name-cell">
+                          <strong>{reminder.title}</strong>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`repeat-badge repeat-${repeatKind(reminder.repeatRule)}`}>
+                          {repeatRuleLabel(reminder.repeatRule)}
+                        </span>
+                      </td>
+                      <td>{formatTime(reminder.remindAt)}</td>
+                      <td>
+                        <span className={`priority-badge priority-${reminder.priority}`}>
+                          {priorityLabel(reminder.priority)}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`status status-${reminder.status}`}>
+                          {statusLabel(reminder.status)}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="reminder-table-actions">
+                          <button
+                            onClick={() => onEdit(reminder)}
+                            aria-label={`编辑 ${reminder.title}`}
+                            title="编辑"
+                          >
+                            <ActionIcon kind="edit" />
+                          </button>
+                          <button
+                            className="danger-action"
+                            onClick={() => onDelete(reminder.id)}
+                            aria-label={`删除 ${reminder.title}`}
+                            title="删除"
+                          >
+                            <ActionIcon kind="delete" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {visibleReminders.length === 0 ? (
+                <div className="reminder-list-empty">
+                  <div className="reminder-empty-illustration reminder-empty-bell">
+                    <svg aria-hidden="true" viewBox="0 0 64 64">
+                      <path d="M18 44h28l-3-5V28c0-7-4-12-10-13V12a3 3 0 0 0-6 0v3c-6 1-10 6-10 13v11l-3 5Z" />
+                      <path d="M27 48a5 5 0 0 0 10 0" />
+                    </svg>
                   </div>
+                  <h3>{emptyListTitle(reminders.length, query, activeFilter)}</h3>
+                  <p>{emptyListDescription(reminders.length, query, emptyListMessage)}</p>
+                  {reminders.length === 0 && !query.trim() ? (
+                    <button className="reminder-empty-action" onClick={onAdd} type="button">
+                      新增提醒
+                    </button>
+                  ) : null}
                 </div>
-              </>
-            ) : null}
+              ) : null}
+            </div>
+            <div className="reminder-table-footer">
+              <span>{footerSummary}</span>
+            </div>
           </div>
         </section>
       </div>
@@ -281,6 +280,30 @@ function statusLabel(status: Reminder["status"]) {
     case "expired":
       return "已过期";
   }
+}
+
+function emptyListTitle(
+  total: number,
+  query: string,
+  activeFilter: "all" | "pending" | "completed",
+) {
+  if (query.trim()) {
+    return "没有匹配的提醒";
+  }
+  if (total === 0) {
+    return "暂无提醒";
+  }
+  if (activeFilter === "completed") {
+    return "暂无已完成提醒";
+  }
+  return "暂无待提醒";
+}
+
+function emptyListDescription(total: number, query: string, fallback: string) {
+  if (total === 0 && !query.trim()) {
+    return "你还没有创建任何提醒，点击右上角按钮创建第一个提醒吧～";
+  }
+  return fallback;
 }
 
 function formatTime(value: string) {

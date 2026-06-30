@@ -48,15 +48,19 @@ it("shows the reminder management workspace when empty", async () => {
   expect(screen.getByRole("button", { name: "待提醒 0" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "已完成 0" })).toBeInTheDocument();
   expect(screen.getByPlaceholderText("搜索提醒名称或重复规则")).toBeInTheDocument();
-  expect(screen.queryByRole("heading", { name: "提醒列表" })).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "提醒列表" })).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "提醒详情" })).not.toBeInTheDocument();
   expect(screen.getByText("暂无提醒")).toBeInTheDocument();
+  expect(
+    screen.getByText("你还没有创建任何提醒，点击右上角按钮创建第一个提醒吧～"),
+  ).toBeInTheDocument();
+  expect(screen.getByText("共 0 条")).toBeInTheDocument();
   expect(screen.queryByText("添加一个提醒后，它会显示在这里。")).not.toBeInTheDocument();
   expect(screen.queryByText("还没有提醒")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "返回工作台" })).not.toBeInTheDocument();
-  expect(screen.getAllByRole("button", { name: "新增提醒" })).toHaveLength(1);
+  expect(screen.getAllByRole("button", { name: "新增提醒" })).toHaveLength(2);
 
-  await user.click(screen.getByRole("button", { name: "新增提醒" }));
+  await user.click(screen.getAllByRole("button", { name: "新增提醒" })[0]);
 
   expect(onAdd).toHaveBeenCalledTimes(1);
 });
@@ -75,6 +79,7 @@ it("filters reminders between all, pending, and completed views", async () => {
   expect(screen.getByRole("button", { name: "全部 2" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "待提醒 1" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "已完成 1" })).toBeInTheDocument();
+  expect(screen.getByText("共 2 条｜待提醒 1｜已完成 1")).toBeInTheDocument();
   expect(screen.getByRole("row", { name: /Stand up/ })).toBeInTheDocument();
   expect(screen.queryByRole("row", { name: /Done task/ })).not.toBeInTheDocument();
 

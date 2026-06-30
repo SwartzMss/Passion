@@ -97,10 +97,9 @@ it("shows a detailed empty state when no tunnel matches", async () => {
 
   await user.type(await screen.findByLabelText("搜索 SSH 隧道"), "not found");
 
-  expect(screen.getByText("暂无 SSH 隧道")).toBeInTheDocument();
-  expect(
-    screen.getByText("点击右上角“新建隧道”创建一个本地端口转发。"),
-  ).toBeInTheDocument();
+  expect(screen.getByText("没有匹配的隧道")).toBeInTheDocument();
+  expect(screen.getByText("调整搜索条件或切换筛选状态后再试。")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "清空筛选" })).not.toBeInTheDocument();
   expect(screen.queryByRole("table", { name: "SSH 隧道列表" })).not.toBeInTheDocument();
 });
 
