@@ -1,13 +1,15 @@
 import { useRef, useState } from "react";
-import { checkPort, inspectPortOccupancy } from "../../lib/api";
+import { checkPort, inspectPortOccupancy, inspectProcessPorts } from "../../lib/api";
 import type {
   PortCheckResult,
   PortOccupancyEntry,
   PortOccupancyResult,
+  ProcessPortsResult,
 } from "../../types";
 
 type NetworkTab = "port_check" | "port_occupancy";
 type PortCheckMode = "single" | "range";
+type OccupancyQueryMode = "port" | "process";
 
 const NETWORK_TABS: Array<{ id: NetworkTab; label: string }> = [
   { id: "port_check", label: "端口检测" },
@@ -19,11 +21,14 @@ const SCAN_CONCURRENCY = 100;
 export function NetworkDiagnosticsPanel() {
   const [activeTab, setActiveTab] = useState<NetworkTab>("port_check");
   const [portMode, setPortMode] = useState<PortCheckMode>("single");
+  const [occupancyMode, setOccupancyMode] =
+    useState<OccupancyQueryMode>("port");
   const [portHost, setPortHost] = useState("127.0.0.1");
   const [portValue, setPortValue] = useState("80");
   const [scanStartPort, setScanStartPort] = useState("1");
   const [scanEndPort, setScanEndPort] = useState("1024");
   const [occupancyPort, setOccupancyPort] = useState("1420");
+  const [processQuery, setProcessQuery] = useState("");
   const [portResult, setPortResult] = useState<PortCheckResult | null>(null);
   const [scanResults, setScanResults] = useState<PortCheckResult[]>([]);
   const [scanCompleted, setScanCompleted] = useState(0);
@@ -31,6 +36,8 @@ export function NetworkDiagnosticsPanel() {
   const [scanStopped, setScanStopped] = useState(false);
   const [occupancyResult, setOccupancyResult] =
     useState<PortOccupancyResult | null>(null);
+  const [processPortsResult, setProcessPortsResult] =
+    useState<ProcessPortsResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPortRunning, setIsPortRunning] = useState(false);
   const [isScanRunning, setIsScanRunning] = useState(false);
@@ -39,6 +46,7 @@ export function NetworkDiagnosticsPanel() {
   const portValidation = validatePortValue(portValue);
   const scanValidation = validatePortRange(scanStartPort, scanEndPort);
   const occupancyValidation = validatePortValue(occupancyPort);
+  const processQueryValidation = validateProcessQuery(processQuery);
   const scanRangeCount = scanValidation
     ? 0
     : Number(scanEndPort) - Number(scanStartPort) + 1;
@@ -143,6 +151,26 @@ export function NetworkDiagnosticsPanel() {
     try {
       const result = await inspectPortOccupancy({ port });
       setOccupancyResult(result);
+      setProcessPortsResult(null);
+    } catch (err) {
+      setError(readError(err));
+    } finally {
+      setIsOccupancyRunning(false);
+    }
+  }
+
+  async function runProcessPorts() {
+    if (processQueryValidation) {
+      setError(processQueryValidation);
+      return;
+    }
+    const query = processQuery.trim();
+    setError(null);
+    setIsOccupancyRunning(true);
+    try {
+      const result = await inspectProcessPorts({ query });
+      setProcessPortsResult(result);
+      setOccupancyResult(null);
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -280,34 +308,79 @@ export function NetworkDiagnosticsPanel() {
           id="network-panel-port_occupancy"
           aria-labelledby="network-tab-port_occupancy"
         >
-          <div className="diagnostics-inline-action">
-            <label className="field-label">
-              端口号
-              <input
-                id="occupancy-port"
-                inputMode="numeric"
-                type="number"
-                value={occupancyPort}
-                onChange={(event) => setOccupancyPort(event.target.value)}
-                title="输入本机端口，查看是否被进程占用"
-              />
-            </label>
+          <OccupancyModeSwitch
+            disabled={isOccupancyRunning}
+            mode={occupancyMode}
+            onChange={setOccupancyMode}
+          />
+          <div className="diagnostics-inline-action occupancy-query-row">
+            {occupancyMode === "port" ? (
+              <label className="field-label">
+                端口号
+                <input
+                  id="occupancy-port"
+                  inputMode="numeric"
+                  type="number"
+                  value={occupancyPort}
+                  onChange={(event) => setOccupancyPort(event.target.value)}
+                  title="输入本机端口，查看是否被进程占用"
+                />
+              </label>
+            ) : (
+              <label className="field-label">
+                进程名称或 PID
+                <input
+                  id="process-query"
+                  value={processQuery}
+                  onChange={(event) => setProcessQuery(event.target.value)}
+                  placeholder="例如：ssh.exe、chrome、1420"
+                  title="输入完整进程名、模糊名称或 PID"
+                />
+              </label>
+            )}
             <button
               className="diagnostics-button query-button"
-              onClick={runPortOccupancy}
-              disabled={isOccupancyRunning || Boolean(occupancyValidation)}
-              title="查看本机端口占用进程"
+              onClick={occupancyMode === "port" ? runPortOccupancy : runProcessPorts}
+              disabled={
+                isOccupancyRunning ||
+                Boolean(
+                  occupancyMode === "port"
+                    ? occupancyValidation
+                    : processQueryValidation,
+                )
+              }
+              title={
+                occupancyMode === "port"
+                  ? "查看本机端口占用进程"
+                  : "查看进程绑定的本机端口"
+              }
             >
               <span aria-hidden="true">{isOccupancyRunning ? "…" : "⌕"}</span>
-              {isOccupancyRunning ? "检测中..." : "查看占用"}
+              {isOccupancyRunning
+                ? "检测中..."
+                : occupancyMode === "port"
+                  ? "查看占用"
+                  : "查看端口"}
             </button>
           </div>
-          {occupancyValidation ? (
+          {occupancyMode === "port" && occupancyValidation ? (
             <p className="field-hint error">{occupancyValidation}</p>
           ) : null}
+          {occupancyMode === "process" && processQueryValidation ? (
+            <p className="field-hint error">{processQueryValidation}</p>
+          ) : null}
+          <p className="field-hint occupancy-mode-help">
+            {occupancyMode === "port"
+              ? "输入端口号，查看当前被哪个进程监听。"
+              : "支持完整进程名、模糊名称或 PID，例如 chrome、ssh.exe、1420。"}
+          </p>
           <div className="diagnostics-divider" />
           <h4>检测结果</h4>
-          <PortOccupancyResultBox result={occupancyResult} />
+          {occupancyMode === "port" ? (
+            <PortOccupancyResultBox result={occupancyResult} />
+          ) : (
+            <ProcessPortsResultBox result={processPortsResult} />
+          )}
         </article>
         ) : null}
       </div>
@@ -344,6 +417,39 @@ function PortModeSwitch({
       >
         <span aria-hidden="true">▦</span>
         范围扫描
+      </button>
+    </div>
+  );
+}
+
+function OccupancyModeSwitch({
+  disabled,
+  mode,
+  onChange,
+}: {
+  disabled: boolean;
+  mode: OccupancyQueryMode;
+  onChange: (mode: OccupancyQueryMode) => void;
+}) {
+  return (
+    <div className="port-mode-toggle occupancy-mode-toggle" aria-label="端口占用查询方式">
+      <button
+        type="button"
+        aria-pressed={mode === "port"}
+        onClick={() => onChange("port")}
+        disabled={disabled}
+      >
+        <span aria-hidden="true">#</span>
+        按端口查询
+      </button>
+      <button
+        type="button"
+        aria-pressed={mode === "process"}
+        onClick={() => onChange("process")}
+        disabled={disabled}
+      >
+        <span aria-hidden="true">⌘</span>
+        按进程查询
       </button>
     </div>
   );
@@ -576,12 +682,85 @@ function PortOccupancyRow({ entry }: { entry: PortOccupancyEntry }) {
   );
 }
 
+function ProcessPortsResultBox({
+  result,
+}: {
+  result: ProcessPortsResult | null;
+}) {
+  if (!result) {
+    return null;
+  }
+  if (result.entries.length === 0) {
+    return (
+      <div className="port-process-empty">
+        <span aria-hidden="true">⌕</span>
+        <strong>未发现绑定端口</strong>
+        <p>没有找到与 {result.query} 匹配的 TCP 端口记录。</p>
+      </div>
+    );
+  }
+  return (
+    <div className="process-port-result-panel">
+      <div className="process-port-summary">
+        <strong>进程 {result.query} 绑定 {result.entries.length} 个端口</strong>
+        <span>共 {result.entries.length} 条</span>
+      </div>
+      <table className="process-port-table">
+        <thead>
+          <tr>
+            <th>PID</th>
+            <th>进程</th>
+            <th>端口</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          {result.entries.map((entry) => (
+            <tr key={`${entry.pid}-${entry.localAddress}-${entry.state}`}>
+              <td>{entry.pid}</td>
+              <td>{entry.processName || "未知进程"}</td>
+              <td>{readPortFromAddress(entry.localAddress)}</td>
+              <td>
+                <span className={`process-port-state ${entry.state.toLowerCase()}`}>
+                  {processPortStateLabel(entry.state)}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function validatePortValue(value: string) {
   const port = Number(value);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     return "端口范围 1-65535";
   }
   return null;
+}
+
+function validateProcessQuery(value: string) {
+  if (!value.trim()) {
+    return "请输入进程名称或 PID";
+  }
+  return null;
+}
+
+function readPortFromAddress(address: string) {
+  const parts = address.split(":");
+  return parts[parts.length - 1] || address;
+}
+
+function processPortStateLabel(state: string) {
+  if (state.toUpperCase() === "LISTENING") {
+    return "监听中";
+  }
+  if (state.toUpperCase() === "ESTABLISHED") {
+    return "已连接";
+  }
+  return state;
 }
 
 function validatePortRange(startValue: string, endValue: string) {

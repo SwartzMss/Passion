@@ -12,6 +12,8 @@ import type {
   PortCheckResult,
   PortOccupancyRequest,
   PortOccupancyResult,
+  ProcessPortsRequest,
+  ProcessPortsResult,
   Reminder,
   Settings,
   ScriptTask,
@@ -83,6 +85,12 @@ export async function inspectPortOccupancy(
   input: PortOccupancyRequest,
 ): Promise<PortOccupancyResult> {
   return invoke<PortOccupancyResult>("inspect_port_occupancy", { input });
+}
+
+export async function inspectProcessPorts(
+  input: ProcessPortsRequest,
+): Promise<ProcessPortsResult> {
+  return invoke<ProcessPortsResult>("inspect_process_ports", { input });
 }
 
 export async function sendHttpRequest(

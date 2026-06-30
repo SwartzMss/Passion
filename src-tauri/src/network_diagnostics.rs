@@ -1,7 +1,7 @@
 use crate::error::{BackendError, BackendResult};
 use crate::models::{
     PortCheckRequest, PortCheckResult, PortOccupancyEntry, PortOccupancyRequest,
-    PortOccupancyResult,
+    PortOccupancyResult, ProcessPortsRequest, ProcessPortsResult,
 };
 #[cfg(target_os = "windows")]
 use encoding_rs::GBK;
@@ -67,6 +67,35 @@ pub async fn inspect_port_occupancy(
     .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?
 }
 
+pub async fn inspect_process_ports(
+    input: ProcessPortsRequest,
+) -> BackendResult<ProcessPortsResult> {
+    let query = input.query.trim().to_string();
+    if query.is_empty() {
+        return Err(BackendError::NetworkDiagnostic(
+            "请输入进程名称或 PID。".to_string(),
+        ));
+    }
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let output = background_command("netstat")
+            .args(["-ano", "-p", "tcp"])
+            .output()
+            .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?;
+        let raw_output = decode_output(&output.stdout, &output.stderr);
+        let pids = parse_netstat_tcp_entries(&raw_output)
+            .into_iter()
+            .map(|entry| entry.pid)
+            .collect();
+        let process_names = lookup_process_names(pids);
+        let entries = parse_netstat_ports_by_process_query(&raw_output, &query, &process_names);
+
+        Ok(ProcessPortsResult { query, entries })
+    })
+    .await
+    .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?
+}
+
 fn decode_output(stdout: &[u8], stderr: &[u8]) -> String {
     #[cfg(target_os = "windows")]
     {
@@ -113,17 +142,26 @@ fn parse_netstat_listening_ports(output: &str, port: u16) -> Vec<PortOccupancyEn
 }
 
 fn parse_netstat_line(line: &str, port: u16) -> Option<PortOccupancyEntry> {
+    let entry = parse_netstat_tcp_line(line)?;
+    if !entry.state.eq_ignore_ascii_case("LISTENING") {
+        return None;
+    }
+    if !address_has_port(&entry.local_address, port) {
+        return None;
+    }
+    Some(entry)
+}
+
+fn parse_netstat_tcp_entries(output: &str) -> Vec<PortOccupancyEntry> {
+    output.lines().filter_map(parse_netstat_tcp_line).collect()
+}
+
+fn parse_netstat_tcp_line(line: &str) -> Option<PortOccupancyEntry> {
     let parts = line.split_whitespace().collect::<Vec<_>>();
     if parts.len() < 5 || !parts[0].eq_ignore_ascii_case("TCP") {
         return None;
     }
     let state = parts[3];
-    if !state.eq_ignore_ascii_case("LISTENING") {
-        return None;
-    }
-    if !address_has_port(parts[1], port) {
-        return None;
-    }
     let pid = parts[4].parse::<u32>().ok()?;
     Some(PortOccupancyEntry {
         protocol: parts[0].to_string(),
@@ -132,6 +170,32 @@ fn parse_netstat_line(line: &str, port: u16) -> Option<PortOccupancyEntry> {
         pid,
         process_name: None,
     })
+}
+
+fn parse_netstat_ports_by_process_query(
+    output: &str,
+    query: &str,
+    process_names: &HashMap<u32, String>,
+) -> Vec<PortOccupancyEntry> {
+    let normalized_query = query.trim().to_lowercase();
+    let query_pid = normalized_query.parse::<u32>().ok();
+    parse_netstat_tcp_entries(output)
+        .into_iter()
+        .filter_map(|mut entry| {
+            let process_name = process_names.get(&entry.pid).cloned();
+            let pid_matches = query_pid == Some(entry.pid);
+            let name_matches = process_name
+                .as_deref()
+                .map(|name| name.to_lowercase().contains(&normalized_query))
+                .unwrap_or(false);
+            if pid_matches || name_matches {
+                entry.process_name = process_name;
+                Some(entry)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn address_has_port(address: &str, port: u16) -> bool {
@@ -249,6 +313,33 @@ mod tests {
         assert_eq!(entries[0].pid, 1234);
         assert_eq!(entries[1].local_address, "[::]:1420");
         assert_eq!(entries[1].pid, 5678);
+    }
+
+    #[test]
+    fn parse_netstat_finds_ports_by_process_query() {
+        let output = r#"
+  Proto  Local Address          Foreign Address        State           PID
+  TCP    127.0.0.1:8085         0.0.0.0:0              LISTENING       9184
+  TCP    127.0.0.1:2222         192.168.3.196:22       ESTABLISHED     9184
+  TCP    127.0.0.1:1420         0.0.0.0:0              LISTENING       1234
+"#;
+        let mut names = HashMap::new();
+        names.insert(9184, "ssh.exe".to_string());
+        names.insert(1234, "node.exe".to_string());
+
+        let entries = parse_netstat_ports_by_process_query(output, "ssh", &names);
+
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].local_address, "127.0.0.1:8085");
+        assert_eq!(entries[0].state, "LISTENING");
+        assert_eq!(entries[0].pid, 9184);
+        assert_eq!(entries[0].process_name, Some("ssh.exe".to_string()));
+        assert_eq!(entries[1].local_address, "127.0.0.1:2222");
+        assert_eq!(entries[1].state, "ESTABLISHED");
+
+        let by_pid = parse_netstat_ports_by_process_query(output, "1234", &names);
+        assert_eq!(by_pid.len(), 1);
+        assert_eq!(by_pid[0].process_name, Some("node.exe".to_string()));
     }
 
     #[test]

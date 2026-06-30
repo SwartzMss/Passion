@@ -120,6 +120,7 @@ pub fn run() {
             commands::test_ai_connection,
             commands::check_port,
             commands::inspect_port_occupancy,
+            commands::inspect_process_ports,
             commands::send_http_request,
             commands::get_ssh_tunnel_settings,
             commands::update_ssh_tunnel_settings,

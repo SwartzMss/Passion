@@ -184,6 +184,19 @@ pub struct PortOccupancyResult {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ProcessPortsRequest {
+    pub query: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessPortsResult {
+    pub query: String,
+    pub entries: Vec<PortOccupancyEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HttpApiHeader {
     pub key: String,
     pub value: String,

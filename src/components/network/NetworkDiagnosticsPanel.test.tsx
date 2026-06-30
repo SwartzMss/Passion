@@ -26,6 +26,28 @@ vi.mock("../../lib/api", () => ({
           ]
         : [],
   })),
+  inspectProcessPorts: vi.fn(async ({ query }: { query: string }) => ({
+    query,
+    entries:
+      query === "ssh.exe"
+        ? [
+            {
+              protocol: "TCP",
+              localAddress: "127.0.0.1:8085",
+              state: "LISTENING",
+              pid: 9184,
+              processName: "ssh.exe",
+            },
+            {
+              protocol: "TCP",
+              localAddress: "127.0.0.1:2222",
+              state: "ESTABLISHED",
+              pid: 9184,
+              processName: "ssh.exe",
+            },
+          ]
+        : [],
+  })),
 }));
 
 it("renders the network diagnostics workspace", () => {
@@ -133,6 +155,27 @@ it("inspects port occupancy and shows process details", async () => {
   expect(screen.getByText("127.0.0.1:1420")).toBeInTheDocument();
   const api = await import("../../lib/api");
   expect(api.inspectPortOccupancy).toHaveBeenCalledWith({ port: 1420 });
+});
+
+it("inspects ports by process name or pid", async () => {
+  const user = userEvent.setup();
+  render(<NetworkDiagnosticsPanel />);
+
+  await user.click(screen.getByRole("tab", { name: "端口占用" }));
+  await user.click(screen.getByRole("button", { name: "按进程查询" }));
+  await user.clear(screen.getByLabelText("进程名称或 PID"));
+  await user.type(screen.getByLabelText("进程名称或 PID"), "ssh.exe");
+  await user.click(screen.getByRole("button", { name: /查看端口/ }));
+
+  expect(await screen.findByText("进程 ssh.exe 绑定 2 个端口")).toBeInTheDocument();
+  expect(screen.getAllByRole("cell", { name: "9184" })).toHaveLength(2);
+  expect(screen.getAllByRole("cell", { name: "ssh.exe" })).toHaveLength(2);
+  expect(screen.getByRole("cell", { name: "8085" })).toBeInTheDocument();
+  expect(screen.getByRole("cell", { name: "2222" })).toBeInTheDocument();
+  expect(screen.getByText("监听中")).toBeInTheDocument();
+  expect(screen.getByText("已连接")).toBeInTheDocument();
+  const api = await import("../../lib/api");
+  expect(api.inspectProcessPorts).toHaveBeenCalledWith({ query: "ssh.exe" });
 });
 
 it("shows a clear available state when a port is not occupied", async () => {

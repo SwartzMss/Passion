@@ -73,6 +73,15 @@ export interface PortOccupancyResult {
   entries: PortOccupancyEntry[];
 }
 
+export interface ProcessPortsRequest {
+  query: string;
+}
+
+export interface ProcessPortsResult {
+  query: string;
+  entries: PortOccupancyEntry[];
+}
+
 export type HttpApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export interface HttpApiPair {

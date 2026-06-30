@@ -2519,6 +2519,15 @@ main {
   padding-top: 18px;
 }
 
+.occupancy-mode-toggle {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.occupancy-mode-toggle button {
+  min-width: 0;
+}
+
 .occupancy-panel .diagnostics-inline-action {
   grid-template-columns: minmax(180px, 0.46fr) minmax(132px, 0.24fr) minmax(0, 1fr);
   align-items: end;
@@ -2542,6 +2551,15 @@ main {
   border-radius: 8px;
   padding: 0 10px;
   font-size: 13px;
+}
+
+.occupancy-query-row {
+  grid-template-columns: minmax(0, 1fr) minmax(132px, auto) !important;
+  padding-bottom: 8px !important;
+}
+
+.occupancy-mode-help {
+  margin: -2px 0 14px;
 }
 
 .port-check-toolbar {
@@ -4095,6 +4113,118 @@ main {
 
 .port-occupancy-row p {
   margin: 0;
+}
+
+.process-port-result-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d8deea;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.process-port-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #172033;
+  font-size: 13px;
+}
+
+.process-port-summary strong {
+  font-size: 14px;
+}
+
+.process-port-summary span {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.process-port-table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border: 1px solid #e6edf5;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.process-port-table th,
+.process-port-table td {
+  border-bottom: 1px solid #e6edf5;
+  padding: 11px 14px;
+  color: #344054;
+  text-align: left;
+}
+
+.process-port-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.process-port-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.process-port-state {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #f1f5f9;
+  padding: 4px 9px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.process-port-state.listening {
+  background: #ecfdf3;
+  color: #16a34a;
+}
+
+.process-port-state.established {
+  background: #eef4ff;
+  color: #2563eb;
+}
+
+.port-process-empty {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 180px;
+  border: 1px dashed #d8deea;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #667085;
+  padding: 20px;
+  text-align: center;
+}
+
+.port-process-empty span {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #2563eb;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.port-process-empty strong {
+  color: #172033;
+  font-size: 15px;
+}
+
+.port-process-empty p {
+  margin: 0;
+  font-size: 13px;
 }
 
 .translation-hero {
