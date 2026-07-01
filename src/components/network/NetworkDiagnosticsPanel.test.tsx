@@ -28,6 +28,9 @@ vi.mock("../../lib/api", () => ({
   })),
   inspectProcessPorts: vi.fn(async ({ query }: { query: string }) => ({
     query,
+    queryKind: /^\d+$/.test(query) ? "pid" : "name",
+    processFound: query !== "999",
+    processName: query === "999" ? null : query === "9184" ? "ssh.exe" : null,
     entries:
       query === "ssh.exe"
         ? [
@@ -176,6 +179,20 @@ it("inspects ports by process name or pid", async () => {
   expect(screen.getByText("已连接")).toBeInTheDocument();
   const api = await import("../../lib/api");
   expect(api.inspectProcessPorts).toHaveBeenCalledWith({ query: "ssh.exe" });
+});
+
+it("shows a specific message when a pid has no matching process", async () => {
+  const user = userEvent.setup();
+  render(<NetworkDiagnosticsPanel />);
+
+  await user.click(screen.getByRole("tab", { name: "端口占用" }));
+  await user.click(screen.getByRole("button", { name: "按进程查询" }));
+  await user.type(screen.getByLabelText("进程名称或 PID"), "999");
+  await user.click(screen.getByRole("button", { name: /查看端口/ }));
+
+  expect(await screen.findByText("未找到对应进程")).toBeInTheDocument();
+  expect(screen.getByText("未找到 PID 999 对应的进程信息。")).toBeInTheDocument();
+  expect(screen.queryByText("没有找到与 999 匹配的 TCP 端口记录。")).not.toBeInTheDocument();
 });
 
 it("shows a clear available state when a port is not occupied", async () => {

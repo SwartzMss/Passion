@@ -1,7 +1,7 @@
 use crate::error::{BackendError, BackendResult};
 use crate::models::{
     PortCheckRequest, PortCheckResult, PortOccupancyEntry, PortOccupancyRequest,
-    PortOccupancyResult, ProcessPortsRequest, ProcessPortsResult,
+    PortOccupancyResult, ProcessPortsRequest, ProcessPortsResult, ProcessQueryKind,
 };
 #[cfg(target_os = "windows")]
 use encoding_rs::GBK;
@@ -87,10 +87,28 @@ pub async fn inspect_process_ports(
             .into_iter()
             .map(|entry| entry.pid)
             .collect();
-        let process_names = lookup_process_names(pids);
-        let entries = parse_netstat_ports_by_process_query(&raw_output, &query, &process_names);
+        let mut process_names = lookup_process_names(pids);
+        if let Ok(pid) = query.parse::<u32>() {
+            if let std::collections::hash_map::Entry::Vacant(entry) = process_names.entry(pid) {
+                if let Some(name) = lookup_process_name(pid) {
+                    entry.insert(name);
+                }
+            }
+        }
+        let resolved = resolve_process_query(&query, &process_names);
+        let entries = if resolved.process_found {
+            parse_netstat_ports_by_process_query(&raw_output, &query, &process_names)
+        } else {
+            Vec::new()
+        };
 
-        Ok(ProcessPortsResult { query, entries })
+        Ok(ProcessPortsResult {
+            query,
+            query_kind: resolved.kind,
+            process_found: resolved.process_found,
+            process_name: resolved.process_name,
+            entries,
+        })
     })
     .await
     .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?
@@ -196,6 +214,38 @@ fn parse_netstat_ports_by_process_query(
             }
         })
         .collect()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ResolvedProcessQuery {
+    kind: ProcessQueryKind,
+    process_found: bool,
+    process_name: Option<String>,
+}
+
+fn resolve_process_query(
+    query: &str,
+    process_names: &HashMap<u32, String>,
+) -> ResolvedProcessQuery {
+    let normalized_query = query.trim().to_lowercase();
+    if let Ok(pid) = normalized_query.parse::<u32>() {
+        let process_name = process_names.get(&pid).cloned();
+        return ResolvedProcessQuery {
+            kind: ProcessQueryKind::Pid,
+            process_found: process_name.is_some(),
+            process_name,
+        };
+    }
+
+    let process_name = process_names
+        .values()
+        .find(|name| name.to_lowercase().contains(&normalized_query))
+        .cloned();
+    ResolvedProcessQuery {
+        kind: ProcessQueryKind::Name,
+        process_found: process_name.is_some(),
+        process_name,
+    }
 }
 
 fn address_has_port(address: &str, port: u16) -> bool {
@@ -340,6 +390,18 @@ mod tests {
         let by_pid = parse_netstat_ports_by_process_query(output, "1234", &names);
         assert_eq!(by_pid.len(), 1);
         assert_eq!(by_pid[0].process_name, Some("node.exe".to_string()));
+    }
+
+    #[test]
+    fn resolve_process_query_reports_missing_pid() {
+        let mut names = HashMap::new();
+        names.insert(9184, "ssh.exe".to_string());
+
+        let query = resolve_process_query("999", &names);
+
+        assert_eq!(query.kind, ProcessQueryKind::Pid);
+        assert!(!query.process_found);
+        assert_eq!(query.process_name, None);
     }
 
     #[test]

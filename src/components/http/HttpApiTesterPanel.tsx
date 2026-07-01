@@ -115,7 +115,6 @@ export function HttpApiTesterPanel() {
           placeholder="https://api.example.com/users"
         />
         <button className="http-send-button" type="button" disabled={isSending} onClick={handleSend}>
-          <span aria-hidden="true">↗</span>
           {isSending ? "发送中" : "发送"}
         </button>
         <button className="http-clear-button" type="button" onClick={clearAll}>

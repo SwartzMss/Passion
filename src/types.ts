@@ -79,6 +79,9 @@ export interface ProcessPortsRequest {
 
 export interface ProcessPortsResult {
   query: string;
+  queryKind: "pid" | "name";
+  processFound: boolean;
+  processName?: string | null;
   entries: PortOccupancyEntry[];
 }
 

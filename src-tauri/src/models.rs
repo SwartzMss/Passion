@@ -190,8 +190,18 @@ pub struct ProcessPortsRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub enum ProcessQueryKind {
+    Pid,
+    Name,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessPortsResult {
     pub query: String,
+    pub query_kind: ProcessQueryKind,
+    pub process_found: bool,
+    pub process_name: Option<String>,
     pub entries: Vec<PortOccupancyEntry>,
 }
 

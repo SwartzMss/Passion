@@ -691,11 +691,12 @@ function ProcessPortsResultBox({
     return null;
   }
   if (result.entries.length === 0) {
+    const emptyState = processPortsEmptyState(result);
     return (
       <div className="port-process-empty">
         <span aria-hidden="true">⌕</span>
-        <strong>未发现绑定端口</strong>
-        <p>没有找到与 {result.query} 匹配的 TCP 端口记录。</p>
+        <strong>{emptyState.title}</strong>
+        <p>{emptyState.description}</p>
       </div>
     );
   }
@@ -739,6 +740,31 @@ function validatePortValue(value: string) {
     return "端口范围 1-65535";
   }
   return null;
+}
+
+function processPortsEmptyState(result: ProcessPortsResult) {
+  if (result.queryKind === "pid" && !result.processFound) {
+    return {
+      title: "未找到对应进程",
+      description: `未找到 PID ${result.query} 对应的进程信息。`,
+    };
+  }
+  if (result.queryKind === "pid") {
+    return {
+      title: "未发现绑定端口",
+      description: `PID ${result.query}${result.processName ? `（${result.processName}）` : ""} 当前没有绑定 TCP 端口。`,
+    };
+  }
+  if (!result.processFound) {
+    return {
+      title: "未找到匹配进程",
+      description: `未找到与 ${result.query} 匹配的进程信息。`,
+    };
+  }
+  return {
+    title: "未发现绑定端口",
+    description: `进程 ${result.processName || result.query} 当前没有绑定 TCP 端口。`,
+  };
 }
 
 function validateProcessQuery(value: string) {
