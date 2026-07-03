@@ -6,11 +6,11 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 use std::collections::HashMap;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::process::{ExitStatus, Stdio};
 use std::sync::{Arc, Mutex};
 use tokio::io::AsyncReadExt;
 use tokio::process::{Child, Command as TokioCommand};
-use tokio::time::{sleep, Duration};
+use tokio::time::{sleep, Duration, Instant};
 use uuid::Uuid;
 
 pub struct SshTunnelRepository;
@@ -20,6 +20,9 @@ const AUTH_TYPE_PRIVATE_KEY: &str = "private_key";
 const SSH_EXECUTABLE_PATH_KEY: &str = "ssh_executable_path";
 const CREATED_AT_COLUMN_INDEX: usize = 10;
 const UPDATED_AT_COLUMN_INDEX: usize = 11;
+const SSH_CONNECT_TIMEOUT_SECS: u64 = 5;
+const SSH_STARTUP_TIMEOUT_SECS: u64 = SSH_CONNECT_TIMEOUT_SECS + 2;
+const SSH_STARTUP_POLL_MS: u64 = 200;
 
 impl SshTunnelRepository {
     pub fn create(conn: &Connection, input: NewSshTunnel) -> BackendResult<SshTunnel> {
@@ -242,6 +245,12 @@ pub fn build_ssh_args(tunnel: &SshTunnel) -> Vec<String> {
         "BatchMode=yes".to_string(),
         "-o".to_string(),
         "StrictHostKeyChecking=no".to_string(),
+        "-o".to_string(),
+        "ExitOnForwardFailure=yes".to_string(),
+        "-o".to_string(),
+        format!("ConnectTimeout={SSH_CONNECT_TIMEOUT_SECS}"),
+        "-o".to_string(),
+        "ConnectionAttempts=1".to_string(),
         format!("{}@{}", tunnel.username, tunnel.remote_host),
     ]
 }
@@ -472,9 +481,8 @@ impl SshTunnelManager {
             });
         }
 
-        sleep(Duration::from_secs(2)).await;
-        match child.try_wait() {
-            Ok(Some(status)) => {
+        match wait_for_ssh_startup(&mut child).await {
+            SshStartupState::Exited(status) => {
                 let error = format!(
                     "SSH 进程退出，退出码: {}{}",
                     status,
@@ -492,7 +500,7 @@ impl SshTunnelManager {
                     ),
                 );
             }
-            Ok(None) => {
+            SshStartupState::Running => {
                 let child = Arc::new(tokio::sync::Mutex::new(child));
                 self.set_running(&tunnel.id, pid);
                 crate::app_log::info(
@@ -506,7 +514,7 @@ impl SshTunnelManager {
                 );
                 self.spawn_monitor(tunnel.id.clone(), child, stderr_buffer, log_path);
             }
-            Err(err) => {
+            SshStartupState::CheckFailed(err) => {
                 let error = format!("进程检查失败: {err}");
                 self.set_error(&tunnel.id, error.clone());
                 crate::app_log::error(
@@ -663,6 +671,24 @@ impl SshTunnelManager {
             .get(id)
             .map(|runtime| runtime.stopping)
             .unwrap_or(false)
+    }
+}
+
+enum SshStartupState {
+    Running,
+    Exited(ExitStatus),
+    CheckFailed(std::io::Error),
+}
+
+async fn wait_for_ssh_startup(child: &mut Child) -> SshStartupState {
+    let deadline = Instant::now() + Duration::from_secs(SSH_STARTUP_TIMEOUT_SECS);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return SshStartupState::Exited(status),
+            Ok(None) if Instant::now() >= deadline => return SshStartupState::Running,
+            Ok(None) => sleep(Duration::from_millis(SSH_STARTUP_POLL_MS)).await,
+            Err(err) => return SshStartupState::CheckFailed(err),
+        }
     }
 }
 
@@ -843,9 +869,20 @@ mod tests {
                 "BatchMode=yes",
                 "-o",
                 "StrictHostKeyChecking=no",
+                "-o",
+                "ExitOnForwardFailure=yes",
+                "-o",
+                "ConnectTimeout=5",
+                "-o",
+                "ConnectionAttempts=1",
                 "root@172.31.3.1",
             ]
         );
+    }
+
+    #[test]
+    fn startup_timeout_covers_ssh_connect_timeout() {
+        assert!(SSH_STARTUP_TIMEOUT_SECS > SSH_CONNECT_TIMEOUT_SECS);
     }
 
     #[test]
