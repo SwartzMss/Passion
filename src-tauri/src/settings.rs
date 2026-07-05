@@ -2,7 +2,7 @@ use crate::error::{BackendError, BackendResult};
 use crate::models::Settings;
 use rusqlite::{params, Connection};
 use tauri::AppHandle;
-use tauri_plugin_autostart::ManagerExt;
+use tauri_plugin_autostart::{AutoLaunchManager, ManagerExt};
 
 pub struct SettingsRepository;
 
@@ -23,12 +23,38 @@ impl SettingsRepository {
 
 pub fn sync_autostart(app: &AppHandle, enabled: bool) -> BackendResult<()> {
     let manager = app.autolaunch();
+    sync_autostart_with_manager(&*manager, enabled)
+}
+
+trait AutostartManager {
+    fn enable(&self) -> Result<(), String>;
+    fn disable(&self) -> Result<(), String>;
+    fn is_enabled(&self) -> Result<bool, String>;
+}
+
+impl AutostartManager for AutoLaunchManager {
+    fn enable(&self) -> Result<(), String> {
+        AutoLaunchManager::enable(self).map_err(|err| err.to_string())
+    }
+
+    fn disable(&self) -> Result<(), String> {
+        AutoLaunchManager::disable(self).map_err(|err| err.to_string())
+    }
+
+    fn is_enabled(&self) -> Result<bool, String> {
+        AutoLaunchManager::is_enabled(self).map_err(|err| err.to_string())
+    }
+}
+
+fn sync_autostart_with_manager(manager: &impl AutostartManager, enabled: bool) -> BackendResult<()> {
     if enabled {
         manager.enable()
-    } else {
+    } else if manager.is_enabled().map_err(BackendError::Startup)? {
         manager.disable()
+    } else {
+        Ok(())
     }
-    .map_err(|err| BackendError::Startup(err.to_string()))
+    .map_err(BackendError::Startup)
 }
 
 fn read_bool(conn: &Connection, key: &str) -> BackendResult<Option<bool>> {
@@ -64,6 +90,7 @@ use rusqlite::OptionalExtension;
 mod tests {
     use super::*;
     use crate::db;
+    use std::cell::Cell;
 
     #[test]
     fn get_returns_defaults_when_settings_are_missing() {
@@ -133,10 +160,50 @@ mod tests {
         assert_eq!(stored_setting(&conn, "minimize_to_tray"), "false");
     }
 
+    #[test]
+    fn sync_autostart_treats_disabling_missing_registration_as_success() {
+        let manager = FakeAutostartManager {
+            enabled: Cell::new(false),
+            disable_fails: true,
+            disable_calls: Cell::new(0),
+        };
+
+        sync_autostart_with_manager(&manager, false).unwrap();
+
+        assert_eq!(manager.disable_calls.get(), 0);
+    }
+
     fn stored_setting(conn: &rusqlite::Connection, key: &str) -> String {
         conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| {
             row.get(0)
         })
         .unwrap()
+    }
+
+    struct FakeAutostartManager {
+        enabled: Cell<bool>,
+        disable_fails: bool,
+        disable_calls: Cell<usize>,
+    }
+
+    impl AutostartManager for FakeAutostartManager {
+        fn enable(&self) -> Result<(), String> {
+            self.enabled.set(true);
+            Ok(())
+        }
+
+        fn disable(&self) -> Result<(), String> {
+            self.disable_calls.set(self.disable_calls.get() + 1);
+            if self.disable_fails {
+                Err("system cannot find the file specified".to_string())
+            } else {
+                self.enabled.set(false);
+                Ok(())
+            }
+        }
+
+        fn is_enabled(&self) -> Result<bool, String> {
+            Ok(self.enabled.get())
+        }
     }
 }
