@@ -711,6 +711,7 @@ function ProcessPortsResultBox({
           <tr>
             <th>PID</th>
             <th>进程</th>
+            <th>绑定地址</th>
             <th>端口</th>
             <th>状态</th>
           </tr>
@@ -720,6 +721,7 @@ function ProcessPortsResultBox({
             <tr key={`${entry.pid}-${entry.localAddress}-${entry.state}`}>
               <td>{entry.pid}</td>
               <td>{entry.processName || "未知进程"}</td>
+              <td>{readBindAddressFromAddress(entry.localAddress)}</td>
               <td>{readPortFromAddress(entry.localAddress)}</td>
               <td>
                 <span className={`process-port-state ${entry.state.toLowerCase()}`}>
@@ -777,6 +779,20 @@ function validateProcessQuery(value: string) {
 function readPortFromAddress(address: string) {
   const parts = address.split(":");
   return parts[parts.length - 1] || address;
+}
+
+function readBindAddressFromAddress(address: string) {
+  if (address.startsWith("[")) {
+    const endIndex = address.indexOf("]:");
+    if (endIndex > 1) {
+      return address.slice(1, endIndex);
+    }
+  }
+  const separatorIndex = address.lastIndexOf(":");
+  if (separatorIndex > 0) {
+    return address.slice(0, separatorIndex);
+  }
+  return address;
 }
 
 function processPortStateLabel(state: string) {

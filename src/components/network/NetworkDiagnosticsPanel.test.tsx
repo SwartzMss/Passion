@@ -36,7 +36,7 @@ vi.mock("../../lib/api", () => ({
         ? [
             {
               protocol: "TCP",
-              localAddress: "127.0.0.1:8085",
+              localAddress: "0.0.0.0:8085",
               state: "LISTENING",
               pid: 9184,
               processName: "ssh.exe",
@@ -173,6 +173,8 @@ it("inspects ports by process name or pid", async () => {
   expect(await screen.findByText("进程 ssh.exe 绑定 2 个端口")).toBeInTheDocument();
   expect(screen.getAllByRole("cell", { name: "9184" })).toHaveLength(2);
   expect(screen.getAllByRole("cell", { name: "ssh.exe" })).toHaveLength(2);
+  expect(screen.getByRole("cell", { name: "0.0.0.0" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "绑定地址" })).toBeInTheDocument();
   expect(screen.getByRole("cell", { name: "8085" })).toBeInTheDocument();
   expect(screen.getByRole("cell", { name: "2222" })).toBeInTheDocument();
   expect(screen.getByText("监听中")).toBeInTheDocument();
