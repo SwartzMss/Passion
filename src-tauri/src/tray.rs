@@ -55,23 +55,73 @@ fn should_show_main_window_from_tray_event(event: &TrayIconEvent) -> bool {
     )
 }
 
-fn show_main_window(app: &AppHandle) -> BackendResult<()> {
+fn run_window_activation(
+    show: impl FnOnce() -> BackendResult<()>,
+    focus: impl FnOnce() -> BackendResult<()>,
+) -> BackendResult<()> {
+    show()?;
+    focus()?;
+    Ok(())
+}
+
+pub(crate) fn show_main_window(app: &AppHandle) -> BackendResult<()> {
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| BackendError::Window("main window was not found".to_string()))?;
-    window
-        .show()
-        .map_err(|err| BackendError::Window(err.to_string()))?;
-    window
-        .set_focus()
-        .map_err(|err| BackendError::Window(err.to_string()))?;
-    Ok(())
+    run_window_activation(
+        || {
+            window
+                .show()
+                .map_err(|err| BackendError::Window(err.to_string()))
+        },
+        || {
+            window
+                .set_focus()
+                .map_err(|err| BackendError::Window(err.to_string()))
+        },
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::{Cell, RefCell};
     use tauri::{tray::TrayIconId, PhysicalPosition, PhysicalSize, Position, Rect, Size};
+
+    #[test]
+    fn window_activation_shows_before_focusing() {
+        let operations = RefCell::new(Vec::new());
+
+        run_window_activation(
+            || {
+                operations.borrow_mut().push("show");
+                Ok(())
+            },
+            || {
+                operations.borrow_mut().push("focus");
+                Ok(())
+            },
+        )
+        .unwrap();
+
+        assert_eq!(*operations.borrow(), vec!["show", "focus"]);
+    }
+
+    #[test]
+    fn window_activation_stops_when_show_fails() {
+        let focused = Cell::new(false);
+
+        let result = run_window_activation(
+            || Err(BackendError::Window("show failed".to_string())),
+            || {
+                focused.set(true);
+                Ok(())
+            },
+        );
+
+        assert!(result.is_err());
+        assert!(!focused.get());
+    }
 
     #[test]
     fn left_double_click_shows_main_window() {

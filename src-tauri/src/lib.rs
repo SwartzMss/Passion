@@ -28,7 +28,23 @@ use tauri::{Manager, WindowEvent};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Err(err) = tray::show_main_window(app) {
+                let message = format!("failed to activate main window from second launch: {err}");
+                if let Some(state) = app.try_state::<AppState>() {
+                    app_log::error(&state.log_path, message);
+                } else {
+                    eprintln!("{message}");
+                }
+            }
+        }));
+    }
+
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
