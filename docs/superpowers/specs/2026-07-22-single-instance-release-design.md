@@ -36,8 +36,8 @@ The existing Passion process remains authoritative. If the main window cannot be
 
 - Update package metadata, Tauri configuration, and the frontend version constant from 1.0.4 to 1.0.5 using the repository's existing release pattern.
 - Commit and push the fix to `main` as requested for a release.
-- Create and push the annotated `v1.0.5` tag only after verification passes.
-- Publish a GitHub Release for `v1.0.5` describing the single-instance fix and Windows verification expectation.
+- Create and push the annotated `app-v1.0.5` tag only after verification passes; this is the tag pattern consumed by the existing Windows release workflow.
+- Publish a GitHub Release named `Passion v1.0.5` describing the single-instance fix and Windows verification expectation.
 - Close issue #37 through the release notes or a dedicated issue update once the release is published.
 
 ## Out of Scope
