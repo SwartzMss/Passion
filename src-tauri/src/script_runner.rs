@@ -502,7 +502,7 @@ mod tests {
         std::fs::write(
             &parent_script_path,
             format!(
-                "Start-Process powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','{}') -PassThru\n$deadline = (Get-Date).AddSeconds(4)\nwhile (!(Test-Path -LiteralPath '{}') -and (Get-Date) -lt $deadline) {{ [System.Threading.Thread]::Sleep(10) }}\nexit 0\n",
+                "Start-Process powershell.exe -NoNewWindow -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','{}') -PassThru\n$deadline = (Get-Date).AddSeconds(4)\nwhile (!(Test-Path -LiteralPath '{}') -and (Get-Date) -lt $deadline) {{ [System.Threading.Thread]::Sleep(10) }}\nexit 0\n",
                 quote_path(&child_script_path),
                 quote_path(&started_marker_path)
             ),
