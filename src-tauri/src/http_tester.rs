@@ -5,6 +5,7 @@ use reqwest::{Client, Method, Url};
 use std::time::{Duration, Instant};
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
+const MAX_RESPONSE_BODY_BYTES: usize = 10 * 1024 * 1024;
 
 pub async fn send_http_request(input: HttpApiRequest) -> BackendResult<HttpApiResponse> {
     let method = parse_method(&input.method)?;
@@ -29,7 +30,7 @@ pub async fn send_http_request(input: HttpApiRequest) -> BackendResult<HttpApiRe
     }
 
     let started_at = Instant::now();
-    let response = request
+    let mut response = request
         .send()
         .await
         .map_err(|err| BackendError::HttpApi(err.to_string()))?;
@@ -43,17 +44,46 @@ pub async fn send_http_request(input: HttpApiRequest) -> BackendResult<HttpApiRe
             value: value.to_str().unwrap_or("").to_string(),
         })
         .collect::<Vec<_>>();
-    let body = response
-        .text()
-        .await
-        .map_err(|err| BackendError::HttpApi(err.to_string()))?;
-    let size_bytes = body.len();
+    let content_length_exceeds_limit = response
+        .content_length()
+        .is_some_and(|length| length > MAX_RESPONSE_BODY_BYTES as u64);
+    let mut body_bytes = Vec::with_capacity(
+        response
+            .content_length()
+            .map(|length| length.min(MAX_RESPONSE_BODY_BYTES as u64) as usize)
+            .unwrap_or(0),
+    );
+    let mut truncated = content_length_exceeds_limit;
+
+    loop {
+        let chunk = response
+            .chunk()
+            .await
+            .map_err(|err| BackendError::HttpApi(err.to_string()))?;
+        let Some(chunk) = chunk else {
+            break;
+        };
+        let remaining = MAX_RESPONSE_BODY_BYTES.saturating_sub(body_bytes.len());
+        if chunk.len() > remaining {
+            body_bytes.extend_from_slice(&chunk[..remaining]);
+            truncated = true;
+            break;
+        }
+        body_bytes.extend_from_slice(&chunk);
+        if truncated && body_bytes.len() == MAX_RESPONSE_BODY_BYTES {
+            break;
+        }
+    }
+
+    let size_bytes = body_bytes.len();
+    let body = String::from_utf8_lossy(&body_bytes).into_owned();
 
     Ok(HttpApiResponse {
         status: status.as_u16(),
         status_text: status.canonical_reason().unwrap_or("").to_string(),
         elapsed_ms,
         size_bytes,
+        truncated,
         received_at: Utc::now(),
         headers,
         body,
@@ -137,6 +167,7 @@ mod tests {
         assert_eq!(response.body, r#"{"created":true}"#);
         assert!(response.elapsed_ms > 0);
         assert_eq!(response.size_bytes, 16);
+        assert!(!response.truncated);
         assert!(response
             .headers
             .iter()
@@ -155,5 +186,39 @@ mod tests {
         .await;
 
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn truncates_responses_that_exceed_the_memory_limit() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+        let address = listener.local_addr().expect("local addr");
+        let body = vec![b'a'; super::MAX_RESPONSE_BODY_BYTES + 1];
+        let content_length = body.len();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept request");
+            let mut request = [0; 1024];
+            stream.read(&mut request).expect("read request");
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\ncontent-length: {content_length}\r\n\r\n"
+            )
+            .expect("write response headers");
+            let _ = stream.write_all(&body);
+        });
+
+        let response = super::send_http_request(HttpApiRequest {
+            method: "GET".to_string(),
+            url: format!("http://{address}/large"),
+            headers: vec![],
+            query: vec![],
+            body: None,
+        })
+        .await
+        .expect("send request");
+
+        handle.join().expect("server thread");
+        assert_eq!(response.body.len(), super::MAX_RESPONSE_BODY_BYTES);
+        assert_eq!(response.size_bytes, super::MAX_RESPONSE_BODY_BYTES);
+        assert!(response.truncated);
     }
 }
