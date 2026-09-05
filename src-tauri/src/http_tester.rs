@@ -108,6 +108,7 @@ fn decode_response_body(body: &[u8], content_type: Option<&str>) -> String {
     let encoding = charset
         .and_then(|label| Encoding::for_label(label.as_bytes()))
         .unwrap_or(UTF_8);
+    // `decode` performs BOM sniffing and removes the BOM, matching reqwest's text path.
     let (text, _, _) = encoding.decode(body);
     text.into_owned()
 }
