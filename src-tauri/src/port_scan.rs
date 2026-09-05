@@ -1,6 +1,6 @@
 use crate::error::{BackendError, BackendResult};
 use crate::models::{PortCheckResult, PortScanProgress, PortScanRequest};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{
@@ -9,11 +9,12 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
-use tokio::net::TcpStream;
+use tokio::net::{lookup_host, TcpStream};
 use tokio::sync::{mpsc, watch, Mutex, Semaphore};
 use uuid::Uuid;
 
 const MAX_SCAN_CONCURRENCY: usize = 64;
+const MAX_COMPLETED_SCAN_IDS: usize = 16;
 const PORT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
 #[derive(Debug, PartialEq, Eq)]
@@ -99,13 +100,23 @@ async fn scan_ports_with_probe_and_updates<P>(
     request: PortScanRequest,
     probe: P,
     cancel_rx: watch::Receiver<bool>,
-    updates: Option<mpsc::UnboundedSender<ScanUpdate>>,
+    updates: Option<mpsc::Sender<ScanUpdate>>,
 ) -> BackendResult<ScanSummary>
 where
     P: PortProbe + Clone + Send + Sync + 'static,
 {
     validate_request(&request)?;
     let host = request.host.trim().to_string();
+    let has_address = lookup_host((host.as_str(), request.start_port))
+        .await
+        .map_err(|err| BackendError::NetworkDiagnostic(format!("无法解析 Host：{err}")))?
+        .next()
+        .is_some();
+    if !has_address {
+        return Err(BackendError::NetworkDiagnostic(
+            "无法解析 Host。".to_string(),
+        ));
+    }
     let total = u32::from(request.end_port - request.start_port) + 1;
     let next_port = Arc::new(AtomicU32::new(0));
     let completed = Arc::new(AtomicU32::new(0));
@@ -150,11 +161,13 @@ where
                 drop(permit);
                 completed.fetch_add(1, Ordering::Relaxed);
                 if let Some(updates) = &updates {
-                    let _ = updates.send(ScanUpdate {
+                    let _ = updates
+                        .send(ScanUpdate {
                         completed: completed.load(Ordering::Relaxed),
                         total,
                         result: result.open.then_some(result.clone()),
-                    });
+                        })
+                        .await;
                 }
                 if result.open {
                     open_ports.lock().await.push(result);
@@ -183,6 +196,7 @@ where
 #[derive(Clone, Default)]
 pub(crate) struct PortScanManager {
     active_scans: Arc<Mutex<HashMap<String, watch::Sender<bool>>>>,
+    completed_scans: Arc<Mutex<VecDeque<String>>>,
 }
 
 impl PortScanManager {
@@ -202,7 +216,7 @@ impl PortScanManager {
         let manager = self.clone();
         let scan_id_for_task = scan_id.clone();
         tokio::spawn(async move {
-            let (updates, mut update_rx) = mpsc::unbounded_channel();
+            let (updates, mut update_rx) = mpsc::channel(64);
             let scan = tokio::spawn(scan_ports_with_probe_and_updates(
                 request,
                 TcpPortProbe,
@@ -279,6 +293,15 @@ impl PortScanManager {
                 let _ = sender.send(true);
                 Ok(())
             }
+            None if self
+                .completed_scans
+                .lock()
+                .await
+                .iter()
+                .any(|completed_id| completed_id == scan_id) =>
+            {
+                Ok(())
+            }
             None => Err(BackendError::NetworkDiagnostic(
                 "端口扫描任务不存在或已结束。".to_string(),
             )),
@@ -288,6 +311,13 @@ impl PortScanManager {
     async fn finish(&self, scan_id: &str) {
         let mut active_scans = self.active_scans.lock().await;
         active_scans.remove(scan_id);
+        drop(active_scans);
+
+        let mut completed_scans = self.completed_scans.lock().await;
+        completed_scans.push_back(scan_id.to_string());
+        while completed_scans.len() > MAX_COMPLETED_SCAN_IDS {
+            completed_scans.pop_front();
+        }
     }
 }
 
@@ -421,6 +451,27 @@ mod tests {
 
         assert_eq!(summary.open_ports.len(), 1);
         assert_eq!(summary.open_ports[0].port, port);
+    }
+
+    #[tokio::test]
+    async fn scan_rejects_an_unresolvable_host() {
+        let mut request = request(80, 80);
+        request.host = "host-that-does-not-exist.invalid".to_string();
+        let (_cancel, cancel_rx) = never_cancel();
+
+        let err = scan_ports_with_probe(request, TcpPortProbe, cancel_rx)
+            .await
+            .unwrap_err();
+
+        assert!(err.to_string().contains("无法解析 Host"));
+    }
+
+    #[tokio::test]
+    async fn stop_is_idempotent_after_scan_finished() {
+        let manager = PortScanManager::default();
+        manager.finish("scan-1").await;
+
+        manager.stop("scan-1").await.unwrap();
     }
 
     #[tokio::test]

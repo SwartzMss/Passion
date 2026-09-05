@@ -72,34 +72,65 @@ async fn run_script_inner(
     timeout: Duration,
 ) -> BackendResult<ScriptExecutionOutput> {
     let plan = build_command_plan(&task.script_path, task.script_args.as_deref().unwrap_or(""))?;
-    let mut child = Command::new(&plan.program)
+    let mut command = Command::new(&plan.program);
+    command
         .args(&plan.args)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(unix)]
+    command.process_group(0);
+    let mut child = command
         .spawn()
         .map_err(|err| BackendError::ScriptTask(format!("脚本执行失败：{err}")))?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| BackendError::ScriptTask("脚本 stdout 管道创建失败。".to_string()))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| BackendError::ScriptTask("脚本 stderr 管道创建失败。".to_string()))?;
+    let process_group_pid = child.id();
+    let stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            terminate_child(&mut child, process_group_pid).await;
+            return Err(BackendError::ScriptTask(
+                "脚本 stdout 管道创建失败。".to_string(),
+            ));
+        }
+    };
+    let stderr = match child.stderr.take() {
+        Some(stderr) => stderr,
+        None => {
+            terminate_child(&mut child, process_group_pid).await;
+            return Err(BackendError::ScriptTask(
+                "脚本 stderr 管道创建失败。".to_string(),
+            ));
+        }
+    };
     let stdout_task = tokio::spawn(collect_output(stdout, MAX_OUTPUT_BYTES));
     let stderr_task = tokio::spawn(collect_output(stderr, MAX_OUTPUT_BYTES));
 
-    let status = match tokio::time::timeout(timeout, child.wait()).await {
-        Ok(result) => {
-            result.map_err(|err| BackendError::ScriptTask(format!("脚本等待失败：{err}")))?
-        }
+    let mut stdout_task = stdout_task;
+    let mut stderr_task = stderr_task;
+    let execution = async {
+        let status = child
+            .wait()
+            .await
+            .map_err(|err| BackendError::ScriptTask(format!("脚本等待失败：{err}")))?;
+        let stdout = (&mut stdout_task)
+            .await
+            .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stdout 失败：{err}")))?
+            .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stdout 失败：{err}")))?;
+        let stderr = (&mut stderr_task)
+            .await
+            .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stderr 失败：{err}")))?
+            .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stderr 失败：{err}")))?;
+        Ok::<_, BackendError>((status, stdout, stderr))
+    };
+
+    let (status, stdout, stderr) = match tokio::time::timeout(timeout, execution).await {
+        Ok(result) => result?,
         Err(_) => {
-            terminate_child(&mut child).await;
-            let stdout = stdout_task
+            terminate_child(&mut child, process_group_pid).await;
+            let stdout = (&mut stdout_task)
                 .await
                 .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stdout 失败：{err}")))?
                 .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stdout 失败：{err}")))?;
-            let stderr = stderr_task
+            let stderr = (&mut stderr_task)
                 .await
                 .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stderr 失败：{err}")))?
                 .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stderr 失败：{err}")))?;
@@ -111,14 +142,6 @@ async fn run_script_inner(
             });
         }
     };
-    let stdout = stdout_task
-        .await
-        .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stdout 失败：{err}")))?
-        .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stdout 失败：{err}")))?;
-    let stderr = stderr_task
-        .await
-        .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stderr 失败：{err}")))?
-        .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stderr 失败：{err}")))?;
 
     Ok(ScriptExecutionOutput {
         exit_code: status.code(),
@@ -128,18 +151,35 @@ async fn run_script_inner(
     })
 }
 
-async fn terminate_child(child: &mut tokio::process::Child) {
-    #[cfg(windows)]
-    if let Some(pid) = child.id() {
-        let _ = Command::new("taskkill")
-            .args(["/PID", &pid.to_string(), "/T", "/F"])
-            .status()
-            .await;
-    } else {
-        let _ = child.kill().await;
+async fn terminate_child(child: &mut tokio::process::Child, process_group_pid: Option<u32>) {
+    #[cfg(unix)]
+    {
+        let killed_group = process_group_pid.or_else(|| child.id()).is_some_and(|pid| {
+            // The child is started as its own process group so descendants do not
+            // retain stdout/stderr pipes after a timeout.
+            unsafe { libc::kill(-(pid as i32), libc::SIGKILL) == 0 }
+        });
+        if !killed_group {
+            let _ = child.kill().await;
+        }
     }
 
-    #[cfg(not(windows))]
+    #[cfg(windows)]
+    {
+        let killed_tree = child.id().or(process_group_pid).map(|pid| async move {
+            Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .status()
+                .await
+                .map(|status| status.success())
+                .unwrap_or(false)
+        });
+        if !killed_tree.map(|future| future.await).unwrap_or(false) {
+            let _ = child.kill().await;
+        }
+    }
+
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = child.kill().await;
     }
@@ -367,6 +407,7 @@ mod tests {
 
     #[tokio::test]
     async fn run_script_reports_timeout_and_reaps_child() {
+        let started = std::time::Instant::now();
         let result =
             run_script_with_timeout(&test_sleeping_task(), Duration::from_millis(50)).await;
 
@@ -375,6 +416,26 @@ mod tests {
             .as_deref()
             .is_some_and(|message| message.contains("超时")));
         assert!(result.finished_at >= result.started_at);
+        assert!(started.elapsed() < Duration::from_millis(500));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn run_script_times_out_when_descendant_keeps_output_pipe_open() {
+        let task = ScriptTask {
+            script_path: "sh".to_string(),
+            script_args: Some("-c \"sleep 1 & exit 0\"".to_string()),
+            ..test_sleeping_task()
+        };
+        let started = std::time::Instant::now();
+
+        let result = run_script_with_timeout(&task, Duration::from_millis(50)).await;
+
+        assert!(result
+            .error
+            .as_deref()
+            .is_some_and(|message| message.contains("超时")));
+        assert!(started.elapsed() < Duration::from_millis(500));
     }
 
     #[cfg(unix)]

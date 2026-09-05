@@ -2606,6 +2606,7 @@ version = "1.0.5"
 dependencies = [
  "chrono",
  "encoding_rs",
+ "libc",
  "reqwest 0.12.28",
  "rusqlite",
  "serde",

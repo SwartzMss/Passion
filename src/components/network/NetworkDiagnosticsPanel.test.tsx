@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { NetworkDiagnosticsPanel } from "./NetworkDiagnosticsPanel";
@@ -165,6 +165,31 @@ it("stops the active backend scan", async () => {
 
   const api = await import("../../lib/api");
   expect(api.stopPortScan).toHaveBeenCalledWith("scan-1");
+});
+
+it("cancels a scan if the component unmounts while it is starting", async () => {
+  const user = userEvent.setup();
+  const api = await import("../../lib/api");
+  vi.mocked(api.startPortScan).mockClear();
+  vi.mocked(api.stopPortScan).mockClear();
+  let resolveStart!: (scanId: string) => void;
+  vi.mocked(api.startPortScan).mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveStart = resolve;
+    }),
+  );
+  const view = render(<NetworkDiagnosticsPanel />);
+
+  await user.click(screen.getByRole("button", { name: "范围扫描" }));
+  const startClick = user.click(screen.getByRole("button", { name: /开始扫描/ }));
+  await waitFor(() => expect(api.startPortScan).toHaveBeenCalled());
+  view.unmount();
+  resolveStart("scan-pending");
+  await startClick;
+
+  await waitFor(() => {
+    expect(api.stopPortScan).toHaveBeenCalledWith("scan-pending");
+  });
 });
 
 it("warns but allows large port ranges", async () => {

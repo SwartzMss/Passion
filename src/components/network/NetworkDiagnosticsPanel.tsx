@@ -52,6 +52,8 @@ export function NetworkDiagnosticsPanel() {
   const activeScanIdRef = useRef<string | null>(null);
   const scanUnlistenRef = useRef<(() => void) | null>(null);
   const pendingScanProgressRef = useRef<PortScanProgress[]>([]);
+  const scanGenerationRef = useRef(0);
+  const isMountedRef = useRef(true);
   const portValidation = validatePortValue(portValue);
   const scanValidation = validatePortRange(scanStartPort, scanEndPort);
   const occupancyValidation = validatePortValue(occupancyPort);
@@ -99,6 +101,7 @@ export function NetworkDiagnosticsPanel() {
     const host = portHost.trim();
     const startPort = Number(scanStartPort);
     const endPort = Number(scanEndPort);
+    const generation = ++scanGenerationRef.current;
     setError(null);
     setScanResults([]);
     setScanCompleted(0);
@@ -109,7 +112,7 @@ export function NetworkDiagnosticsPanel() {
     const handleProgress = (progress: PortScanProgress) => {
       const activeScanId = activeScanIdRef.current;
       if (!activeScanId) {
-        pendingScanProgressRef.current.push(progress);
+        pendingScanProgressRef.current = [progress];
         return;
       }
       if (progress.scanId !== activeScanId) {
@@ -119,14 +122,27 @@ export function NetworkDiagnosticsPanel() {
     };
 
     try {
-      scanUnlistenRef.current = await onPortScanProgress(handleProgress);
+      const unlisten = await onPortScanProgress(handleProgress);
+      if (!isMountedRef.current || generation !== scanGenerationRef.current) {
+        unlisten();
+        return;
+      }
+      scanUnlistenRef.current = unlisten;
       const scanId = await startPortScan({ host, startPort, endPort });
+      if (!isMountedRef.current || generation !== scanGenerationRef.current) {
+        await cancelPortScan(scanId);
+        unlisten();
+        return;
+      }
       activeScanIdRef.current = scanId;
       for (const progress of pendingScanProgressRef.current.splice(0)) {
         handleProgress(progress);
       }
     } catch (err) {
       pendingScanProgressRef.current = [];
+      if (!isMountedRef.current || generation !== scanGenerationRef.current) {
+        return;
+      }
       setError(readError(err));
       setIsScanRunning(false);
       clearScanListener();
@@ -167,11 +183,14 @@ export function NetworkDiagnosticsPanel() {
 
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
+      scanGenerationRef.current += 1;
       const scanId = activeScanIdRef.current;
       if (scanId) {
         void cancelPortScan(scanId);
       }
       activeScanIdRef.current = null;
+      pendingScanProgressRef.current = [];
       clearScanListener();
     };
   }, []);
