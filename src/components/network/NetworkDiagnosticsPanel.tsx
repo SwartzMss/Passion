@@ -24,6 +24,7 @@ const NETWORK_TABS: Array<{ id: NetworkTab; label: string }> = [
   { id: "port_occupancy", label: "端口占用" },
 ];
 const LARGE_SCAN_THRESHOLD = 1000;
+const MAX_PENDING_SCAN_EVENTS = 65_536;
 
 export function NetworkDiagnosticsPanel() {
   const [activeTab, setActiveTab] = useState<NetworkTab>("port_check");
@@ -112,7 +113,15 @@ export function NetworkDiagnosticsPanel() {
     const handleProgress = (progress: PortScanProgress) => {
       const activeScanId = activeScanIdRef.current;
       if (!activeScanId) {
-        pendingScanProgressRef.current = [progress];
+        const openProgress = pendingScanProgressRef.current.filter(
+          (item) => item.result?.open,
+        );
+        const latestProgress = progress.result?.open ? null : progress;
+        pendingScanProgressRef.current = [
+          ...openProgress,
+          ...(latestProgress ? [latestProgress] : []),
+          ...(progress.result?.open ? [progress] : []),
+        ].slice(-MAX_PENDING_SCAN_EVENTS);
         return;
       }
       if (progress.scanId !== activeScanId) {
@@ -182,6 +191,7 @@ export function NetworkDiagnosticsPanel() {
   }
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       scanGenerationRef.current += 1;

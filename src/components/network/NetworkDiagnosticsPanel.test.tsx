@@ -192,6 +192,55 @@ it("cancels a scan if the component unmounts while it is starting", async () => 
   });
 });
 
+it("keeps open results received before the backend returns the scan id", async () => {
+  const user = userEvent.setup();
+  const api = await import("../../lib/api");
+  vi.mocked(api.startPortScan).mockClear();
+  let resolveStart!: (scanId: string) => void;
+  vi.mocked(api.startPortScan).mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveStart = resolve;
+    }),
+  );
+  render(<NetworkDiagnosticsPanel />);
+
+  await user.click(screen.getByRole("button", { name: "范围扫描" }));
+  const startClick = user.click(screen.getByRole("button", { name: /开始扫描/ }));
+  await waitFor(() => expect(api.startPortScan).toHaveBeenCalled());
+  emitProgress({
+    scanId: "scan-buffered",
+    completed: 1,
+    total: 2,
+    result: { host: "127.0.0.1", port: 2, open: true, elapsedMs: 12 },
+    done: false,
+    stopped: false,
+    error: null,
+  });
+  emitProgress({
+    scanId: "scan-buffered",
+    completed: 2,
+    total: 2,
+    result: { host: "127.0.0.1", port: 3, open: true, elapsedMs: 13 },
+    done: false,
+    stopped: false,
+    error: null,
+  });
+  emitProgress({
+    scanId: "scan-buffered",
+    completed: 2,
+    total: 2,
+    done: true,
+    stopped: false,
+    error: null,
+  });
+  resolveStart("scan-buffered");
+  await startClick;
+
+  expect(await screen.findByText("已发现 2 个开放端口")).toBeInTheDocument();
+  expect(screen.getByRole("cell", { name: "2" })).toBeInTheDocument();
+  expect(screen.getByRole("cell", { name: "3" })).toBeInTheDocument();
+});
+
 it("warns but allows large port ranges", async () => {
   const user = userEvent.setup();
   render(<NetworkDiagnosticsPanel />);

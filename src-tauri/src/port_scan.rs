@@ -16,6 +16,7 @@ use uuid::Uuid;
 const MAX_SCAN_CONCURRENCY: usize = 64;
 const MAX_COMPLETED_SCAN_IDS: usize = 16;
 const PORT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+const HOST_RESOLVE_TIMEOUT: Duration = Duration::from_secs(3);
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ScanSummary {
@@ -107,17 +108,18 @@ where
 {
     validate_request(&request)?;
     let host = request.host.trim().to_string();
-    let has_address = lookup_host((host.as_str(), request.start_port))
-        .await
-        .map_err(|err| BackendError::NetworkDiagnostic(format!("无法解析 Host：{err}")))?
-        .next()
-        .is_some();
-    if !has_address {
-        return Err(BackendError::NetworkDiagnostic(
-            "无法解析 Host。".to_string(),
-        ));
-    }
     let total = u32::from(request.end_port - request.start_port) + 1;
+    let resolved_host = match resolve_host(&host, request.start_port, &cancel_rx).await? {
+        Some(host) => host,
+        None => {
+            return Ok(ScanSummary {
+                completed: 0,
+                total,
+                open_ports: Vec::new(),
+                stopped: true,
+            });
+        }
+    };
     let next_port = Arc::new(AtomicU32::new(0));
     let completed = Arc::new(AtomicU32::new(0));
     let open_ports = Arc::new(Mutex::new(Vec::new()));
@@ -126,7 +128,8 @@ where
     let mut workers = Vec::with_capacity(worker_count);
 
     for _ in 0..worker_count {
-        let host = host.clone();
+        let display_host = host.clone();
+        let resolved_host = resolved_host.clone();
         let probe = probe.clone();
         let next_port = Arc::clone(&next_port);
         let completed = Arc::clone(&completed);
@@ -151,13 +154,14 @@ where
                     permit = semaphore.clone().acquire_owned() => permit.expect("scan semaphore closed"),
                 };
                 let port = request.start_port + offset as u16;
-                let result = tokio::select! {
+                let mut result = tokio::select! {
                     _ = worker_cancel.changed() => {
                         if *worker_cancel.borrow() { drop(permit); break; }
                         continue;
                     }
-                    result = probe.probe(host.clone(), port) => result,
+                    result = probe.probe(resolved_host.clone(), port) => result,
                 };
+                result.host = display_host.clone();
                 drop(permit);
                 completed.fetch_add(1, Ordering::Relaxed);
                 if let Some(updates) = &updates {
@@ -193,10 +197,56 @@ where
     })
 }
 
+async fn resolve_host(
+    host: &str,
+    port: u16,
+    cancel_rx: &watch::Receiver<bool>,
+) -> BackendResult<Option<String>> {
+    if *cancel_rx.borrow() {
+        return Ok(None);
+    }
+
+    let mut cancel_rx = cancel_rx.clone();
+    let lookup = tokio::time::timeout(HOST_RESOLVE_TIMEOUT, lookup_host((host, port)));
+    tokio::pin!(lookup);
+    let result = tokio::select! {
+        changed = cancel_rx.changed() => {
+            if changed.is_ok() && *cancel_rx.borrow() {
+                return Ok(None);
+            }
+            (&mut lookup).await
+        }
+        result = &mut lookup => result,
+    };
+    let mut addresses = match result {
+        Ok(Ok(addresses)) => addresses,
+        Ok(Err(err)) => {
+            return Err(BackendError::NetworkDiagnostic(format!(
+                "无法解析 Host：{err}"
+            )));
+        }
+        Err(_) => {
+            return Err(BackendError::NetworkDiagnostic(
+                "解析 Host 超时。".to_string(),
+            ));
+        }
+    };
+    addresses
+        .next()
+        .map(|address| address.ip().to_string())
+        .ok_or_else(|| BackendError::NetworkDiagnostic("无法解析 Host。".to_string()))
+        .map(Some)
+}
+
 #[derive(Clone, Default)]
 pub(crate) struct PortScanManager {
-    active_scans: Arc<Mutex<HashMap<String, watch::Sender<bool>>>>,
-    completed_scans: Arc<Mutex<VecDeque<String>>>,
+    state: Arc<Mutex<PortScanState>>,
+}
+
+#[derive(Default)]
+struct PortScanState {
+    active_scans: HashMap<String, watch::Sender<bool>>,
+    completed_scans: VecDeque<String>,
 }
 
 impl PortScanManager {
@@ -205,12 +255,12 @@ impl PortScanManager {
         let scan_id = Uuid::new_v4().to_string();
         let (cancel_tx, cancel_rx) = watch::channel(false);
         {
-            let mut active_scans = self.active_scans.lock().await;
-            for sender in active_scans.values() {
+            let mut state = self.state.lock().await;
+            for sender in state.active_scans.values() {
                 let _ = sender.send(true);
             }
-            active_scans.clear();
-            active_scans.insert(scan_id.clone(), cancel_tx);
+            state.active_scans.clear();
+            state.active_scans.insert(scan_id.clone(), cancel_tx);
         }
 
         let manager = self.clone();
@@ -287,18 +337,20 @@ impl PortScanManager {
     }
 
     pub async fn stop(&self, scan_id: &str) -> BackendResult<()> {
-        let sender = self.active_scans.lock().await.get(scan_id).cloned();
+        let state = self.state.lock().await;
+        let sender = state.active_scans.get(scan_id).cloned();
         match sender {
             Some(sender) => {
                 let _ = sender.send(true);
                 Ok(())
             }
-            None if self
+            // Scan IDs are UUIDs. Treating a valid but already-removed UUID as a
+            // no-op keeps stop idempotent without retaining an unbounded history.
+            None if state
                 .completed_scans
-                .lock()
-                .await
                 .iter()
-                .any(|completed_id| completed_id == scan_id) =>
+                .any(|completed_id| completed_id == scan_id)
+                || Uuid::parse_str(scan_id).is_ok() =>
             {
                 Ok(())
             }
@@ -309,14 +361,11 @@ impl PortScanManager {
     }
 
     async fn finish(&self, scan_id: &str) {
-        let mut active_scans = self.active_scans.lock().await;
-        active_scans.remove(scan_id);
-        drop(active_scans);
-
-        let mut completed_scans = self.completed_scans.lock().await;
-        completed_scans.push_back(scan_id.to_string());
-        while completed_scans.len() > MAX_COMPLETED_SCAN_IDS {
-            completed_scans.pop_front();
+        let mut state = self.state.lock().await;
+        state.active_scans.remove(scan_id);
+        state.completed_scans.push_back(scan_id.to_string());
+        while state.completed_scans.len() > MAX_COMPLETED_SCAN_IDS {
+            state.completed_scans.pop_front();
         }
     }
 }
@@ -464,6 +513,18 @@ mod tests {
             .unwrap_err();
 
         assert!(err.to_string().contains("无法解析 Host"));
+    }
+
+    #[tokio::test]
+    async fn scan_returns_stopped_when_cancelled_before_host_resolution() {
+        let (_cancel, cancel_rx) = watch::channel(true);
+
+        let summary = scan_ports_with_probe(request(80, 80), TcpPortProbe, cancel_rx)
+            .await
+            .unwrap();
+
+        assert!(summary.stopped);
+        assert_eq!(summary.completed, 0);
     }
 
     #[tokio::test]
