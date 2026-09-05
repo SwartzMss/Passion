@@ -483,16 +483,34 @@ mod tests {
         let alive_marker_name = format!("{marker_prefix}-alive.txt");
         let started_marker_path = std::env::temp_dir().join(&started_marker_name);
         let alive_marker_path = std::env::temp_dir().join(&alive_marker_name);
+        let child_script_path = std::env::temp_dir().join(format!("{marker_prefix}-child.ps1"));
+        let parent_script_path = std::env::temp_dir().join(format!("{marker_prefix}-parent.ps1"));
         let _ = std::fs::remove_file(&started_marker_path);
         let _ = std::fs::remove_file(&alive_marker_path);
-        let task = ScriptTask {
-            script_path: "powershell.exe".to_string(),
-            script_args: Some(
-                format!(
-                    "-NoProfile -Command \"$child = Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Set-Content -LiteralPath (Join-Path $env:TEMP ''{}'') -Value started; Start-Sleep -Milliseconds 5000; Set-Content -LiteralPath (Join-Path $env:TEMP ''{}'') -Value alive' -PassThru; $deadline = (Get-Date).AddSeconds(4); while (!(Test-Path -LiteralPath (Join-Path $env:TEMP '{}')) -and (Get-Date) -lt $deadline) {{ Start-Sleep -Milliseconds 10 }}; exit 0\"",
-                    started_marker_name, alive_marker_name, started_marker_name
-                ),
+        let _ = std::fs::remove_file(&child_script_path);
+        let _ = std::fs::remove_file(&parent_script_path);
+        let quote_path = |path: &Path| path.to_string_lossy().replace('\'', "''");
+        std::fs::write(
+            &child_script_path,
+            format!(
+                "Set-Content -LiteralPath '{}' -Value started\nStart-Sleep -Seconds 5\nSet-Content -LiteralPath '{}' -Value alive\n",
+                quote_path(&started_marker_path),
+                quote_path(&alive_marker_path)
             ),
+        )
+        .unwrap();
+        std::fs::write(
+            &parent_script_path,
+            format!(
+                "Start-Process powershell.exe -ArgumentList @('-NoProfile','-File','\"{}\"') -PassThru\n$deadline = (Get-Date).AddSeconds(4)\nwhile (!(Test-Path -LiteralPath '{}') -and (Get-Date) -lt $deadline) {{ [System.Threading.Thread]::Sleep(10) }}\nexit 0\n",
+                quote_path(&child_script_path),
+                quote_path(&started_marker_path)
+            ),
+        )
+        .unwrap();
+        let task = ScriptTask {
+            script_path: parent_script_path.to_string_lossy().into_owned(),
+            script_args: None,
             ..test_sleeping_task()
         };
         let started = std::time::Instant::now();
@@ -510,6 +528,8 @@ mod tests {
         let alive_marker_exists = alive_marker_path.exists();
         let _ = std::fs::remove_file(&started_marker_path);
         let _ = std::fs::remove_file(&alive_marker_path);
+        let _ = std::fs::remove_file(&child_script_path);
+        let _ = std::fs::remove_file(&parent_script_path);
         assert!(!alive_marker_exists);
     }
 
@@ -517,13 +537,13 @@ mod tests {
     #[tokio::test]
     async fn preserving_windows_job_object_does_not_kill_a_running_script() {
         let mut command = Command::new("powershell.exe");
-        command.args(["-NoProfile", "-Command", "Start-Sleep -Milliseconds 100"]);
+        command.args(["-NoProfile", "-Command", "Start-Sleep -Seconds 1"]);
         let mut child = command.spawn().unwrap();
         let job = windows_job::JobObject::attach(&child).unwrap();
         job.preserve_processes().unwrap();
         drop(job);
 
-        let status = tokio::time::timeout(Duration::from_secs(1), child.wait())
+        let status = tokio::time::timeout(Duration::from_secs(2), child.wait())
             .await
             .unwrap()
             .unwrap();
