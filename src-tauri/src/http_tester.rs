@@ -223,6 +223,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn decodes_charset_response_and_reports_retained_bytes() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+        let address = listener.local_addr().expect("local addr");
+        let body = [0xe9];
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept request");
+            let mut request = [0; 1024];
+            stream.read(&mut request).expect("read request");
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\ncontent-type: text/plain; charset=windows-1252\r\ncontent-length: {}\r\n\r\n",
+                body.len()
+            )
+            .expect("write response headers");
+            stream.write_all(&body).expect("write response body");
+        });
+
+        let response = super::send_http_request(HttpApiRequest {
+            method: "GET".to_string(),
+            url: format!("http://{address}/charset"),
+            headers: vec![],
+            query: vec![],
+            body: None,
+        })
+        .await
+        .expect("send request");
+
+        handle.join().expect("server thread");
+        assert_eq!(response.body, "é");
+        assert_eq!(response.size_bytes, 1);
+        assert!(!response.truncated);
+    }
+
+    #[tokio::test]
     async fn truncates_responses_that_exceed_the_memory_limit() {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
         let address = listener.local_addr().expect("local addr");

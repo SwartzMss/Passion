@@ -113,7 +113,7 @@ let size_bytes = body_bytes.len();
 let body = String::from_utf8_lossy(&body_bytes).into_owned();
 ```
 
-This preserves small responses, caps retained memory, and stops after the cap once overflow is known. Include `size_bytes` and `truncated` in the `HttpApiResponse` initializer.
+This preserves status, headers, timing, and charset/BOM-aware text decoding for small responses, caps retained memory, and stops after the cap once overflow is known. `size_bytes` is the retained raw response-byte count. Include `size_bytes` and `truncated` in the `HttpApiResponse` initializer.
 
 - [ ] **Step 3: Run focused and complete backend tests.** Run `cargo test --manifest-path src-tauri/Cargo.toml http_tester::tests -- --nocapture`, then `cargo test --manifest-path src-tauri/Cargo.toml`. Expected: exit code 0 for both.
 
