@@ -249,6 +249,7 @@ pub struct HttpApiResponse {
     pub status_text: String,
     pub elapsed_ms: u128,
     pub size_bytes: usize,
+    pub truncated: bool,
     pub received_at: DateTime<Utc>,
     pub headers: Vec<HttpApiHeader>,
     pub body: String,
