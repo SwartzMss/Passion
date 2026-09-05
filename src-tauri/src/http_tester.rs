@@ -1,7 +1,8 @@
 use crate::error::{BackendError, BackendResult};
 use crate::models::{HttpApiHeader, HttpApiRequest, HttpApiResponse};
 use chrono::Utc;
-use reqwest::{Client, Method, Url};
+use encoding_rs::{Encoding, UTF_8};
+use reqwest::{header::CONTENT_TYPE, Client, Method, Url};
 use std::time::{Duration, Instant};
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
@@ -44,6 +45,11 @@ pub async fn send_http_request(input: HttpApiRequest) -> BackendResult<HttpApiRe
             value: value.to_str().unwrap_or("").to_string(),
         })
         .collect::<Vec<_>>();
+    let content_type = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
     let content_length_exceeds_limit = response
         .content_length()
         .is_some_and(|length| length > MAX_RESPONSE_BODY_BYTES as u64);
@@ -76,7 +82,7 @@ pub async fn send_http_request(input: HttpApiRequest) -> BackendResult<HttpApiRe
     }
 
     let size_bytes = body_bytes.len();
-    let body = String::from_utf8_lossy(&body_bytes).into_owned();
+    let body = decode_response_body(&body_bytes, content_type.as_deref());
 
     Ok(HttpApiResponse {
         status: status.as_u16(),
@@ -88,6 +94,22 @@ pub async fn send_http_request(input: HttpApiRequest) -> BackendResult<HttpApiRe
         headers,
         body,
     })
+}
+
+fn decode_response_body(body: &[u8], content_type: Option<&str>) -> String {
+    let charset = content_type.and_then(|value| {
+        value.split(';').find_map(|parameter| {
+            let (name, value) = parameter.split_once('=')?;
+            name.trim()
+                .eq_ignore_ascii_case("charset")
+                .then_some(value.trim().trim_matches('"'))
+        })
+    });
+    let encoding = charset
+        .and_then(|label| Encoding::for_label(label.as_bytes()))
+        .unwrap_or(UTF_8);
+    let (text, _, _) = encoding.decode(body);
+    text.into_owned()
 }
 
 fn parse_method(value: &str) -> BackendResult<Method> {
@@ -186,6 +208,18 @@ mod tests {
         .await;
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn decodes_response_body_with_declared_charset_and_bom() {
+        assert_eq!(
+            super::decode_response_body(b"\xef\xbb\xbfhello", Some("text/plain; charset=utf-8")),
+            "hello"
+        );
+        assert_eq!(
+            super::decode_response_body(&[0xe9], Some("text/plain; charset=windows-1252")),
+            "é"
+        );
     }
 
     #[tokio::test]
