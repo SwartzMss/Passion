@@ -43,6 +43,13 @@ extern "system" {
     fn AssignProcessToJobObject(job: Handle, process: Handle) -> Bool;
     fn CloseHandle(handle: Handle) -> Bool;
     fn CreateJobObjectW(attributes: *mut c_void, name: *const u16) -> Handle;
+    fn QueryInformationJobObject(
+        job: Handle,
+        info_class: Dword,
+        info: *mut c_void,
+        info_len: Dword,
+        return_len: *mut Dword,
+    ) -> Bool;
     fn SetInformationJobObject(
         job: Handle,
         info_class: Dword,
@@ -97,28 +104,31 @@ impl JobObject {
     }
 
     fn set_kill_on_close(&self, enabled: bool) -> io::Result<()> {
-        let mut limits = JobObjectExtendedLimitInformation {
-            basic_limit_information: JobObjectBasicLimitInformation {
-                per_process_user_time_limit: 0,
-                per_job_user_time_limit: 0,
-                limit_flags: if enabled {
-                    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-                } else {
-                    0
-                },
-                minimum_working_set_size: 0,
-                maximum_working_set_size: 0,
-                active_process_limit: 0,
-                affinity: 0,
-                priority_class: 0,
-                scheduling_class: 0,
-            },
-            io_info: IoCounters { counters: [0; 6] },
-            process_memory_limit: 0,
-            job_memory_limit: 0,
-            peak_process_memory_used: 0,
-            peak_job_memory_used: 0,
+        // Query the current limits before changing the single flag. Windows
+        // documents this read-modify-write pattern for job limits and it keeps
+        // future job attributes intact when successful execution preserves the
+        // process tree.
+        let mut limits = unsafe { std::mem::zeroed::<JobObjectExtendedLimitInformation>() };
+        let mut return_len = 0;
+        let queried = unsafe {
+            QueryInformationJobObject(
+                self.0,
+                JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS,
+                &mut limits as *mut JobObjectExtendedLimitInformation as *mut c_void,
+                size_of::<JobObjectExtendedLimitInformation>() as Dword,
+                &mut return_len,
+            ) != 0
         };
+        if !queried {
+            return Err(io::Error::last_os_error());
+        }
+
+        if enabled {
+            limits.basic_limit_information.limit_flags |= JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        } else {
+            limits.basic_limit_information.limit_flags &= !JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        }
+
         let updated = unsafe {
             SetInformationJobObject(
                 self.0,

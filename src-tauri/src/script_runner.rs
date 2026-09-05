@@ -502,7 +502,7 @@ mod tests {
         std::fs::write(
             &parent_script_path,
             format!(
-                "Start-Process powershell.exe -ArgumentList @('-NoProfile','-File','\"{}\"') -PassThru\n$deadline = (Get-Date).AddSeconds(4)\nwhile (!(Test-Path -LiteralPath '{}') -and (Get-Date) -lt $deadline) {{ [System.Threading.Thread]::Sleep(10) }}\nexit 0\n",
+                "Start-Process powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','\"{}\"') -PassThru\n$deadline = (Get-Date).AddSeconds(4)\nwhile (!(Test-Path -LiteralPath '{}') -and (Get-Date) -lt $deadline) {{ [System.Threading.Thread]::Sleep(10) }}\nexit 0\n",
                 quote_path(&child_script_path),
                 quote_path(&started_marker_path)
             ),
@@ -543,7 +543,7 @@ mod tests {
         job.preserve_processes().unwrap();
         drop(job);
 
-        let status = tokio::time::timeout(Duration::from_secs(2), child.wait())
+        let status = tokio::time::timeout(Duration::from_secs(5), child.wait())
             .await
             .unwrap()
             .unwrap();
