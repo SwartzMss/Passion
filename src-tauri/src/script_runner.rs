@@ -165,6 +165,11 @@ async fn run_script_inner(
         }
     };
 
+    #[cfg(windows)]
+    process_tree
+        .preserve_processes()
+        .map_err(|err| BackendError::ScriptTask(format!("脚本进程树释放失败：{err}")))?;
+
     Ok(ScriptExecutionOutput {
         exit_code: status.code(),
         stdout: decode_output(stdout),
@@ -473,10 +478,16 @@ mod tests {
     #[cfg(windows)]
     #[tokio::test]
     async fn run_script_times_out_when_windows_descendant_keeps_output_pipe_open() {
+        let marker_name = format!("passion-job-child-{}.txt", std::process::id());
+        let marker_path = std::env::temp_dir().join(&marker_name);
+        let _ = std::fs::remove_file(&marker_path);
         let task = ScriptTask {
             script_path: "powershell.exe".to_string(),
             script_args: Some(
-                "-NoProfile -Command \"Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep -Seconds 1' -PassThru; exit 0\"".to_string(),
+                format!(
+                    "-NoProfile -Command \"Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep -Milliseconds 500; Set-Content -LiteralPath (Join-Path $env:TEMP ''{}'') -Value alive' -PassThru; exit 0\"",
+                    marker_name
+                ),
             ),
             ..test_sleeping_task()
         };
@@ -489,15 +500,21 @@ mod tests {
             .as_deref()
             .is_some_and(|message| message.contains("超时")));
         assert!(started.elapsed() < Duration::from_millis(500));
+
+        tokio::time::sleep(Duration::from_millis(700)).await;
+        let marker_exists = marker_path.exists();
+        let _ = std::fs::remove_file(&marker_path);
+        assert!(!marker_exists);
     }
 
     #[cfg(windows)]
     #[tokio::test]
-    async fn dropping_windows_job_object_does_not_kill_a_running_script() {
+    async fn preserving_windows_job_object_does_not_kill_a_running_script() {
         let mut command = Command::new("powershell.exe");
         command.args(["-NoProfile", "-Command", "Start-Sleep -Milliseconds 100"]);
         let mut child = command.spawn().unwrap();
         let job = windows_job::JobObject::attach(&child).unwrap();
+        job.preserve_processes().unwrap();
         drop(job);
 
         let status = tokio::time::timeout(Duration::from_secs(1), child.wait())

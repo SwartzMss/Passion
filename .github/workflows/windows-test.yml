@@ -1,0 +1,37 @@
+name: Windows Tests
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/windows-test.yml"
+      - "src-tauri/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/windows-test.yml"
+      - "src-tauri/**"
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: Rust tests on Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Run Rust tests
+        working-directory: src-tauri
+        run: cargo test
