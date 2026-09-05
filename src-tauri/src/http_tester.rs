@@ -257,6 +257,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn strips_utf8_bom_from_http_response_body() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+        let address = listener.local_addr().expect("local addr");
+        let body = b"\xef\xbb\xbfhello";
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept request");
+            let mut request = [0; 1024];
+            stream.read(&mut request).expect("read request");
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\ncontent-type: text/plain\r\ncontent-length: {}\r\n\r\n",
+                body.len()
+            )
+            .expect("write response headers");
+            stream.write_all(body).expect("write response body");
+        });
+
+        let response = super::send_http_request(HttpApiRequest {
+            method: "GET".to_string(),
+            url: format!("http://{address}/bom"),
+            headers: vec![],
+            query: vec![],
+            body: None,
+        })
+        .await
+        .expect("send request");
+
+        handle.join().expect("server thread");
+        assert_eq!(response.body, "hello");
+        assert_eq!(response.size_bytes, body.len());
+        assert!(!response.truncated);
+    }
+
+    #[tokio::test]
     async fn truncates_responses_that_exceed_the_memory_limit() {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
         let address = listener.local_addr().expect("local addr");
