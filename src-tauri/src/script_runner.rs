@@ -199,20 +199,18 @@ async fn terminate_child(
 
     #[cfg(windows)]
     {
-        let killed_tree = _process_tree.terminate()
-            || child
-                .id()
-                .or(process_group_pid)
-                .map(|pid| async move {
-                    Command::new("taskkill")
-                        .args(["/PID", &pid.to_string(), "/T", "/F"])
-                        .status()
-                        .await
-                        .map(|status| status.success())
-                        .unwrap_or(false)
-                })
-                .map(|future| future.await)
-                .unwrap_or(false);
+        let killed_tree = if _process_tree.terminate() {
+            true
+        } else if let Some(pid) = child.id().or(process_group_pid) {
+            Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .status()
+                .await
+                .map(|status| status.success())
+                .unwrap_or(false)
+        } else {
+            false
+        };
         if !killed_tree {
             let _ = child.kill().await;
         }
