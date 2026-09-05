@@ -73,6 +73,7 @@ it("shows when the response body was truncated", async () => {
   render(<HttpApiTesterPanel />);
   await user.click(screen.getByRole("button", { name: /发送/ }));
 
+  expect(await screen.findByText("已保存：")).toBeInTheDocument();
   expect(await screen.findByText("已截断")).toBeInTheDocument();
 });
 
