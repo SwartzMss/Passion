@@ -9,6 +9,7 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::Command;
 
 #[cfg(windows)]
+#[path = "windows_job.rs"]
 mod windows_job;
 
 #[cfg(windows)]
@@ -488,6 +489,22 @@ mod tests {
             .as_deref()
             .is_some_and(|message| message.contains("超时")));
         assert!(started.elapsed() < Duration::from_millis(500));
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn dropping_windows_job_object_does_not_kill_a_running_script() {
+        let mut command = Command::new("powershell.exe");
+        command.args(["-NoProfile", "-Command", "Start-Sleep -Milliseconds 100"]);
+        let mut child = command.spawn().unwrap();
+        let job = windows_job::JobObject::attach(&child).unwrap();
+        drop(job);
+
+        let status = tokio::time::timeout(Duration::from_secs(1), child.wait())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(status.success());
     }
 
     #[cfg(unix)]

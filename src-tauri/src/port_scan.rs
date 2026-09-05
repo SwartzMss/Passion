@@ -39,13 +39,14 @@ struct ScanUpdate {
 struct ScanProgressBatcher {
     pending_closed: Option<ScanUpdate>,
     pending_closed_count: usize,
+    last_emitted_completed: u32,
 }
 
 impl ScanProgressBatcher {
     fn push(&mut self, update: ScanUpdate) -> Vec<ScanUpdate> {
         if update.result.is_some() {
             let mut updates = self.flush();
-            updates.push(update);
+            updates.push(self.normalize_immediate(update));
             return updates;
         }
 
@@ -60,7 +61,25 @@ impl ScanProgressBatcher {
 
     fn flush(&mut self) -> Vec<ScanUpdate> {
         self.pending_closed_count = 0;
-        self.pending_closed.take().into_iter().collect::<Vec<_>>()
+        self.pending_closed
+            .take()
+            .into_iter()
+            .map(|mut update| {
+                update.completed = update.completed.max(self.last_emitted_completed);
+                self.last_emitted_completed = update.completed;
+                update
+            })
+            .collect::<Vec<_>>()
+    }
+
+    fn normalize_immediate(&mut self, mut update: ScanUpdate) -> ScanUpdate {
+        update.completed = update.completed.max(self.last_emitted_completed);
+        self.last_emitted_completed = update.completed;
+        update
+    }
+
+    fn last_emitted_completed(&self) -> u32 {
+        self.last_emitted_completed
     }
 }
 
@@ -330,11 +349,12 @@ impl PortScanManager {
             let result = scan.await;
             match result {
                 Ok(Ok(summary)) => {
+                    let completed = summary.completed.max(batcher.last_emitted_completed());
                     let _ = app.emit(
                         "port-scan-progress",
                         PortScanProgress {
                             scan_id: scan_id_for_task.clone(),
-                            completed: summary.completed,
+                            completed,
                             total: summary.total,
                             result: None,
                             done: true,
@@ -621,6 +641,36 @@ mod tests {
             updates[1].result.as_ref().map(|result| result.port),
             Some(80)
         );
+    }
+
+    #[test]
+    fn progress_batcher_never_emits_regressing_completed_counts() {
+        let mut batcher = ScanProgressBatcher::default();
+        let first = batcher.push(ScanUpdate {
+            completed: 2,
+            total: 3,
+            result: Some(PortCheckResult {
+                host: "127.0.0.1".to_string(),
+                port: 80,
+                open: true,
+                elapsed_ms: 1,
+                error: None,
+            }),
+        });
+        let second = batcher.push(ScanUpdate {
+            completed: 1,
+            total: 3,
+            result: Some(PortCheckResult {
+                host: "127.0.0.1".to_string(),
+                port: 81,
+                open: true,
+                elapsed_ms: 1,
+                error: None,
+            }),
+        });
+
+        assert_eq!(first[0].completed, 2);
+        assert_eq!(second[0].completed, 2);
     }
 
     fn closed_update(completed: usize) -> ScanUpdate {
