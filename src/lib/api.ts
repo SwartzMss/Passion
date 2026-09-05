@@ -10,6 +10,7 @@ import type {
   NewSshTunnel,
   PortCheckRequest,
   PortCheckResult,
+  PortScanRequest,
   PortOccupancyRequest,
   PortOccupancyResult,
   ProcessPortsRequest,
@@ -79,6 +80,14 @@ export async function checkPort(
   input: PortCheckRequest,
 ): Promise<PortCheckResult> {
   return invoke<PortCheckResult>("check_port", { input });
+}
+
+export async function startPortScan(input: PortScanRequest): Promise<string> {
+  return invoke<string>("start_port_scan", { input });
+}
+
+export async function stopPortScan(scanId: string): Promise<void> {
+  return invoke<void>("stop_port_scan", { scanId });
 }
 
 export async function inspectPortOccupancy(

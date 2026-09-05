@@ -8,6 +8,7 @@ mod error;
 mod http_tester;
 mod models;
 mod network_diagnostics;
+mod port_scan;
 mod reminders;
 mod scheduler;
 mod script_runner;
@@ -135,6 +136,8 @@ pub fn run() {
             commands::translate_text,
             commands::test_ai_connection,
             commands::check_port,
+            commands::start_port_scan,
+            commands::stop_port_scan,
             commands::inspect_port_occupancy,
             commands::inspect_process_ports,
             commands::send_http_request,

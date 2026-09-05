@@ -56,6 +56,22 @@ export interface PortCheckResult {
   error?: string | null;
 }
 
+export interface PortScanRequest {
+  host: string;
+  startPort: number;
+  endPort: number;
+}
+
+export interface PortScanProgress {
+  scanId: string;
+  completed: number;
+  total: number;
+  result?: PortCheckResult | null;
+  done: boolean;
+  stopped: boolean;
+  error?: string | null;
+}
+
 export interface PortOccupancyRequest {
   port: number;
 }
