@@ -4,8 +4,8 @@ use crate::error::{BackendError, ErrorPayload};
 use crate::models::{
     AiSettings, DownloadRequest, DownloadResult, HttpApiRequest, HttpApiResponse, NewReminder,
     NewScriptTask, NewSshTunnel, PortCheckRequest, PortCheckResult, PortOccupancyRequest,
-    PortOccupancyResult, ProcessPortsRequest, ProcessPortsResult, Reminder, ScriptTask, Settings,
-    SshTunnelInfo, SshTunnelSettings, TranslationRequest, TranslationResult,
+    PortOccupancyResult, PortScanRequest, ProcessPortsRequest, ProcessPortsResult, Reminder,
+    ScriptTask, Settings, SshTunnelInfo, SshTunnelSettings, TranslationRequest, TranslationResult,
 };
 use crate::reminders::ReminderRepository;
 use crate::script_tasks::ScriptTaskRepository;
@@ -274,6 +274,31 @@ pub async fn test_ai_connection(state: State<'_, AppState>) -> CommandResult<()>
 #[tauri::command]
 pub async fn check_port(input: PortCheckRequest) -> CommandResult<PortCheckResult> {
     crate::network_diagnostics::check_port(input)
+        .await
+        .map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn start_port_scan(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    input: PortScanRequest,
+) -> CommandResult<String> {
+    state
+        .port_scan_manager
+        .start(app, input)
+        .await
+        .map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub async fn stop_port_scan(
+    state: State<'_, AppState>,
+    scan_id: String,
+) -> CommandResult<()> {
+    state
+        .port_scan_manager
+        .stop(&scan_id)
         .await
         .map_err(ErrorPayload::from)
 }

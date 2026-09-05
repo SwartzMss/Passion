@@ -161,6 +161,26 @@ pub struct PortCheckResult {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PortScanRequest {
+    pub host: String,
+    pub start_port: u16,
+    pub end_port: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortScanProgress {
+    pub scan_id: String,
+    pub completed: u32,
+    pub total: u32,
+    pub result: Option<PortCheckResult>,
+    pub done: bool,
+    pub stopped: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PortOccupancyRequest {
     pub port: u16,
 }
