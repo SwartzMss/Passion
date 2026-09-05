@@ -8,6 +8,14 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::Command;
 
+#[cfg(windows)]
+mod windows_job;
+
+#[cfg(windows)]
+type ProcessTreeHandle = windows_job::JobObject;
+#[cfg(not(windows))]
+type ProcessTreeHandle = ();
+
 const MAX_OUTPUT_BYTES: usize = 32 * 1024;
 const MAX_OUTPUT_CHARS: usize = 8000;
 const SCRIPT_TIMEOUT: Duration = Duration::from_secs(5 * 60);
@@ -83,10 +91,23 @@ async fn run_script_inner(
         .spawn()
         .map_err(|err| BackendError::ScriptTask(format!("脚本执行失败：{err}")))?;
     let process_group_pid = child.id();
+    #[cfg(windows)]
+    let process_tree = match windows_job::JobObject::attach(&child) {
+        Ok(job) => job,
+        Err(err) => {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+            return Err(BackendError::ScriptTask(format!(
+                "脚本进程树隔离失败：{err}"
+            )));
+        }
+    };
+    #[cfg(not(windows))]
+    let process_tree = ();
     let stdout = match child.stdout.take() {
         Some(stdout) => stdout,
         None => {
-            terminate_child(&mut child, process_group_pid).await;
+            terminate_child(&mut child, process_group_pid, &process_tree).await;
             return Err(BackendError::ScriptTask(
                 "脚本 stdout 管道创建失败。".to_string(),
             ));
@@ -95,7 +116,7 @@ async fn run_script_inner(
     let stderr = match child.stderr.take() {
         Some(stderr) => stderr,
         None => {
-            terminate_child(&mut child, process_group_pid).await;
+            terminate_child(&mut child, process_group_pid, &process_tree).await;
             return Err(BackendError::ScriptTask(
                 "脚本 stderr 管道创建失败。".to_string(),
             ));
@@ -125,7 +146,7 @@ async fn run_script_inner(
     let (status, stdout, stderr) = match tokio::time::timeout(timeout, execution).await {
         Ok(result) => result?,
         Err(_) => {
-            terminate_child(&mut child, process_group_pid).await;
+            terminate_child(&mut child, process_group_pid, &process_tree).await;
             let stdout = (&mut stdout_task)
                 .await
                 .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stdout 失败：{err}")))?
@@ -151,7 +172,11 @@ async fn run_script_inner(
     })
 }
 
-async fn terminate_child(child: &mut tokio::process::Child, process_group_pid: Option<u32>) {
+async fn terminate_child(
+    child: &mut tokio::process::Child,
+    process_group_pid: Option<u32>,
+    _process_tree: &ProcessTreeHandle,
+) {
     #[cfg(unix)]
     {
         let killed_group = process_group_pid.or_else(|| child.id()).is_some_and(|pid| {
@@ -166,15 +191,21 @@ async fn terminate_child(child: &mut tokio::process::Child, process_group_pid: O
 
     #[cfg(windows)]
     {
-        let killed_tree = child.id().or(process_group_pid).map(|pid| async move {
-            Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                .status()
-                .await
-                .map(|status| status.success())
-                .unwrap_or(false)
-        });
-        if !killed_tree.map(|future| future.await).unwrap_or(false) {
+        let killed_tree = _process_tree.terminate()
+            || child
+                .id()
+                .or(process_group_pid)
+                .map(|pid| async move {
+                    Command::new("taskkill")
+                        .args(["/PID", &pid.to_string(), "/T", "/F"])
+                        .status()
+                        .await
+                        .map(|status| status.success())
+                        .unwrap_or(false)
+                })
+                .map(|future| future.await)
+                .unwrap_or(false);
+        if !killed_tree {
             let _ = child.kill().await;
         }
     }
@@ -425,6 +456,27 @@ mod tests {
         let task = ScriptTask {
             script_path: "sh".to_string(),
             script_args: Some("-c \"sleep 1 & exit 0\"".to_string()),
+            ..test_sleeping_task()
+        };
+        let started = std::time::Instant::now();
+
+        let result = run_script_with_timeout(&task, Duration::from_millis(50)).await;
+
+        assert!(result
+            .error
+            .as_deref()
+            .is_some_and(|message| message.contains("超时")));
+        assert!(started.elapsed() < Duration::from_millis(500));
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn run_script_times_out_when_windows_descendant_keeps_output_pipe_open() {
+        let task = ScriptTask {
+            script_path: "powershell.exe".to_string(),
+            script_args: Some(
+                "-NoProfile -Command \"Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep -Seconds 1' -PassThru; exit 0\"".to_string(),
+            ),
             ..test_sleeping_task()
         };
         let started = std::time::Instant::now();

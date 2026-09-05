@@ -17,6 +17,8 @@ const MAX_SCAN_CONCURRENCY: usize = 64;
 const MAX_COMPLETED_SCAN_IDS: usize = 16;
 const PORT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const HOST_RESOLVE_TIMEOUT: Duration = Duration::from_secs(3);
+const SCAN_PROGRESS_BATCH_SIZE: usize = 128;
+const SCAN_PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ScanSummary {
@@ -31,6 +33,35 @@ struct ScanUpdate {
     completed: u32,
     total: u32,
     result: Option<PortCheckResult>,
+}
+
+#[derive(Default)]
+struct ScanProgressBatcher {
+    pending_closed: Option<ScanUpdate>,
+    pending_closed_count: usize,
+}
+
+impl ScanProgressBatcher {
+    fn push(&mut self, update: ScanUpdate) -> Vec<ScanUpdate> {
+        if update.result.is_some() {
+            let mut updates = self.flush();
+            updates.push(update);
+            return updates;
+        }
+
+        self.pending_closed = Some(update);
+        self.pending_closed_count += 1;
+        if self.pending_closed_count >= SCAN_PROGRESS_BATCH_SIZE {
+            self.flush()
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn flush(&mut self) -> Vec<ScanUpdate> {
+        self.pending_closed_count = 0;
+        self.pending_closed.take().into_iter().collect::<Vec<_>>()
+    }
 }
 
 pub(crate) trait PortProbe: Clone + Send + Sync + 'static {
@@ -273,17 +304,28 @@ impl PortScanManager {
                 cancel_rx,
                 Some(updates),
             ));
-            while let Some(update) = update_rx.recv().await {
-                let progress = PortScanProgress {
-                    scan_id: scan_id_for_task.clone(),
-                    completed: update.completed,
-                    total: update.total,
-                    result: update.result,
-                    done: false,
-                    stopped: false,
-                    error: None,
-                };
-                let _ = app.emit("port-scan-progress", progress);
+            let mut batcher = ScanProgressBatcher::default();
+            let mut flush_timer = tokio::time::interval(SCAN_PROGRESS_INTERVAL);
+            flush_timer.tick().await;
+            loop {
+                tokio::select! {
+                    update = update_rx.recv() => match update {
+                        Some(update) => {
+                            for update in batcher.push(update) {
+                                emit_scan_update(&app, &scan_id_for_task, update);
+                            }
+                        }
+                        None => break,
+                    },
+                    _ = flush_timer.tick() => {
+                        for update in batcher.flush() {
+                            emit_scan_update(&app, &scan_id_for_task, update);
+                        }
+                    }
+                }
+            }
+            for update in batcher.flush() {
+                emit_scan_update(&app, &scan_id_for_task, update);
             }
             let result = scan.await;
             match result {
@@ -368,6 +410,21 @@ impl PortScanManager {
             state.completed_scans.pop_front();
         }
     }
+}
+
+fn emit_scan_update(app: &AppHandle, scan_id: &str, update: ScanUpdate) {
+    let _ = app.emit(
+        "port-scan-progress",
+        PortScanProgress {
+            scan_id: scan_id.to_string(),
+            completed: update.completed,
+            total: update.total,
+            result: update.result,
+            done: false,
+            stopped: false,
+            error: None,
+        },
+    );
 }
 
 #[cfg(test)]
@@ -525,6 +582,53 @@ mod tests {
 
         assert!(summary.stopped);
         assert_eq!(summary.completed, 0);
+    }
+
+    #[test]
+    fn progress_batcher_coalesces_closed_ports_until_batch_size() {
+        let mut batcher = ScanProgressBatcher::default();
+
+        for completed in 1..SCAN_PROGRESS_BATCH_SIZE {
+            assert!(batcher.push(closed_update(completed)).is_empty());
+        }
+        let updates = batcher.push(closed_update(SCAN_PROGRESS_BATCH_SIZE));
+
+        assert_eq!(updates.len(), 1);
+        assert_eq!(updates[0].completed, SCAN_PROGRESS_BATCH_SIZE as u32);
+        assert!(updates[0].result.is_none());
+    }
+
+    #[test]
+    fn progress_batcher_flushes_closed_progress_before_open_port() {
+        let mut batcher = ScanProgressBatcher::default();
+        assert!(batcher.push(closed_update(1)).is_empty());
+
+        let updates = batcher.push(ScanUpdate {
+            completed: 2,
+            total: 2,
+            result: Some(PortCheckResult {
+                host: "127.0.0.1".to_string(),
+                port: 80,
+                open: true,
+                elapsed_ms: 1,
+                error: None,
+            }),
+        });
+
+        assert_eq!(updates.len(), 2);
+        assert_eq!(updates[0].completed, 1);
+        assert_eq!(
+            updates[1].result.as_ref().map(|result| result.port),
+            Some(80)
+        );
+    }
+
+    fn closed_update(completed: usize) -> ScanUpdate {
+        ScanUpdate {
+            completed: completed as u32,
+            total: SCAN_PROGRESS_BATCH_SIZE as u32,
+            result: None,
+        }
     }
 
     #[tokio::test]
