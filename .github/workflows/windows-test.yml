@@ -35,3 +35,7 @@ jobs:
       - name: Run Rust tests
         working-directory: src-tauri
         run: cargo test
+
+      - name: Build Rust backend
+        working-directory: src-tauri
+        run: cargo build

@@ -74,8 +74,9 @@ impl JobObject {
         unsafe { TerminateJobObject(self.0, 1) != 0 }
     }
 
-    // Job Objects are only used for timeout/error cleanup. Successful script
-    // completion preserves descendants that the script intentionally leaves running.
+    /// Job Object is only used as a failure cleanup boundary. Successful script
+    /// completion intentionally releases kill-on-close to preserve existing detached
+    /// process behavior.
     pub(crate) fn preserve_processes(&self) -> io::Result<()> {
         self.set_kill_on_close(false)
     }
