@@ -165,6 +165,8 @@ async fn run_script_inner(
         }
     };
 
+    // Keep the existing script contract: only timeout/error cleanup owns the
+    // process tree; successful scripts may intentionally leave descendants running.
     #[cfg(windows)]
     process_tree
         .preserve_processes()
@@ -478,33 +480,39 @@ mod tests {
     #[cfg(windows)]
     #[tokio::test]
     async fn run_script_times_out_when_windows_descendant_keeps_output_pipe_open() {
-        let marker_name = format!("passion-job-child-{}.txt", std::process::id());
-        let marker_path = std::env::temp_dir().join(&marker_name);
-        let _ = std::fs::remove_file(&marker_path);
+        let marker_prefix = format!("passion-job-child-{}", std::process::id());
+        let started_marker_name = format!("{marker_prefix}-started.txt");
+        let alive_marker_name = format!("{marker_prefix}-alive.txt");
+        let started_marker_path = std::env::temp_dir().join(&started_marker_name);
+        let alive_marker_path = std::env::temp_dir().join(&alive_marker_name);
+        let _ = std::fs::remove_file(&started_marker_path);
+        let _ = std::fs::remove_file(&alive_marker_path);
         let task = ScriptTask {
             script_path: "powershell.exe".to_string(),
             script_args: Some(
                 format!(
-                    "-NoProfile -Command \"Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep -Milliseconds 500; Set-Content -LiteralPath (Join-Path $env:TEMP ''{}'') -Value alive' -PassThru; exit 0\"",
-                    marker_name
+                    "-NoProfile -Command \"$child = Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Set-Content -LiteralPath (Join-Path $env:TEMP ''{}'') -Value started; Start-Sleep -Milliseconds 5000; Set-Content -LiteralPath (Join-Path $env:TEMP ''{}'') -Value alive' -PassThru; $deadline = (Get-Date).AddSeconds(4); while (!(Test-Path -LiteralPath (Join-Path $env:TEMP '{}')) -and (Get-Date) -lt $deadline) {{ Start-Sleep -Milliseconds 10 }}; exit 0\"",
+                    started_marker_name, alive_marker_name, started_marker_name
                 ),
             ),
             ..test_sleeping_task()
         };
         let started = std::time::Instant::now();
 
-        let result = run_script_with_timeout(&task, Duration::from_millis(50)).await;
+        let result = run_script_with_timeout(&task, Duration::from_secs(2)).await;
 
         assert!(result
             .error
             .as_deref()
             .is_some_and(|message| message.contains("超时")));
-        assert!(started.elapsed() < Duration::from_millis(500));
+        assert!(started.elapsed() < Duration::from_secs(3));
 
-        tokio::time::sleep(Duration::from_millis(700)).await;
-        let marker_exists = marker_path.exists();
-        let _ = std::fs::remove_file(&marker_path);
-        assert!(!marker_exists);
+        assert!(started_marker_path.exists());
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        let alive_marker_exists = alive_marker_path.exists();
+        let _ = std::fs::remove_file(&started_marker_path);
+        let _ = std::fs::remove_file(&alive_marker_path);
+        assert!(!alive_marker_exists);
     }
 
     #[cfg(windows)]

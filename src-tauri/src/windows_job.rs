@@ -56,12 +56,14 @@ impl JobObject {
 
         let job = Self(job);
         if let Err(error) = job.set_kill_on_close(true) {
+            drop(job);
             return Err(error);
         }
 
         let assigned = unsafe { AssignProcessToJobObject(job.0, process as Handle) != 0 };
         if !assigned {
             let error = io::Error::last_os_error();
+            drop(job);
             return Err(error);
         }
 
@@ -72,6 +74,8 @@ impl JobObject {
         unsafe { TerminateJobObject(self.0, 1) != 0 }
     }
 
+    // Job Objects are only used for timeout/error cleanup. Successful script
+    // completion preserves descendants that the script intentionally leaves running.
     pub(crate) fn preserve_processes(&self) -> io::Result<()> {
         self.set_kill_on_close(false)
     }
