@@ -292,10 +292,7 @@ pub async fn start_port_scan(
 }
 
 #[tauri::command]
-pub async fn stop_port_scan(
-    state: State<'_, AppState>,
-    scan_id: String,
-) -> CommandResult<()> {
+pub async fn stop_port_scan(state: State<'_, AppState>, scan_id: String) -> CommandResult<()> {
     state
         .port_scan_manager
         .stop(&scan_id)

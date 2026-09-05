@@ -1,9 +1,17 @@
-import { useRef, useState } from "react";
-import { checkPort, inspectPortOccupancy, inspectProcessPorts } from "../../lib/api";
+import { useEffect, useRef, useState } from "react";
+import {
+  checkPort,
+  inspectPortOccupancy,
+  inspectProcessPorts,
+  startPortScan,
+  stopPortScan as cancelPortScan,
+} from "../../lib/api";
+import { onPortScanProgress } from "../../lib/events";
 import type {
   PortCheckResult,
   PortOccupancyEntry,
   PortOccupancyResult,
+  PortScanProgress,
   ProcessPortsResult,
 } from "../../types";
 
@@ -16,7 +24,6 @@ const NETWORK_TABS: Array<{ id: NetworkTab; label: string }> = [
   { id: "port_occupancy", label: "端口占用" },
 ];
 const LARGE_SCAN_THRESHOLD = 1000;
-const SCAN_CONCURRENCY = 100;
 
 export function NetworkDiagnosticsPanel() {
   const [activeTab, setActiveTab] = useState<NetworkTab>("port_check");
@@ -42,7 +49,9 @@ export function NetworkDiagnosticsPanel() {
   const [isPortRunning, setIsPortRunning] = useState(false);
   const [isScanRunning, setIsScanRunning] = useState(false);
   const [isOccupancyRunning, setIsOccupancyRunning] = useState(false);
-  const scanRunIdRef = useRef(0);
+  const activeScanIdRef = useRef<string | null>(null);
+  const scanUnlistenRef = useRef<(() => void) | null>(null);
+  const pendingScanProgressRef = useRef<PortScanProgress[]>([]);
   const portValidation = validatePortValue(portValue);
   const scanValidation = validatePortRange(scanStartPort, scanEndPort);
   const occupancyValidation = validatePortValue(occupancyPort);
@@ -90,55 +99,82 @@ export function NetworkDiagnosticsPanel() {
     const host = portHost.trim();
     const startPort = Number(scanStartPort);
     const endPort = Number(scanEndPort);
-    const ports = Array.from(
-      { length: endPort - startPort + 1 },
-      (_, index) => startPort + index,
-    );
-    const runId = scanRunIdRef.current + 1;
-    scanRunIdRef.current = runId;
     setError(null);
     setScanResults([]);
     setScanCompleted(0);
-    setScanTotal(ports.length);
+    setScanTotal(endPort - startPort + 1);
     setScanStopped(false);
     setIsScanRunning(true);
 
+    const handleProgress = (progress: PortScanProgress) => {
+      const activeScanId = activeScanIdRef.current;
+      if (!activeScanId) {
+        pendingScanProgressRef.current.push(progress);
+        return;
+      }
+      if (progress.scanId !== activeScanId) {
+        return;
+      }
+      applyScanProgress(progress);
+    };
+
     try {
-      for (let index = 0; index < ports.length; index += SCAN_CONCURRENCY) {
-        if (scanRunIdRef.current !== runId) {
-          setScanStopped(true);
-          break;
-        }
-        const batch = ports.slice(index, index + SCAN_CONCURRENCY);
-        const results = await Promise.all(
-          batch.map((port) => checkPort({ host, port })),
-        );
-        if (scanRunIdRef.current !== runId) {
-          setScanStopped(true);
-          break;
-        }
-        const openResults = results.filter((result) => result.open);
-        if (openResults.length > 0) {
-          setScanResults((current) => [...current, ...openResults]);
-        }
-        setScanCompleted((current) => current + results.length);
+      scanUnlistenRef.current = await onPortScanProgress(handleProgress);
+      const scanId = await startPortScan({ host, startPort, endPort });
+      activeScanIdRef.current = scanId;
+      for (const progress of pendingScanProgressRef.current.splice(0)) {
+        handleProgress(progress);
       }
     } catch (err) {
-      if (scanRunIdRef.current === runId) {
-        setError(readError(err));
-      }
-    } finally {
-      if (scanRunIdRef.current === runId) {
-        setIsScanRunning(false);
-      }
+      pendingScanProgressRef.current = [];
+      setError(readError(err));
+      setIsScanRunning(false);
+      clearScanListener();
     }
   }
 
-  function stopPortScan() {
-    scanRunIdRef.current += 1;
-    setIsScanRunning(false);
-    setScanStopped(true);
+  async function stopPortScan() {
+    const scanId = activeScanIdRef.current;
+    if (!scanId) {
+      return;
+    }
+    try {
+      await cancelPortScan(scanId);
+    } catch (err) {
+      setError(readError(err));
+    }
   }
+
+  function applyScanProgress(progress: PortScanProgress) {
+    setScanCompleted(progress.completed);
+    setScanTotal(progress.total);
+    if (progress.result?.open) {
+      setScanResults((current) => [...current, progress.result as PortCheckResult]);
+    }
+    if (progress.done) {
+      setScanStopped(progress.stopped);
+      setError(progress.error ?? null);
+      setIsScanRunning(false);
+      activeScanIdRef.current = null;
+      clearScanListener();
+    }
+  }
+
+  function clearScanListener() {
+    scanUnlistenRef.current?.();
+    scanUnlistenRef.current = null;
+  }
+
+  useEffect(() => {
+    return () => {
+      const scanId = activeScanIdRef.current;
+      if (scanId) {
+        void cancelPortScan(scanId);
+      }
+      activeScanIdRef.current = null;
+      clearScanListener();
+    };
+  }, []);
 
   async function runPortOccupancy() {
     if (occupancyValidation) {

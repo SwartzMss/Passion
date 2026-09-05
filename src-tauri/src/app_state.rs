@@ -1,6 +1,6 @@
+use crate::port_scan::PortScanManager;
 use crate::scheduler::Scheduler;
 use crate::script_task_scheduler::ScriptTaskScheduler;
-use crate::port_scan::PortScanManager;
 use crate::ssh_tunnels::SshTunnelManager;
 use rusqlite::Connection;
 use std::{

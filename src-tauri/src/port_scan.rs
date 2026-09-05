@@ -8,8 +8,8 @@ use std::sync::{
     Arc,
 };
 use std::time::{Duration, Instant};
-use tokio::net::TcpStream;
 use tauri::{AppHandle, Emitter};
+use tokio::net::TcpStream;
 use tokio::sync::{mpsc, watch, Mutex, Semaphore};
 use uuid::Uuid;
 
@@ -73,14 +73,9 @@ impl PortProbe for TcpPortProbe {
 
 pub(crate) fn validate_request(request: &PortScanRequest) -> BackendResult<()> {
     if request.host.trim().is_empty() {
-        return Err(BackendError::NetworkDiagnostic(
-            "请输入 Host。".to_string(),
-        ));
+        return Err(BackendError::NetworkDiagnostic("请输入 Host。".to_string()));
     }
-    if request.start_port == 0
-        || request.end_port == 0
-        || request.start_port > request.end_port
-    {
+    if request.start_port == 0 || request.end_port == 0 || request.start_port > request.end_port {
         return Err(BackendError::NetworkDiagnostic(
             "端口范围必须在 1-65535 且起始端口不能大于结束端口。".to_string(),
         ));
@@ -88,6 +83,7 @@ pub(crate) fn validate_request(request: &PortScanRequest) -> BackendResult<()> {
     Ok(())
 }
 
+#[cfg(test)]
 pub(crate) async fn scan_ports_with_probe<P>(
     request: PortScanRequest,
     probe: P,
@@ -369,8 +365,8 @@ mod tests {
     impl PortProbe for BlockingProbe {
         fn probe(
             &self,
-            host: String,
-            port: u16,
+            _host: String,
+            _port: u16,
         ) -> Pin<Box<dyn Future<Output = PortCheckResult> + Send>> {
             let started = Arc::clone(&self.started);
             Box::pin(async move {
@@ -411,6 +407,20 @@ mod tests {
             .await
             .unwrap();
         assert!(probe.max_in_flight() <= 64);
+    }
+
+    #[tokio::test]
+    async fn scan_finds_an_open_local_listener() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (_cancel, cancel_rx) = never_cancel();
+
+        let summary = scan_ports_with_probe(request(port, port), TcpPortProbe, cancel_rx)
+            .await
+            .unwrap();
+
+        assert_eq!(summary.open_ports.len(), 1);
+        assert_eq!(summary.open_ports[0].port, port);
     }
 
     #[tokio::test]

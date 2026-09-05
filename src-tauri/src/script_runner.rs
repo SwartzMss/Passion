@@ -3,9 +3,14 @@ use crate::models::ScriptTask;
 use crate::script_tasks::validate_script_path;
 use chrono::{DateTime, Utc};
 use std::path::Path;
+use std::process::Stdio;
+use std::time::Duration;
+use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::Command;
 
+const MAX_OUTPUT_BYTES: usize = 32 * 1024;
 const MAX_OUTPUT_CHARS: usize = 8000;
+const SCRIPT_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScriptCommandPlan {
@@ -24,18 +29,25 @@ pub struct ScriptExecutionResult {
 }
 
 pub async fn run_script(task: &ScriptTask) -> ScriptExecutionResult {
+    run_script_with_timeout(task, SCRIPT_TIMEOUT).await
+}
+
+pub(crate) async fn run_script_with_timeout(
+    task: &ScriptTask,
+    timeout: Duration,
+) -> ScriptExecutionResult {
     let started_at = Utc::now();
-    let result = run_script_inner(task).await;
+    let result = run_script_inner(task, timeout).await;
     let finished_at = Utc::now();
 
     match result {
-        Ok((exit_code, stdout, stderr)) => ScriptExecutionResult {
+        Ok(output) => ScriptExecutionResult {
             started_at,
             finished_at,
-            exit_code,
-            stdout: non_empty_output(stdout),
-            stderr: non_empty_output(stderr),
-            error: None,
+            exit_code: output.exit_code,
+            stdout: non_empty_output(output.stdout),
+            stderr: non_empty_output(output.stderr),
+            error: output.error,
         },
         Err(err) => ScriptExecutionResult {
             started_at,
@@ -48,19 +60,111 @@ pub async fn run_script(task: &ScriptTask) -> ScriptExecutionResult {
     }
 }
 
-async fn run_script_inner(task: &ScriptTask) -> BackendResult<(Option<i32>, String, String)> {
-    let plan = build_command_plan(&task.script_path, task.script_args.as_deref().unwrap_or(""))?;
-    let output = Command::new(&plan.program)
-        .args(&plan.args)
-        .output()
-        .await
-        .map_err(|err| BackendError::ScriptTask(format!("脚本执行失败：{err}")))?;
+struct ScriptExecutionOutput {
+    exit_code: Option<i32>,
+    stdout: String,
+    stderr: String,
+    error: Option<String>,
+}
 
-    Ok((
-        output.status.code(),
-        truncate_output(&String::from_utf8_lossy(&output.stdout), MAX_OUTPUT_CHARS),
-        truncate_output(&String::from_utf8_lossy(&output.stderr), MAX_OUTPUT_CHARS),
-    ))
+async fn run_script_inner(
+    task: &ScriptTask,
+    timeout: Duration,
+) -> BackendResult<ScriptExecutionOutput> {
+    let plan = build_command_plan(&task.script_path, task.script_args.as_deref().unwrap_or(""))?;
+    let mut child = Command::new(&plan.program)
+        .args(&plan.args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|err| BackendError::ScriptTask(format!("脚本执行失败：{err}")))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| BackendError::ScriptTask("脚本 stdout 管道创建失败。".to_string()))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| BackendError::ScriptTask("脚本 stderr 管道创建失败。".to_string()))?;
+    let stdout_task = tokio::spawn(collect_output(stdout, MAX_OUTPUT_BYTES));
+    let stderr_task = tokio::spawn(collect_output(stderr, MAX_OUTPUT_BYTES));
+
+    let status = match tokio::time::timeout(timeout, child.wait()).await {
+        Ok(result) => {
+            result.map_err(|err| BackendError::ScriptTask(format!("脚本等待失败：{err}")))?
+        }
+        Err(_) => {
+            terminate_child(&mut child).await;
+            let stdout = stdout_task
+                .await
+                .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stdout 失败：{err}")))?
+                .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stdout 失败：{err}")))?;
+            let stderr = stderr_task
+                .await
+                .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stderr 失败：{err}")))?
+                .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stderr 失败：{err}")))?;
+            return Ok(ScriptExecutionOutput {
+                exit_code: None,
+                stdout: decode_output(stdout),
+                stderr: decode_output(stderr),
+                error: Some(format!("脚本执行超时（超过 {} 秒）。", timeout.as_secs())),
+            });
+        }
+    };
+    let stdout = stdout_task
+        .await
+        .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stdout 失败：{err}")))?
+        .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stdout 失败：{err}")))?;
+    let stderr = stderr_task
+        .await
+        .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stderr 失败：{err}")))?
+        .map_err(|err| BackendError::ScriptTask(format!("读取脚本 stderr 失败：{err}")))?;
+
+    Ok(ScriptExecutionOutput {
+        exit_code: status.code(),
+        stdout: decode_output(stdout),
+        stderr: decode_output(stderr),
+        error: None,
+    })
+}
+
+async fn terminate_child(child: &mut tokio::process::Child) {
+    #[cfg(windows)]
+    if let Some(pid) = child.id() {
+        let _ = Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .status()
+            .await;
+    } else {
+        let _ = child.kill().await;
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = child.kill().await;
+    }
+    let _ = child.wait().await;
+}
+
+async fn collect_output<R: AsyncRead + Unpin>(
+    mut reader: R,
+    max_bytes: usize,
+) -> std::io::Result<Vec<u8>> {
+    let mut retained = Vec::with_capacity(max_bytes.min(4096));
+    let mut chunk = [0_u8; 4096];
+    loop {
+        let read = reader.read(&mut chunk).await?;
+        if read == 0 {
+            break;
+        }
+        let remaining = max_bytes.saturating_sub(retained.len());
+        retained.extend_from_slice(&chunk[..read.min(remaining)]);
+    }
+    Ok(retained)
+}
+
+fn decode_output(output: Vec<u8>) -> String {
+    truncate_output(&String::from_utf8_lossy(&output), MAX_OUTPUT_CHARS)
 }
 
 pub fn build_command_plan(
@@ -164,6 +268,7 @@ fn non_empty_output(output: String) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
     fn command_plan_uses_powershell_for_ps1() {
@@ -250,5 +355,70 @@ mod tests {
         assert!(
             matches!(err, BackendError::ScriptTask(message) if message == "执行参数中的引号未闭合。")
         );
+    }
+
+    #[tokio::test]
+    async fn collect_output_keeps_only_the_configured_summary() {
+        let input = std::io::Cursor::new(vec![b'x'; 128 * 1024]);
+        let output = collect_output(input, 32 * 1024).await.unwrap();
+
+        assert_eq!(output.len(), 32 * 1024);
+    }
+
+    #[tokio::test]
+    async fn run_script_reports_timeout_and_reaps_child() {
+        let result =
+            run_script_with_timeout(&test_sleeping_task(), Duration::from_millis(50)).await;
+
+        assert!(result
+            .error
+            .as_deref()
+            .is_some_and(|message| message.contains("超时")));
+        assert!(result.finished_at >= result.started_at);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn run_script_keeps_bounded_stdout_from_a_real_child() {
+        let task = ScriptTask {
+            script_path: "sh".to_string(),
+            script_args: Some("-c \"yes x | head -c 131072\"".to_string()),
+            ..test_sleeping_task()
+        };
+
+        let result = run_script_with_timeout(&task, Duration::from_secs(1)).await;
+
+        assert_eq!(result.error, None);
+        assert_eq!(result.stdout.as_deref().map(str::len), Some(8000));
+    }
+
+    fn test_sleeping_task() -> ScriptTask {
+        #[cfg(unix)]
+        let (script_path, script_args) = ("sh", Some("-c \"sleep 1\"".to_string()));
+        #[cfg(windows)]
+        let (script_path, script_args) = (
+            "powershell.exe",
+            Some("-Command \"Start-Sleep -Seconds 1\"".to_string()),
+        );
+
+        ScriptTask {
+            id: "test-script".to_string(),
+            name: "Test script".to_string(),
+            script_path: script_path.to_string(),
+            script_args,
+            schedule_type: "interval".to_string(),
+            interval_minutes: 15,
+            time_of_day: None,
+            weekdays: None,
+            enabled: true,
+            last_started_at: None,
+            last_finished_at: None,
+            last_exit_code: None,
+            last_stdout: None,
+            last_stderr: None,
+            last_error: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
     }
 }

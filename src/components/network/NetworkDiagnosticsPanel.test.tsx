@@ -3,6 +3,18 @@ import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { NetworkDiagnosticsPanel } from "./NetworkDiagnosticsPanel";
 
+const scanEvents = vi.hoisted(() => ({
+  handler: null as ((progress: {
+    scanId: string;
+    completed: number;
+    total: number;
+    result?: { host: string; port: number; open: boolean; elapsedMs: number } | null;
+    done: boolean;
+    stopped: boolean;
+    error?: string | null;
+  }) => void) | null,
+}));
+
 vi.mock("../../lib/api", () => ({
   checkPort: vi.fn(async ({ host, port }: { host: string; port: number }) => ({
     host,
@@ -11,6 +23,8 @@ vi.mock("../../lib/api", () => ({
     elapsedMs: 12,
     error: port === 2 ? null : "connection refused",
   })),
+  startPortScan: vi.fn(async () => "scan-1"),
+  stopPortScan: vi.fn(async () => undefined),
   inspectPortOccupancy: vi.fn(async ({ port }: { port: number }) => ({
     port,
     entries:
@@ -53,6 +67,17 @@ vi.mock("../../lib/api", () => ({
   })),
 }));
 
+vi.mock("../../lib/events", () => ({
+  onPortScanProgress: vi.fn((handler) => {
+    scanEvents.handler = handler;
+    return Promise.resolve(vi.fn());
+  }),
+}));
+
+function emitProgress(progress: Parameters<NonNullable<typeof scanEvents.handler>>[0]) {
+  scanEvents.handler?.(progress);
+}
+
 it("renders the network diagnostics workspace", () => {
   render(<NetworkDiagnosticsPanel />);
 
@@ -91,26 +116,55 @@ it("checks a tcp port and shows result", async () => {
   expect(api.checkPort).toHaveBeenCalledWith({ host: "127.0.0.1", port: 80 });
 });
 
-it("scans a range and shows open ports", async () => {
+it("starts one backend scan and renders its progress event", async () => {
   const user = userEvent.setup();
   render(<NetworkDiagnosticsPanel />);
 
   await user.click(screen.getByRole("button", { name: "范围扫描" }));
-  await user.clear(screen.getByLabelText("起始端口"));
-  await user.type(screen.getByLabelText("起始端口"), "1");
-  await user.clear(screen.getByLabelText("结束端口"));
-  await user.type(screen.getByLabelText("结束端口"), "3");
   await user.click(screen.getByRole("button", { name: /开始扫描/ }));
 
+  const api = await import("../../lib/api");
+  expect(api.startPortScan).toHaveBeenCalledWith({
+    host: "127.0.0.1",
+    startPort: 1,
+    endPort: 1024,
+  });
+  emitProgress({
+    scanId: "other-scan",
+    completed: 1,
+    total: 3,
+    result: { host: "127.0.0.1", port: 2, open: true, elapsedMs: 12 },
+    done: false,
+    stopped: false,
+    error: null,
+  });
+  expect(screen.getByText("已发现 0 个开放端口")).toBeInTheDocument();
+  emitProgress({
+    scanId: "scan-1",
+    completed: 2,
+    total: 3,
+    result: { host: "127.0.0.1", port: 2, open: true, elapsedMs: 12 },
+    done: false,
+    stopped: false,
+    error: null,
+  });
   expect(await screen.findByText("已发现 1 个开放端口")).toBeInTheDocument();
   expect(screen.getByRole("cell", { name: "2" })).toBeInTheDocument();
   expect(screen.getByRole("cell", { name: "TCP" })).toBeInTheDocument();
   expect(screen.getByRole("cell", { name: "开放" })).toBeInTheDocument();
   expect(screen.getByRole("cell", { name: "12ms" })).toBeInTheDocument();
+});
+
+it("stops the active backend scan", async () => {
+  const user = userEvent.setup();
+  render(<NetworkDiagnosticsPanel />);
+
+  await user.click(screen.getByRole("button", { name: "范围扫描" }));
+  await user.click(screen.getByRole("button", { name: /开始扫描/ }));
+  await user.click(screen.getByRole("button", { name: "停止扫描" }));
+
   const api = await import("../../lib/api");
-  expect(api.checkPort).toHaveBeenCalledWith({ host: "127.0.0.1", port: 1 });
-  expect(api.checkPort).toHaveBeenCalledWith({ host: "127.0.0.1", port: 2 });
-  expect(api.checkPort).toHaveBeenCalledWith({ host: "127.0.0.1", port: 3 });
+  expect(api.stopPortScan).toHaveBeenCalledWith("scan-1");
 });
 
 it("warns but allows large port ranges", async () => {
