@@ -9,6 +9,7 @@ vi.mock("../../lib/api", () => ({
     statusText: "OK",
     elapsedMs: 42,
     sizeBytes: 18,
+    truncated: false,
     receivedAt: "2026-06-28T14:30:00Z",
     headers: [{ key: "content-type", value: "application/json" }],
     body: '{"ok":true}',
@@ -53,6 +54,26 @@ it("sends a request and shows response metadata", async () => {
     query: [],
     body: null,
   });
+});
+
+it("shows when the response body was truncated", async () => {
+  const api = await import("../../lib/api");
+  vi.mocked(api.sendHttpRequest).mockResolvedValueOnce({
+    status: 200,
+    statusText: "OK",
+    elapsedMs: 42,
+    sizeBytes: 10 * 1024 * 1024,
+    truncated: true,
+    receivedAt: "2026-06-28T14:30:00Z",
+    headers: [],
+    body: "retained response",
+  });
+  const user = userEvent.setup();
+
+  render(<HttpApiTesterPanel />);
+  await user.click(screen.getByRole("button", { name: /发送/ }));
+
+  expect(await screen.findByText("已截断")).toBeInTheDocument();
 });
 
 it("supports query and body tabs", async () => {

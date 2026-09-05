@@ -189,6 +189,11 @@ export function HttpApiTesterPanel() {
                 </span>
                 <span>耗时：<strong>{response.elapsedMs}ms</strong></span>
                 <span>大小：<strong>{formatBytes(response.sizeBytes)}</strong></span>
+                {response.truncated ? (
+                  <span className="http-response-truncated" role="status">
+                    已截断
+                  </span>
+                ) : null}
                 <span>时间：{formatTime(response.receivedAt)}</span>
               </div>
               <div className="http-response-tools">

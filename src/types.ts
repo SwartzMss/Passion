@@ -121,6 +121,7 @@ export interface HttpApiResponse {
   statusText: string;
   elapsedMs: number;
   sizeBytes: number;
+  truncated: boolean;
   receivedAt: string;
   headers: HttpApiPair[];
   body: string;
