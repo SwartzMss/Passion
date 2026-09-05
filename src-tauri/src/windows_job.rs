@@ -7,7 +7,7 @@ type Bool = i32;
 type Dword = u32;
 type Handle = RawHandle;
 
-const JOB_OBJECT_BASIC_LIMIT_INFORMATION_CLASS: Dword = 2;
+const JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS: Dword = 9;
 const JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: Dword = 0x0000_2000;
 
 #[repr(C)]
@@ -21,6 +21,21 @@ struct JobObjectBasicLimitInformation {
     affinity: usize,
     priority_class: Dword,
     scheduling_class: Dword,
+}
+
+#[repr(C)]
+struct IoCounters {
+    counters: [u64; 6],
+}
+
+#[repr(C)]
+struct JobObjectExtendedLimitInformation {
+    basic_limit_information: JobObjectBasicLimitInformation,
+    io_info: IoCounters,
+    process_memory_limit: usize,
+    job_memory_limit: usize,
+    peak_process_memory_used: usize,
+    peak_job_memory_used: usize,
 }
 
 #[link(name = "kernel32")]
@@ -82,27 +97,34 @@ impl JobObject {
     }
 
     fn set_kill_on_close(&self, enabled: bool) -> io::Result<()> {
-        let mut limits = JobObjectBasicLimitInformation {
-            per_process_user_time_limit: 0,
-            per_job_user_time_limit: 0,
-            limit_flags: if enabled {
-                JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-            } else {
-                0
+        let mut limits = JobObjectExtendedLimitInformation {
+            basic_limit_information: JobObjectBasicLimitInformation {
+                per_process_user_time_limit: 0,
+                per_job_user_time_limit: 0,
+                limit_flags: if enabled {
+                    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+                } else {
+                    0
+                },
+                minimum_working_set_size: 0,
+                maximum_working_set_size: 0,
+                active_process_limit: 0,
+                affinity: 0,
+                priority_class: 0,
+                scheduling_class: 0,
             },
-            minimum_working_set_size: 0,
-            maximum_working_set_size: 0,
-            active_process_limit: 0,
-            affinity: 0,
-            priority_class: 0,
-            scheduling_class: 0,
+            io_info: IoCounters { counters: [0; 6] },
+            process_memory_limit: 0,
+            job_memory_limit: 0,
+            peak_process_memory_used: 0,
+            peak_job_memory_used: 0,
         };
         let updated = unsafe {
             SetInformationJobObject(
                 self.0,
-                JOB_OBJECT_BASIC_LIMIT_INFORMATION_CLASS,
-                &mut limits as *mut JobObjectBasicLimitInformation as *mut c_void,
-                size_of::<JobObjectBasicLimitInformation>() as Dword,
+                JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS,
+                &mut limits as *mut JobObjectExtendedLimitInformation as *mut c_void,
+                size_of::<JobObjectExtendedLimitInformation>() as Dword,
             ) != 0
         };
         if updated {
