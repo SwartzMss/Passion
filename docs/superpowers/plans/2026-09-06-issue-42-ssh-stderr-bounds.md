@@ -52,7 +52,7 @@ fn stderr_ring_buffer_keeps_latest_bytes() {
 
     buffer.append(&input);
 
-    assert_eq!(buffer.snapshot(), input[3..]);
+    assert_eq!(buffer.snapshot(), input[3..].to_vec());
 }
 
 #[test]
@@ -115,7 +115,7 @@ async fn stderr_reader_drains_a_child_and_keeps_the_latest_limit() {
 Run:
 
 ```bash
-cargo test --manifest-path src-tauri/Cargo.toml ssh_tunnels::tests::stderr_ring_buffer_keeps_latest_bytes ssh_tunnels::tests::stderr_reader_drains_a_child_and_keeps_the_latest_limit
+cargo test --manifest-path src-tauri/Cargo.toml ssh_tunnels::tests
 ```
 
 Expected: compilation fails because `StderrRingBuffer` and `spawn_stderr_capture` are not defined. Do not change production code before observing this failure.
@@ -248,7 +248,7 @@ async fn stderr_suffix(stderr_capture: Option<&mut StderrCapture>) -> String {
 Run:
 
 ```bash
-cargo test --manifest-path src-tauri/Cargo.toml ssh_tunnels::tests::stderr_ring_buffer_keeps_latest_bytes ssh_tunnels::tests::stderr_ring_buffer_decodes_utf8_only_at_snapshot_boundary ssh_tunnels::tests::stderr_reader_drains_a_child_and_keeps_the_latest_limit
+cargo test --manifest-path src-tauri/Cargo.toml ssh_tunnels::tests
 ```
 
 Expected: 3 tests pass. The child-process test must complete within the timeout; a hang indicates the reader is not draining the pipe.
