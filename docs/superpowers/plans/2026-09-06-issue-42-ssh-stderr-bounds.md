@@ -360,7 +360,7 @@ git status --short --branch
 
 Expected: only the approved design/plan documents and `src-tauri/src/ssh_tunnels.rs` are changed; no generated build artifacts are tracked.
 
-- [ ] **Step 4: Request code review before creating the PR.**
+- [x] **Step 4: Request code review before creating the PR.**
 
 Review the diff against `origin/main` for these requirements:
 
@@ -370,7 +370,7 @@ Review the diff against `origin/main` for these requirements:
 - exit diagnostics await reader completion and retain the tail marker in the regression test;
 - existing startup, monitor, stop, and status behavior is unchanged.
 
-- [ ] **Step 5: Push the feature branch and create the PR.**
+- [x] **Step 5: Push the feature branch and create the PR.**
 
 ```bash
 git push -u origin feat/issue-42-ssh-stderr-bounds
