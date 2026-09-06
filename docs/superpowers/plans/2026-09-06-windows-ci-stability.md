@@ -235,4 +235,3 @@ git status --short --branch
 ~~~
 
 Expected: no whitespace errors; only the test stabilization, workflow change, and their documentation commits are present. The remote Windows Actions run remains the final validation for Windows-only behavior.
-
