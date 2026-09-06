@@ -10,7 +10,7 @@ use std::process::{ExitStatus, Stdio};
 use std::sync::{Arc, Mutex};
 use tokio::io::AsyncReadExt;
 use tokio::process::{Child, Command as TokioCommand};
-use tokio::time::{sleep, Duration, Instant};
+use tokio::time::{sleep, timeout, Duration, Instant};
 use uuid::Uuid;
 
 pub struct SshTunnelRepository;
@@ -26,6 +26,7 @@ const SSH_STARTUP_POLL_MS: u64 = 200;
 // Retain only the most recent stderr bytes so long-running tunnels stay bounded.
 const SSH_STDERR_BUFFER_LIMIT_BYTES: usize = 64 * 1024;
 const SSH_STDERR_READ_CHUNK_BYTES: usize = 4096;
+const SSH_STDERR_DRAIN_TIMEOUT_SECS: u64 = 1;
 #[cfg(test)]
 const STDERR_CHILD_ENV: &str = "PASSION_SSH_STDERR_CHILD";
 
@@ -831,8 +832,17 @@ where
 
 impl StderrCapture {
     async fn snapshot(&mut self) -> String {
-        if let Some(reader_task) = self.reader_task.take() {
-            let _ = reader_task.await;
+        if let Some(mut reader_task) = self.reader_task.take() {
+            if timeout(
+                Duration::from_secs(SSH_STDERR_DRAIN_TIMEOUT_SECS),
+                &mut reader_task,
+            )
+            .await
+            .is_err()
+            {
+                reader_task.abort();
+                let _ = reader_task.await;
+            }
         }
         let buffer = self.buffer.lock().await;
         buffer.to_lossy_string()
@@ -1091,6 +1101,16 @@ mod tests {
         assert_eq!(output.as_bytes().len(), SSH_STDERR_BUFFER_LIMIT_BYTES);
         assert!(output.ends_with("tail-marker"));
         assert!(!output.contains("old-prefix-marker"));
+    }
+
+    #[tokio::test]
+    async fn stderr_snapshot_does_not_wait_forever_for_an_open_pipe() {
+        let (_writer, reader) = tokio::io::duplex(1);
+        let mut capture = spawn_stderr_capture(reader);
+
+        let result = timeout(Duration::from_secs(2), capture.snapshot()).await;
+
+        assert!(result.is_ok(), "snapshot waited for stderr EOF");
     }
 
     #[cfg(target_os = "windows")]

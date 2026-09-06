@@ -30,6 +30,7 @@ Add these constants beside the existing SSH timing constants:
 ```rust
 const SSH_STDERR_BUFFER_LIMIT_BYTES: usize = 64 * 1024;
 const SSH_STDERR_READ_CHUNK_BYTES: usize = 4096;
+const SSH_STDERR_DRAIN_TIMEOUT_SECS: u64 = 1;
 const STDERR_CHILD_ENV: &str = "PASSION_SSH_STDERR_CHILD";
 ```
 
@@ -107,6 +108,16 @@ async fn stderr_reader_drains_a_child_and_keeps_the_latest_limit() {
     assert_eq!(output.as_bytes().len(), SSH_STDERR_BUFFER_LIMIT_BYTES);
     assert!(output.ends_with("tail-marker"));
     assert!(!output.contains("old-prefix-marker"));
+}
+
+#[tokio::test]
+async fn stderr_snapshot_does_not_wait_forever_for_an_open_pipe() {
+    let (_writer, reader) = tokio::io::duplex(1);
+    let mut capture = spawn_stderr_capture(reader);
+
+    let result = timeout(Duration::from_secs(2), capture.snapshot()).await;
+
+    assert!(result.is_ok(), "snapshot waited for stderr EOF");
 }
 ```
 
@@ -216,8 +227,17 @@ where
 
 impl StderrCapture {
     async fn snapshot(&mut self) -> String {
-        if let Some(reader_task) = self.reader_task.take() {
-            let _ = reader_task.await;
+        if let Some(mut reader_task) = self.reader_task.take() {
+            if timeout(
+                Duration::from_secs(SSH_STDERR_DRAIN_TIMEOUT_SECS),
+                &mut reader_task,
+            )
+            .await
+            .is_err()
+            {
+                reader_task.abort();
+                let _ = reader_task.await;
+            }
         }
         let buffer = self.buffer.lock().await;
         buffer.to_lossy_string()
@@ -251,7 +271,7 @@ Run:
 cargo test --manifest-path src-tauri/Cargo.toml ssh_tunnels::tests
 ```
 
-Expected: 3 tests pass. The child-process test must complete within the timeout; a hang indicates the reader is not draining the pipe.
+Expected: 4 tests pass. The child-process test must complete within the timeout; the open-pipe test must return after the one-second drain grace period instead of waiting for EOF forever.
 
 - [x] **Step 5: Commit the bounded capture implementation.**
 
@@ -367,7 +387,7 @@ Review the diff against `origin/main` for these requirements:
 - no `read_to_end()` remains in SSH stderr handling;
 - retained bytes never exceed 64 KiB;
 - the reader continues after the limit is reached;
-- exit diagnostics await reader completion and retain the tail marker in the regression test;
+- exit diagnostics give the reader a bounded grace period, abort on timeout, and retain the tail marker in the regression test;
 - existing startup, monitor, stop, and status behavior is unchanged.
 
 - [x] **Step 5: Push the feature branch and create the PR.**
