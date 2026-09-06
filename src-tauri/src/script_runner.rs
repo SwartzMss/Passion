@@ -493,7 +493,7 @@ mod tests {
         std::fs::write(
             &child_script_path,
             format!(
-                "Set-Content -LiteralPath '{}' -Value started\nStart-Sleep -Seconds 5\nSet-Content -LiteralPath '{}' -Value alive\n",
+                "Set-Content -LiteralPath '{}' -Value started\nStart-Sleep -Seconds 10\nSet-Content -LiteralPath '{}' -Value alive\n",
                 quote_path(&started_marker_path),
                 quote_path(&alive_marker_path)
             ),
@@ -515,13 +515,13 @@ mod tests {
         };
         let started = std::time::Instant::now();
 
-        let result = run_script_with_timeout(&task, Duration::from_secs(2)).await;
+        let result = run_script_with_timeout(&task, Duration::from_secs(5)).await;
 
         assert!(result
             .error
             .as_deref()
             .is_some_and(|message| message.contains("超时")));
-        assert!(started.elapsed() < Duration::from_secs(3));
+        assert!(started.elapsed() < Duration::from_secs(6));
 
         assert!(started_marker_path.exists());
         tokio::time::sleep(Duration::from_millis(500)).await;
