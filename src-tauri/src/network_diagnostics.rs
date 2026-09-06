@@ -5,7 +5,7 @@ use crate::models::{
 };
 #[cfg(target_os = "windows")]
 use encoding_rs::GBK;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::{TcpStream, ToSocketAddrs};
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
@@ -56,7 +56,7 @@ pub async fn inspect_port_occupancy(
             .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?;
         let raw_output = decode_output(&output.stdout, &output.stderr);
         let mut entries = parse_netstat_listening_ports(&raw_output, port);
-        let process_names = lookup_process_names(entries.iter().map(|entry| entry.pid).collect());
+        let process_names = lookup_process_names(entries.iter().map(|entry| entry.pid));
         for entry in &mut entries {
             entry.process_name = process_names.get(&entry.pid).cloned();
         }
@@ -83,18 +83,14 @@ pub async fn inspect_process_ports(
             .output()
             .map_err(|err| BackendError::NetworkDiagnostic(err.to_string()))?;
         let raw_output = decode_output(&output.stdout, &output.stderr);
-        let pids = parse_netstat_tcp_entries(&raw_output)
+        let mut pids = parse_netstat_tcp_entries(&raw_output)
             .into_iter()
             .map(|entry| entry.pid)
-            .collect();
-        let mut process_names = lookup_process_names(pids);
+            .collect::<HashSet<_>>();
         if let Ok(pid) = query.parse::<u32>() {
-            if let std::collections::hash_map::Entry::Vacant(entry) = process_names.entry(pid) {
-                if let Some(name) = lookup_process_name(pid) {
-                    entry.insert(name);
-                }
-            }
+            pids.insert(pid);
         }
+        let process_names = lookup_process_names(pids);
         let resolved = resolve_process_query(&query, &process_names);
         let entries = if resolved.process_found {
             parse_netstat_ports_by_process_query(&raw_output, &query, &process_names)
@@ -255,47 +251,73 @@ fn address_has_port(address: &str, port: u16) -> bool {
         == Some(port)
 }
 
-fn lookup_process_names(pids: Vec<u32>) -> HashMap<u32, String> {
-    let mut names = HashMap::new();
-    for pid in pids {
-        if names.contains_key(&pid) {
-            continue;
-        }
-        if let Some(name) = lookup_process_name(pid) {
-            names.insert(pid, name);
-        }
+fn lookup_process_names(pids: impl IntoIterator<Item = u32>) -> HashMap<u32, String> {
+    let requested = pids.into_iter().collect::<HashSet<_>>();
+    if requested.is_empty() {
+        return HashMap::new();
     }
-    names
+
+    let snapshot = lookup_process_snapshot();
+    select_process_names(&snapshot, requested)
 }
 
-fn lookup_process_name(pid: u32) -> Option<String> {
-    let filter = format!("PID eq {pid}");
-    let output = background_command("tasklist")
-        .args(["/FI", &filter, "/FO", "CSV", "/NH"])
+fn lookup_process_snapshot() -> HashMap<u32, String> {
+    let output = match background_command("tasklist")
+        .args(["/FO", "CSV", "/NH"])
         .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
+    {
+        Ok(output) if output.status.success() => output,
+        _ => return HashMap::new(),
+    };
     let raw = decode_output(&output.stdout, &output.stderr);
-    parse_tasklist_process_name(&raw)
+    parse_tasklist_processes(&raw)
 }
 
-fn parse_tasklist_process_name(output: &str) -> Option<String> {
-    output
-        .lines()
-        .find_map(|line| parse_csv_first_field(line).filter(|value| !value.eq("INFO:")))
+fn select_process_names(
+    snapshot: &HashMap<u32, String>,
+    pids: impl IntoIterator<Item = u32>,
+) -> HashMap<u32, String> {
+    let requested = pids.into_iter().collect::<HashSet<_>>();
+    snapshot
+        .iter()
+        .filter(|(pid, _)| requested.contains(pid))
+        .map(|(pid, name)| (*pid, name.clone()))
+        .collect()
 }
 
-fn parse_csv_first_field(line: &str) -> Option<String> {
-    let trimmed = line.trim();
-    if trimmed.is_empty() {
+fn parse_tasklist_processes(output: &str) -> HashMap<u32, String> {
+    output.lines().filter_map(parse_tasklist_process).collect()
+}
+
+fn parse_tasklist_process(line: &str) -> Option<(u32, String)> {
+    let fields = parse_csv_fields(line);
+    let process_name = fields.first()?.trim().to_string();
+    if process_name.is_empty() || process_name.eq_ignore_ascii_case("INFO:") {
         return None;
     }
-    if let Some(rest) = trimmed.strip_prefix('"') {
-        return rest.split('"').next().map(str::to_string);
+    let pid = fields.get(1)?.trim().parse::<u32>().ok()?;
+    Some((pid, process_name))
+}
+
+fn parse_csv_fields(line: &str) -> Vec<String> {
+    let mut fields = Vec::new();
+    let mut field = String::new();
+    let mut quoted = false;
+    let mut chars = line.trim().chars().peekable();
+
+    while let Some(character) = chars.next() {
+        match character {
+            '"' if quoted && chars.peek() == Some(&'"') => {
+                field.push('"');
+                chars.next();
+            }
+            '"' => quoted = !quoted,
+            ',' if !quoted => fields.push(std::mem::take(&mut field)),
+            _ => field.push(character),
+        }
     }
-    trimmed.split(',').next().map(str::to_string)
+    fields.push(field);
+    fields
 }
 
 fn background_command(program: &str) -> Command {
@@ -409,9 +431,45 @@ mod tests {
         let output = "\"node.exe\",\"1234\",\"Console\",\"1\",\"50,000 K\"";
 
         assert_eq!(
-            parse_tasklist_process_name(output),
-            Some("node.exe".to_string())
+            parse_tasklist_processes(output).get(&1234),
+            Some(&"node.exe".to_string())
         );
+    }
+
+    #[test]
+    fn parse_tasklist_maps_multiple_rows_and_ignores_invalid_rows() {
+        let output = r#"
+"node.exe","1234","Console","1","50,000 K"
+"ssh.exe","5678","Console","1","12,000 K"
+INFO: No tasks are running which match the specified criteria.
+"broken.exe","not-a-pid","Console","1","1,000 K"
+"worker,with-comma.exe","9012","Console","1","2,000 K"
+"#;
+
+        let processes = parse_tasklist_processes(output);
+
+        assert_eq!(processes.len(), 3);
+        assert_eq!(processes.get(&1234), Some(&"node.exe".to_string()));
+        assert_eq!(processes.get(&5678), Some(&"ssh.exe".to_string()));
+        assert_eq!(
+            processes.get(&9012),
+            Some(&"worker,with-comma.exe".to_string())
+        );
+    }
+
+    #[test]
+    fn select_process_names_deduplicates_requested_pids_and_ignores_missing() {
+        let snapshot = HashMap::from([
+            (1234, "node.exe".to_string()),
+            (5678, "ssh.exe".to_string()),
+        ]);
+
+        let selected = select_process_names(&snapshot, [1234, 1234, 9999, 5678]);
+
+        assert_eq!(selected.len(), 2);
+        assert_eq!(selected.get(&1234), Some(&"node.exe".to_string()));
+        assert_eq!(selected.get(&5678), Some(&"ssh.exe".to_string()));
+        assert!(!selected.contains_key(&9999));
     }
 
     #[cfg(target_os = "windows")]
