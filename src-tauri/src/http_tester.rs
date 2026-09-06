@@ -3,18 +3,31 @@ use crate::models::{HttpApiHeader, HttpApiRequest, HttpApiResponse};
 use chrono::Utc;
 use encoding_rs::{Encoding, UTF_8};
 use reqwest::{header::CONTENT_TYPE, Client, Method, Url};
-use std::time::{Duration, Instant};
+use std::{
+    sync::OnceLock,
+    time::{Duration, Instant},
+};
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
 const MAX_RESPONSE_BODY_BYTES: usize = 10 * 1024 * 1024;
+static HTTP_CLIENT: OnceLock<Result<Client, String>> = OnceLock::new();
+
+fn http_client() -> BackendResult<&'static Client> {
+    HTTP_CLIENT
+        .get_or_init(|| {
+            Client::builder()
+                .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECONDS))
+                .build()
+                .map_err(|err| err.to_string())
+        })
+        .as_ref()
+        .map_err(|err| BackendError::HttpApi(err.clone()))
+}
 
 pub async fn send_http_request(input: HttpApiRequest) -> BackendResult<HttpApiResponse> {
     let method = parse_method(&input.method)?;
     let url = build_url(&input.url, &input.query)?;
-    let client = Client::builder()
-        .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECONDS))
-        .build()
-        .map_err(|err| BackendError::HttpApi(err.to_string()))?;
+    let client = http_client()?;
     let mut request = client.request(method.clone(), url);
 
     for header in input
@@ -148,6 +161,14 @@ mod tests {
     use std::thread;
 
     use crate::models::{HttpApiHeader, HttpApiRequest};
+
+    #[test]
+    fn http_client_provider_returns_the_same_instance() {
+        let first = super::http_client().expect("client should initialize");
+        let second = super::http_client().expect("client should initialize");
+
+        assert!(std::ptr::eq(first, second));
+    }
 
     #[tokio::test]
     async fn sends_http_request_with_headers_query_and_body() {
