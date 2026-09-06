@@ -23,7 +23,7 @@ No frontend files, Cargo dependencies, SSH arguments, or database models need to
 **Files:**
 - Modify: `src-tauri/src/ssh_tunnels.rs:1-25, 766-777, 779-975`
 
-- [ ] **Step 1: Add the constants and tests before adding the implementation.**
+- [x] **Step 1: Add the constants and tests before adding the implementation.**
 
 Add these constants beside the existing SSH timing constants:
 
@@ -110,7 +110,7 @@ async fn stderr_reader_drains_a_child_and_keeps_the_latest_limit() {
 }
 ```
 
-- [ ] **Step 2: Run the focused tests and verify they fail for the expected missing-implementation reason.**
+- [x] **Step 2: Run the focused tests and verify they fail for the expected missing-implementation reason.**
 
 Run:
 
@@ -125,7 +125,7 @@ Expected: compilation fails because `StderrRingBuffer` and `spawn_stderr_capture
 **Files:**
 - Modify: `src-tauri/src/ssh_tunnels.rs:1-25, 766-777`
 
-- [ ] **Step 1: Add the byte-oriented rolling buffer.**
+- [x] **Step 1: Add the byte-oriented rolling buffer.**
 
 Add `VecDeque` to the collections import:
 
@@ -179,7 +179,7 @@ impl StderrRingBuffer {
 }
 ```
 
-- [ ] **Step 2: Add a capture wrapper that drains the reader and awaits completion before diagnostics.**
+- [x] **Step 2: Add a capture wrapper that drains the reader and awaits completion before diagnostics.**
 
 Add this implementation immediately after `StderrRingBuffer`:
 
@@ -225,7 +225,7 @@ impl StderrCapture {
 }
 ```
 
-- [ ] **Step 3: Replace the old unbounded `stderr_suffix` helper.**
+- [x] **Step 3: Replace the old unbounded `stderr_suffix` helper.**
 
 Replace `summarize_output` and the old `stderr_suffix` with:
 
@@ -243,7 +243,7 @@ async fn stderr_suffix(stderr_capture: Option<&mut StderrCapture>) -> String {
 }
 ```
 
-- [ ] **Step 4: Run the focused tests and verify they pass.**
+- [x] **Step 4: Run the focused tests and verify they pass.**
 
 Run:
 
@@ -253,7 +253,7 @@ cargo test --manifest-path src-tauri/Cargo.toml ssh_tunnels::tests
 
 Expected: 3 tests pass. The child-process test must complete within the timeout; a hang indicates the reader is not draining the pipe.
 
-- [ ] **Step 5: Commit the bounded capture implementation.**
+- [x] **Step 5: Commit the bounded capture implementation.**
 
 ```bash
 git add src-tauri/src/ssh_tunnels.rs
@@ -265,7 +265,7 @@ git commit -m "feat: add bounded ssh stderr capture"
 **Files:**
 - Modify: `src-tauri/src/ssh_tunnels.rs:471-515, 620-666`
 
-- [ ] **Step 1: Replace startup stderr setup with an optional capture.**
+- [x] **Step 1: Replace startup stderr setup with an optional capture.**
 
 Replace the current `stderr_buffer` setup in `SshTunnelManager::start` with:
 
@@ -294,7 +294,7 @@ self.spawn_monitor(tunnel.id.clone(), child, stderr_capture, log_path);
 
 The `CheckFailed` arm continues to set the same error and drops the capture task, which remains bounded and will finish when the child pipe closes.
 
-- [ ] **Step 2: Update `spawn_monitor` to own and finish the capture.**
+- [x] **Step 2: Update `spawn_monitor` to own and finish the capture.**
 
 Change its parameter from `Arc<tokio::sync::Mutex<String>>` to `Option<StderrCapture>`:
 
@@ -310,18 +310,18 @@ fn spawn_monitor(
 
 In the exited branch, replace `stderr_suffix(&stderr_buffer).await` with `stderr_suffix(stderr_capture.as_mut()).await`. Keep the existing `is_stopping` guard, log text, `set_error`, polling interval, and break behavior exactly as they are.
 
-- [ ] **Step 3: Format and run SSH tests.**
+- [x] **Step 3: Format and run SSH tests.**
 
 Run:
 
 ```bash
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+rustfmt --edition 2021 --check src-tauri/src/ssh_tunnels.rs
 cargo test --manifest-path src-tauri/Cargo.toml ssh_tunnels::tests
 ```
 
-Expected: formatting succeeds and all SSH tunnel tests pass, including the new child-pipe regression test.
+Expected: the changed SSH file is formatted and all SSH tunnel tests pass, including the new child-pipe regression test. The full-workspace Cargo format check may still report an existing difference in `src-tauri/src/settings.rs`.
 
-- [ ] **Step 4: Commit the lifecycle integration.**
+- [x] **Step 4: Commit the lifecycle integration.**
 
 ```bash
 git add src-tauri/src/ssh_tunnels.rs
@@ -333,7 +333,7 @@ git commit -m "fix: bound ssh tunnel stderr memory"
 **Files:**
 - Modify: none unless verification reveals a defect.
 
-- [ ] **Step 1: Run the complete backend test suite.**
+- [x] **Step 1: Run the complete backend test suite.**
 
 ```bash
 cargo test --manifest-path src-tauri/Cargo.toml
@@ -341,7 +341,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 Expected: all backend tests pass with zero failures.
 
-- [ ] **Step 2: Run frontend tests and the production build.**
+- [x] **Step 2: Run frontend tests and the production build.**
 
 ```bash
 npm test -- --run
@@ -350,7 +350,7 @@ npm run build
 
 Expected: all existing frontend tests pass and TypeScript/Vite build exits successfully. The `npm install` baseline reported audit findings; do not change dependency versions as part of this issue.
 
-- [ ] **Step 3: Inspect the final diff and verify repository state.**
+- [x] **Step 3: Inspect the final diff and verify repository state.**
 
 ```bash
 git diff origin/main...HEAD --check
