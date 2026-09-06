@@ -18,7 +18,7 @@ permissions:
 jobs:
   rust:
     name: Rust tests on Windows
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     steps:
       - name: Checkout repository
@@ -34,7 +34,7 @@ jobs:
 
       - name: Run Rust tests
         working-directory: src-tauri
-        run: cargo test
+        run: cargo test -- --test-threads=1
 
       - name: Build Rust backend
         working-directory: src-tauri
