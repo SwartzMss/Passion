@@ -65,14 +65,17 @@ Add this test, which uses real threads and the filesystem rather than mocking th
 fn concurrent_writes_keep_at_most_three_archives() {
     let dir = tempfile::tempdir().unwrap();
     let path = std::sync::Arc::new(dir.path().join("passion.log"));
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(16));
     let handles = (0..16)
         .map(|index| {
             let path = std::sync::Arc::clone(&path);
+            let barrier = std::sync::Arc::clone(&barrier);
             std::thread::spawn(move || {
+                barrier.wait();
                 super::write_log_line_with_limit(
                     path.as_path(),
                     &format!("thread-{index:02}\\n"),
-                    16,
+                    40,
                 )
                 .unwrap();
             })
@@ -85,10 +88,72 @@ fn concurrent_writes_keep_at_most_three_archives() {
 
     assert!(path.exists());
     assert!(!path.with_file_name("passion.log.4").exists());
+
+    let mut actual = Vec::new();
+    for index in 0..=3 {
+        let file = if index == 0 {
+            path.as_path().to_path_buf()
+        } else {
+            path.with_file_name(format!("passion.log.{index}"))
+        };
+        if file.exists() {
+            actual.extend(
+                std::fs::read_to_string(file)
+                    .unwrap()
+                    .lines()
+                    .map(str::to_string),
+            );
+        }
+    }
+    actual.sort();
+    let mut expected = (0..16)
+        .map(|index| format!("thread-{index:02}"))
+        .collect::<Vec<_>>();
+    expected.sort();
+    assert_eq!(actual, expected);
 }
 ```
 
-- [ ] **Step 3: Run the focused tests and verify the intended failure**
+- [ ] **Step 3: Add production-boundary and oversized-line tests**
+
+Add tests that use the production 5 MiB constant and verify that a single line larger than a test limit remains intact:
+
+```rust
+#[test]
+fn rotates_at_the_production_size_boundary() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("passion.log");
+    let almost_full = "a".repeat((super::MAX_LOG_FILE_BYTES - 1) as usize);
+
+    super::write_log_line_with_limit(&path, &almost_full, super::MAX_LOG_FILE_BYTES).unwrap();
+    super::write_log_line_with_limit(&path, "b", super::MAX_LOG_FILE_BYTES).unwrap();
+    assert_eq!(std::fs::metadata(&path).unwrap().len(), super::MAX_LOG_FILE_BYTES);
+
+    super::write_log_line_with_limit(&path, "c", super::MAX_LOG_FILE_BYTES).unwrap();
+
+    assert_eq!(
+        std::fs::metadata(path.with_file_name("passion.log.1"))
+            .unwrap()
+            .len(),
+        super::MAX_LOG_FILE_BYTES
+    );
+    assert_eq!(std::fs::read_to_string(path).unwrap(), "c");
+}
+
+#[test]
+fn keeps_a_single_log_line_that_exceeds_the_limit_intact() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("passion.log");
+    let line = "x".repeat(32);
+
+    super::write_log_line_with_limit(&path, &line, 16).unwrap();
+
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), line);
+    assert!(!path.with_file_name("passion.log.1").exists());
+}
+```
+
+- [ ] **Step 4: Run the focused tests and verify the intended failure**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml app_log -- --nocapture`
 
