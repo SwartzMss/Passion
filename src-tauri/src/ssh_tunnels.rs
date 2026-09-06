@@ -3,7 +3,7 @@ use crate::models::{NewSshTunnel, SshTunnel, SshTunnelSettings};
 use crate::models::{SshTunnelInfo, SshTunnelStatus};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Row};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
@@ -23,6 +23,11 @@ const UPDATED_AT_COLUMN_INDEX: usize = 11;
 const SSH_CONNECT_TIMEOUT_SECS: u64 = 5;
 const SSH_STARTUP_TIMEOUT_SECS: u64 = SSH_CONNECT_TIMEOUT_SECS + 2;
 const SSH_STARTUP_POLL_MS: u64 = 200;
+// Retain only the most recent stderr bytes so long-running tunnels stay bounded.
+const SSH_STDERR_BUFFER_LIMIT_BYTES: usize = 64 * 1024;
+const SSH_STDERR_READ_CHUNK_BYTES: usize = 4096;
+#[cfg(test)]
+const STDERR_CHILD_ENV: &str = "PASSION_SSH_STDERR_CHILD";
 
 impl SshTunnelRepository {
     pub fn create(conn: &Connection, input: NewSshTunnel) -> BackendResult<SshTunnel> {
@@ -468,25 +473,14 @@ impl SshTunnelManager {
                     .unwrap_or_else(|| "<unknown>".to_string())
             ),
         );
-        let stderr = child.stderr.take();
-        let stderr_buffer = Arc::new(tokio::sync::Mutex::new(String::new()));
-        if let Some(mut stderr) = stderr {
-            let stderr_buffer = stderr_buffer.clone();
-            tauri::async_runtime::spawn(async move {
-                let mut bytes = Vec::new();
-                let _ = stderr.read_to_end(&mut bytes).await;
-                let text = String::from_utf8_lossy(&bytes).to_string();
-                let mut buffer = stderr_buffer.lock().await;
-                *buffer = summarize_output(&text);
-            });
-        }
+        let mut stderr_capture = child.stderr.take().map(spawn_stderr_capture);
 
         match wait_for_ssh_startup(&mut child).await {
             SshStartupState::Exited(status) => {
                 let error = format!(
                     "SSH 进程退出，退出码: {}{}",
                     status,
-                    stderr_suffix(&stderr_buffer).await
+                    stderr_suffix(stderr_capture.as_mut()).await
                 );
                 self.set_error(&tunnel.id, error.clone());
                 crate::app_log::error(
@@ -512,7 +506,7 @@ impl SshTunnelManager {
                             .unwrap_or_else(|| "<unknown>".to_string())
                     ),
                 );
-                self.spawn_monitor(tunnel.id.clone(), child, stderr_buffer, log_path);
+                self.spawn_monitor(tunnel.id.clone(), child, stderr_capture, log_path);
             }
             SshStartupState::CheckFailed(err) => {
                 let error = format!("进程检查失败: {err}");
@@ -621,7 +615,7 @@ impl SshTunnelManager {
         &self,
         id: String,
         child: Arc<tokio::sync::Mutex<Child>>,
-        stderr_buffer: Arc<tokio::sync::Mutex<String>>,
+        mut stderr_capture: Option<StderrCapture>,
         log_path: PathBuf,
     ) {
         let manager = self.clone();
@@ -638,7 +632,7 @@ impl SshTunnelManager {
                             let message = format!(
                                 "SSH 进程退出，退出码: {}{}",
                                 status,
-                                stderr_suffix(&stderr_buffer).await
+                                stderr_suffix(stderr_capture.as_mut()).await
                             );
                             crate::app_log::error(
                                 log_path.as_path(),
@@ -763,12 +757,93 @@ fn kill_process_tree_command(pid: u32) -> (String, Vec<String>) {
     )
 }
 
-fn summarize_output(value: &str) -> String {
-    value.chars().take(2000).collect()
+struct StderrRingBuffer {
+    bytes: VecDeque<u8>,
 }
 
-async fn stderr_suffix(stderr_buffer: &Arc<tokio::sync::Mutex<String>>) -> String {
-    let stderr = stderr_buffer.lock().await;
+impl StderrRingBuffer {
+    fn new() -> Self {
+        Self {
+            bytes: VecDeque::with_capacity(SSH_STDERR_BUFFER_LIMIT_BYTES),
+        }
+    }
+
+    fn append(&mut self, chunk: &[u8]) {
+        if chunk.len() >= SSH_STDERR_BUFFER_LIMIT_BYTES {
+            self.bytes.clear();
+            self.bytes.extend(
+                chunk[chunk.len() - SSH_STDERR_BUFFER_LIMIT_BYTES..]
+                    .iter()
+                    .copied(),
+            );
+            return;
+        }
+
+        let overflow = self
+            .bytes
+            .len()
+            .saturating_add(chunk.len())
+            .saturating_sub(SSH_STDERR_BUFFER_LIMIT_BYTES);
+        for _ in 0..overflow {
+            self.bytes.pop_front();
+        }
+        self.bytes.extend(chunk.iter().copied());
+    }
+
+    fn snapshot(&self) -> Vec<u8> {
+        self.bytes.iter().copied().collect()
+    }
+
+    fn to_lossy_string(&self) -> String {
+        String::from_utf8_lossy(&self.snapshot()).into_owned()
+    }
+}
+
+struct StderrCapture {
+    buffer: Arc<tokio::sync::Mutex<StderrRingBuffer>>,
+    reader_task: Option<tauri::async_runtime::JoinHandle<()>>,
+}
+
+fn spawn_stderr_capture<R>(mut stderr: R) -> StderrCapture
+where
+    R: tokio::io::AsyncRead + Unpin + Send + 'static,
+{
+    let buffer = Arc::new(tokio::sync::Mutex::new(StderrRingBuffer::new()));
+    let shared_buffer = buffer.clone();
+    let reader_task = tauri::async_runtime::spawn(async move {
+        let mut chunk = [0u8; SSH_STDERR_READ_CHUNK_BYTES];
+        loop {
+            match stderr.read(&mut chunk).await {
+                Ok(0) | Err(_) => break,
+                Ok(size) => {
+                    let mut buffer = shared_buffer.lock().await;
+                    buffer.append(&chunk[..size]);
+                }
+            }
+        }
+    });
+
+    StderrCapture {
+        buffer,
+        reader_task: Some(reader_task),
+    }
+}
+
+impl StderrCapture {
+    async fn snapshot(&mut self) -> String {
+        if let Some(reader_task) = self.reader_task.take() {
+            let _ = reader_task.await;
+        }
+        let buffer = self.buffer.lock().await;
+        buffer.to_lossy_string()
+    }
+}
+
+async fn stderr_suffix(stderr_capture: Option<&mut StderrCapture>) -> String {
+    let Some(stderr_capture) = stderr_capture else {
+        return String::new();
+    };
+    let stderr = stderr_capture.snapshot().await;
     if stderr.trim().is_empty() {
         String::new()
     } else {
@@ -781,6 +856,8 @@ mod tests {
     use super::*;
     use crate::db;
     use crate::models::NewSshTunnel;
+    use std::io::Write;
+    use tokio::time::timeout;
 
     fn sample_input() -> NewSshTunnel {
         NewSshTunnel {
@@ -948,6 +1025,72 @@ mod tests {
         assert_eq!(info.status, crate::models::SshTunnelStatus::Stopped);
         assert_eq!(info.pid, None);
         assert_eq!(info.error_message, None);
+    }
+
+    #[test]
+    fn stderr_ring_buffer_keeps_latest_bytes() {
+        let mut buffer = StderrRingBuffer::new();
+        let input: Vec<u8> = (0..SSH_STDERR_BUFFER_LIMIT_BYTES + 3)
+            .map(|value| (value % 251) as u8)
+            .collect();
+
+        buffer.append(&input);
+
+        assert_eq!(buffer.snapshot(), input[3..].to_vec());
+    }
+
+    #[test]
+    fn stderr_ring_buffer_decodes_utf8_only_at_snapshot_boundary() {
+        let mut buffer = StderrRingBuffer::new();
+        buffer.append("连接失败".as_bytes());
+
+        assert_eq!(buffer.to_lossy_string(), "连接失败");
+    }
+
+    #[test]
+    fn stderr_writer_child() {
+        if std::env::var_os(STDERR_CHILD_ENV).is_none() {
+            return;
+        }
+
+        let mut stderr = std::io::stderr().lock();
+        stderr.write_all(b"old-prefix-marker").unwrap();
+        let chunk = vec![b'x'; SSH_STDERR_READ_CHUNK_BYTES];
+        for _ in 0..(SSH_STDERR_BUFFER_LIMIT_BYTES / SSH_STDERR_READ_CHUNK_BYTES + 2) {
+            stderr.write_all(&chunk).unwrap();
+        }
+        stderr.write_all(b"tail-marker").unwrap();
+        stderr.flush().unwrap();
+    }
+
+    #[tokio::test]
+    async fn stderr_reader_drains_a_child_and_keeps_the_latest_limit() {
+        let executable = std::env::current_exe().unwrap();
+        let mut child = TokioCommand::new(executable)
+            .args([
+                "--exact",
+                "ssh_tunnels::tests::stderr_writer_child",
+                "--nocapture",
+            ])
+            .env(STDERR_CHILD_ENV, "1")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let stderr = child.stderr.take().unwrap();
+        let mut capture = spawn_stderr_capture(stderr);
+
+        let status = timeout(Duration::from_secs(5), child.wait())
+            .await
+            .expect("child blocked on stderr pipe")
+            .unwrap();
+        assert!(status.success());
+
+        let output = capture.snapshot().await;
+        assert_eq!(output.as_bytes().len(), SSH_STDERR_BUFFER_LIMIT_BYTES);
+        assert!(output.ends_with("tail-marker"));
+        assert!(!output.contains("old-prefix-marker"));
     }
 
     #[cfg(target_os = "windows")]
