@@ -15,7 +15,7 @@
 **Files:**
 - Modify: `src-tauri/src/network_diagnostics.rs` (unit tests near the existing tasklist parser test)
 
-- [ ] Add a regression test covering multiple CSV rows, duplicate-safe mapping, quoted commas in process names, `INFO:` rows, and malformed PIDs:
+- [x] Add a regression test covering multiple CSV rows, duplicate-safe mapping, quoted commas in process names, `INFO:` rows, and malformed PIDs:
 
 ```rust
 #[test]
@@ -40,7 +40,7 @@ INFO: No tasks are running which match the specified criteria.
 }
 ```
 
-- [ ] Add a test proving requested PIDs are deduplicated and missing PIDs are ignored when selecting names from a snapshot:
+- [x] Add a test proving requested PIDs are deduplicated and missing PIDs are ignored when selecting names from a snapshot:
 
 ```rust
 #[test]
@@ -59,8 +59,8 @@ fn select_process_names_deduplicates_requested_pids_and_ignores_missing() {
 }
 ```
 
-- [ ] Update the existing single-row tasklist test to assert the parsed PID/name map rather than the soon-to-be-removed single-name helper.
-- [ ] Run the focused tests and confirm they fail because the new parser/selection helpers do not exist yet:
+- [x] Update the existing single-row tasklist test to assert the parsed PID/name map rather than the soon-to-be-removed single-name helper.
+- [x] Run the focused tests and confirm they fail because the new parser/selection helpers do not exist yet:
 
 ```bash
 cargo test --manifest-path src-tauri/Cargo.toml network_diagnostics::tests -- --test-threads=1
@@ -73,17 +73,17 @@ Expected result: compilation fails with missing `parse_tasklist_processes` and/o
 **Files:**
 - Modify: `src-tauri/src/network_diagnostics.rs`
 
-- [ ] Import `HashSet` alongside `HashMap`.
-- [ ] Replace the per-PID `lookup_process_names`/`lookup_process_name` implementation with a collection-based lookup that:
+- [x] Import `HashSet` alongside `HashMap`.
+- [x] Replace the per-PID `lookup_process_names`/`lookup_process_name` implementation with a collection-based lookup that:
   - collects requested PIDs into a `HashSet`;
   - returns immediately without spawning `tasklist` for an empty set;
   - invokes `tasklist` exactly once with `[/FO, CSV, /NH]`;
   - preserves `background_command`, success checking, and `decode_output` behavior;
   - returns an empty map if spawning or tasklist execution fails;
   - filters the full snapshot to the requested PIDs in memory.
-- [ ] Implement `parse_tasklist_processes` and a row parser that reads the first two CSV fields, supports quoted fields and escaped quotes, ignores blank/`INFO:`/malformed rows, and parses the PID as `u32`.
-- [ ] Keep process names unchanged, including names containing commas; do not alter public models or query result formatting.
-- [ ] Run the focused tests and confirm they pass:
+- [x] Implement `parse_tasklist_processes` and a row parser that reads the first two CSV fields, supports quoted fields and escaped quotes, ignores blank/`INFO:`/malformed rows, and parses the PID as `u32`.
+- [x] Keep process names unchanged, including names containing commas; do not alter public models or query result formatting.
+- [x] Run the focused tests and confirm they pass:
 
 ```bash
 cargo test --manifest-path src-tauri/Cargo.toml network_diagnostics::tests -- --test-threads=1
@@ -94,15 +94,15 @@ cargo test --manifest-path src-tauri/Cargo.toml network_diagnostics::tests -- --
 **Files:**
 - Modify: `src-tauri/src/network_diagnostics.rs`
 
-- [ ] In `inspect_port_occupancy`, pass the parsed netstat entry PIDs directly to the one-shot lookup and keep the existing per-entry `process_name` assignment.
-- [ ] In `inspect_process_ports`, collect/deduplicate PIDs from netstat, add the numeric query PID even if it is absent from netstat, perform one lookup, and leave `resolve_process_query` and response construction unchanged.
-- [ ] Verify no per-PID filter remains and no more than one tasklist invocation is reachable from either query:
+- [x] In `inspect_port_occupancy`, pass the parsed netstat entry PIDs directly to the one-shot lookup and keep the existing per-entry `process_name` assignment.
+- [x] In `inspect_process_ports`, collect/deduplicate PIDs from netstat, add the numeric query PID even if it is absent from netstat, perform one lookup, and leave `resolve_process_query` and response construction unchanged.
+- [x] Verify no per-PID filter remains and no more than one tasklist invocation is reachable from either query:
 
 ```bash
 rg -n "lookup_process_name|PID eq|tasklist|inspect_port_occupancy|inspect_process_ports" src-tauri/src/network_diagnostics.rs
 ```
 
-- [ ] Format and run focused verification:
+- [x] Format and run focused verification:
 
 ```bash
 rustfmt --edition 2021 --check src-tauri/src/network_diagnostics.rs
@@ -118,7 +118,7 @@ Expected result: no formatting changes are reported and all Network Diagnostics 
 - Verify: `docs/superpowers/specs/2026-09-06-issue-44-network-tasklist-snapshot-design.md`
 - Verify: `docs/superpowers/plans/2026-09-06-issue-44-network-tasklist-snapshot.md`
 
-- [ ] Run the complete backend test suite sequentially:
+- [x] Run the complete backend test suite sequentially:
 
 ```bash
 cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1
@@ -126,14 +126,14 @@ cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1
 
 Expected result: the baseline 121 tests plus the new regression tests pass; any platform-specific pre-existing failure is recorded precisely.
 
-- [ ] Run frontend verification without changing dependencies:
+- [x] Run frontend verification without changing dependencies:
 
 ```bash
 npm test -- --run
 npm run build
 ```
 
-- [ ] Check the final diff and whitespace:
+- [x] Check the final diff and whitespace:
 
 ```bash
 git diff --check
@@ -143,7 +143,7 @@ git diff --stat origin/main...HEAD
 
 Expected result: only the scoped backend change and the Issue #44 design/plan documents are present.
 
-- [ ] Commit the implementation with a focused message:
+- [x] Commit the implementation with a focused message:
 
 ```bash
 git add src-tauri/src/network_diagnostics.rs
@@ -151,4 +151,3 @@ git commit -m "fix: snapshot tasklist once per network query"
 ```
 
 - [ ] Request a code review of the final diff, then push `feat/issue-44-tasklist-snapshot` and create a PR targeting `main`, linking Issue #44 and documenting verification results.
-
