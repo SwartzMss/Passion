@@ -290,16 +290,16 @@ fn parse_tasklist_processes(output: &str) -> HashMap<u32, String> {
 }
 
 fn parse_tasklist_process(line: &str) -> Option<(u32, String)> {
-    let fields = parse_csv_fields(line);
+    let fields = parse_csv_fields(line)?;
     let process_name = fields.first()?.trim().to_string();
-    if process_name.is_empty() || process_name.eq_ignore_ascii_case("INFO:") {
+    if process_name.is_empty() || process_name.to_ascii_uppercase().starts_with("INFO:") {
         return None;
     }
     let pid = fields.get(1)?.trim().parse::<u32>().ok()?;
     Some((pid, process_name))
 }
 
-fn parse_csv_fields(line: &str) -> Vec<String> {
+fn parse_csv_fields(line: &str) -> Option<Vec<String>> {
     let mut fields = Vec::new();
     let mut field = String::new();
     let mut quoted = false;
@@ -316,8 +316,11 @@ fn parse_csv_fields(line: &str) -> Vec<String> {
             _ => field.push(character),
         }
     }
+    if quoted {
+        return None;
+    }
     fields.push(field);
-    fields
+    Some(fields)
 }
 
 fn background_command(program: &str) -> Command {
@@ -442,8 +445,10 @@ mod tests {
 "node.exe","1234","Console","1","50,000 K"
 "ssh.exe","5678","Console","1","12,000 K"
 INFO: No tasks are running which match the specified criteria.
+INFO: No matching process,3456
 "broken.exe","not-a-pid","Console","1","1,000 K"
 "worker,with-comma.exe","9012","Console","1","2,000 K"
+"unclosed.exe","3456","Console
 "#;
 
         let processes = parse_tasklist_processes(output);
