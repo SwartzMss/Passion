@@ -139,7 +139,7 @@ export function DownloadPanel() {
           task.id === taskId && task.status !== "paused"
             ? {
                 ...task,
-                status: "failed",
+                status: message === "下载已暂停。" ? "paused" : "failed",
                 finishedAt: new Date().toISOString(),
                 error: message,
               }
@@ -206,7 +206,7 @@ export function DownloadPanel() {
       await pauseDownload(task.id);
       setTasks((current) =>
         current.map((item) =>
-          item.id === task.id ? { ...item, status: "paused" } : item,
+          item.id === task.id && item.status === "running" ? { ...item, status: "paused" } : item,
         ),
       );
     } catch (err) {
