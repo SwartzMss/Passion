@@ -37,6 +37,8 @@ export interface AiSettings {
 
 export interface TranslationRequest {
   text: string;
+  sourceLanguage?: string;
+  targetLanguage?: string;
 }
 
 export interface TranslationResult {

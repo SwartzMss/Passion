@@ -25,6 +25,8 @@ Passion 是一个 Windows 桌面个人助理应用，基于 Tauri + React 构建
 
 ### 翻译
 
+- 支持自动检测源语言，以及中文、英语、日语、韩语之间的指定语言翻译。
+- 原文最多 100 KB，响应最多 2 MB；连接、读取和整次请求均有超时限制。
 - 支持 OpenAI Chat Completions 兼容接口。
 - 可配置 Base URL、模型名和 API Key。
 - 支持测试 AI 连接状态。

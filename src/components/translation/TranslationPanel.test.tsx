@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { TranslationPanel } from "./TranslationPanel";
@@ -61,7 +61,33 @@ it("translates text and displays the result", async () => {
   expect(await screen.findByText("你好，世界")).toBeInTheDocument();
   expect(translateText).toHaveBeenCalledWith({
     text: "Hello world",
+    sourceLanguage: "auto",
+    targetLanguage: "zh-CN",
   });
+});
+
+it("submits selected languages including Japanese and Korean", async () => {
+  const user = userEvent.setup();
+  render(<TranslationPanel onOpenSettings={() => {}} />);
+  await user.selectOptions(screen.getByLabelText("源语言"), "ja");
+  await user.selectOptions(screen.getByLabelText("目标语言"), "ko");
+  await user.type(screen.getByLabelText("原文"), "こんにちは");
+  await user.click(screen.getByRole("button", { name: "翻译" }));
+  expect(translateText).toHaveBeenCalledWith({ text: "こんにちは", sourceLanguage: "ja", targetLanguage: "ko" });
+});
+
+it("blocks repeated keyboard submits and ignores a response after clearing", async () => {
+  let finish!: (value: { translatedText: string }) => void;
+  vi.mocked(translateText).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  const user = userEvent.setup();
+  render(<TranslationPanel onOpenSettings={() => {}} />);
+  await user.type(screen.getByLabelText("原文"), "hello");
+  await user.keyboard("{Control>}{Enter}{Enter}{/Control}");
+  expect(translateText).toHaveBeenCalledTimes(1);
+  await user.click(screen.getByRole("button", { name: "清空" }));
+  await act(async () => finish({ translatedText: "late result" }));
+  expect(screen.getByLabelText("译文")).toHaveValue("");
+  expect(screen.getByRole("button", { name: "翻译" })).toBeEnabled();
 });
 
 it("clears source and translated text", async () => {

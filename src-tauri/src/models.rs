@@ -134,6 +134,19 @@ impl Default for AiSettings {
 #[serde(rename_all = "camelCase")]
 pub struct TranslationRequest {
     pub text: String,
+    #[serde(default = "default_source_language")]
+    pub source_language: String,
+    #[serde(default = "default_target_language")]
+    pub target_language: String,
+}
+
+fn default_source_language() -> String { "auto".into() }
+fn default_target_language() -> String { "zh-CN".into() }
+
+impl Default for TranslationRequest {
+    fn default() -> Self {
+        Self { text: String::new(), source_language: default_source_language(), target_language: default_target_language() }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
