@@ -1,8 +1,49 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { DownloadPanel } from "./DownloadPanel";
 import type { DownloadProgressEvent } from "../../types";
+import type { DownloadTask } from "../../types";
+import { listDownloadTasks } from "../../lib/api";
+import { onDownloadTaskChanged } from "../../lib/events";
+
+const savedTask: DownloadTask = {
+  id: "restored", url: "https://example.com/restored.zip", saveDir: "D:\\Downloads",
+  requestedFileName: "restored.zip", startedAt: "2026-09-11T00:00:00Z",
+  status: "running", totalBytes: 100, downloadedBytes: 30, revision: 2,
+};
+
+it("restores backend tasks after leaving and reopening the panel", async () => {
+  vi.mocked(listDownloadTasks).mockResolvedValueOnce([savedTask]);
+  const first = render(<DownloadPanel />);
+  expect(await screen.findByText("restored.zip")).toBeInTheDocument();
+  first.unmount();
+  vi.mocked(listDownloadTasks).mockResolvedValueOnce([{ ...savedTask, downloadedBytes: 70, revision: 3 }]);
+  render(<DownloadPanel />);
+  expect(await screen.findByText("70%")).toBeInTheDocument();
+});
+
+it("does not let a stale initial snapshot overwrite a newer event", async () => {
+  let resolveSnapshot!: (tasks: DownloadTask[]) => void;
+  vi.mocked(listDownloadTasks).mockImplementationOnce(() => new Promise((resolve) => { resolveSnapshot = resolve; }));
+  render(<DownloadPanel />);
+  await waitFor(() => expect(resolveSnapshot).toBeDefined());
+  const calls = vi.mocked(onDownloadTaskChanged).mock.calls;
+  const handler = calls[calls.length - 1][0];
+  act(() => handler({ ...savedTask, downloadedBytes: 80, revision: 4 }));
+  await act(async () => resolveSnapshot([savedTask]));
+  expect(screen.getByText("80%")).toBeInTheDocument();
+});
+
+it("cleans up a listener even if registration finishes after unmount", async () => {
+  let resolveListener!: (cleanup: () => void) => void;
+  const cleanup = vi.fn();
+  vi.mocked(onDownloadTaskChanged).mockImplementationOnce(() => new Promise((resolve) => { resolveListener = resolve; }));
+  const view = render(<DownloadPanel />);
+  view.unmount();
+  await act(async () => resolveListener(cleanup));
+  expect(cleanup).toHaveBeenCalledOnce();
+});
 
 let resolveDownload: ((value: {
   url: string;
@@ -14,6 +55,8 @@ let resolveDownload: ((value: {
 
 vi.mock("../../lib/api", () => ({
   getDefaultDownloadDir: vi.fn(async () => "C:\\Users\\tester\\Downloads"),
+  listDownloadTasks: vi.fn(async () => []),
+  deleteDownloadTask: vi.fn(async () => undefined),
   pauseDownload: vi.fn(async () => undefined),
   cancelDownload: vi.fn(async () => undefined),
   downloadFile: vi.fn(
@@ -27,8 +70,11 @@ vi.mock("../../lib/api", () => ({
 let downloadProgressHandler: ((event: DownloadProgressEvent) => void) | null = null;
 
 vi.mock("../../lib/events", () => ({
-  onDownloadProgress: vi.fn(async (handler: (event: DownloadProgressEvent) => void) => {
-    downloadProgressHandler = handler;
+  onDownloadTaskChanged: vi.fn(async (handler: (task: import("../../types").DownloadTask) => void) => {
+    downloadProgressHandler = (event) => handler({
+      ...event, id: event.taskId, requestedFileName: event.fileName,
+      saveDir: "D:\\Downloads", startedAt: new Date().toISOString(),
+    });
     return vi.fn();
   }),
 }));
