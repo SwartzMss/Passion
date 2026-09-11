@@ -3,6 +3,28 @@ import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import App from "./App";
 import { APP_VERSION } from "./version";
+import { listDownloadTasks, listScriptTasks, listSshTunnels } from "./lib/api";
+
+it("refreshes actual download and runtime counts after returning home", async () => {
+  const user = userEvent.setup();
+  const view = render(<App />);
+  const navigation = within(screen.getByRole("navigation"));
+  await waitFor(() => expect(listDownloadTasks).toHaveBeenCalled());
+  await user.click(navigation.getByRole("button", { name: "翻译" }));
+  vi.mocked(listDownloadTasks).mockResolvedValueOnce([{
+    id: "download", url: "file", saveDir: "D:\\Downloads", requestedFileName: "file",
+    startedAt: "2026-09-11T00:00:00Z", status: "running",
+  }]);
+  vi.mocked(listScriptTasks).mockResolvedValueOnce([]);
+  vi.mocked(listSshTunnels).mockResolvedValueOnce([]);
+  await user.click(navigation.getByRole("button", { name: "工作台" }));
+  await waitFor(() => {
+    expect(screen.getByText("下载中").closest("article")?.querySelector("strong")).toHaveTextContent("1");
+    expect(screen.getByText("运行中脚本").closest("article")?.querySelector("strong")).toHaveTextContent("0");
+    expect(screen.getByText("运行中隧道").closest("article")?.querySelector("strong")).toHaveTextContent("0");
+  });
+  view.unmount();
+});
 
 vi.mock("./lib/api", () => ({
   listReminders: vi.fn(async () => []),
