@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { translateText } from "../../lib/api";
 
 interface Props {
@@ -12,22 +12,31 @@ export function TranslationPanel({ onOpenSettings }: Props) {
   const [targetLanguage, setTargetLanguage] = useState("zh-CN");
   const [error, setError] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
+  const inFlight = useRef(false);
+  const revision = useRef(0);
+  useEffect(() => () => { revision.current += 1; }, []);
 
   async function submit() {
+    if (inFlight.current) return;
     if (!sourceText.trim()) {
       setError("请输入要翻译的内容。");
       return;
     }
     setError(null);
+    inFlight.current = true;
+    const requestRevision = revision.current;
     setIsTranslating(true);
     try {
       const result = await translateText({
         text: sourceText,
+        sourceLanguage,
+        targetLanguage,
       });
-      setTranslatedText(result.translatedText);
+      if (revision.current === requestRevision) setTranslatedText(result.translatedText);
     } catch (err) {
-      setError(readError(err));
+      if (revision.current === requestRevision) setError(readError(err));
     } finally {
+      inFlight.current = false;
       setIsTranslating(false);
     }
   }
@@ -47,6 +56,7 @@ export function TranslationPanel({ onOpenSettings }: Props) {
   }
 
   function clearText() {
+    revision.current += 1;
     setSourceText("");
     setTranslatedText("");
     setError(null);

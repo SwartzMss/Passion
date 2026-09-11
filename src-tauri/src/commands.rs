@@ -617,12 +617,18 @@ fn resolve_ssh_executable_path(state: &AppState) -> crate::error::BackendResult<
 pub async fn download_file(
     app: AppHandle,
     state: State<'_, AppState>,
-    input: DownloadRequest,
+    mut input: DownloadRequest,
 ) -> CommandResult<DownloadResult> {
     let task_id = input
         .task_id
         .clone()
-        .unwrap_or_else(|| "download-task".to_string());
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    input.task_id = Some(task_id.clone());
+    if input.save_dir.as_deref().is_none_or(|dir| dir.trim().is_empty()) {
+        input.save_dir = Some(crate::downloader::default_download_dir(&app).map_err(ErrorPayload::from)?);
+    }
+    let task = state.download_task_manager.begin(&input).map_err(ErrorPayload::from)?;
+    let _ = app.emit(crate::download_tasks::CHANGED_EVENT, task);
     let source = input.url.clone();
     let save_dir = input.save_dir.clone().unwrap_or_default();
     crate::app_log::info(
@@ -638,7 +644,10 @@ pub async fn download_file(
             }
         ),
     );
-    match crate::downloader::download_file(&app, input).await {
+    let result = crate::downloader::download_file(&app, input).await;
+    let task = state.download_task_manager.finish(&task_id, &result).map_err(ErrorPayload::from)?;
+    let _ = app.emit(crate::download_tasks::CHANGED_EVENT, task);
+    match result {
         Ok(result) => {
             crate::app_log::info(
                 state.log_path.as_path(),
@@ -670,21 +679,47 @@ pub async fn download_file(
 }
 
 #[tauri::command]
-pub fn pause_download(state: State<'_, AppState>, task_id: String) -> CommandResult<()> {
+pub async fn pause_download(state: State<'_, AppState>, task_id: String) -> CommandResult<()> {
     crate::app_log::info(
         state.log_path.as_path(),
         format!("download_pause_requested task_id={task_id}"),
     );
-    crate::downloader::pause_download(&task_id).map_err(ErrorPayload::from)
+    stop_download_task(&state, &task_id, false).await
 }
 
 #[tauri::command]
-pub fn cancel_download(state: State<'_, AppState>, task_id: String) -> CommandResult<()> {
+pub async fn cancel_download(app: AppHandle, state: State<'_, AppState>, task_id: String) -> CommandResult<()> {
     crate::app_log::info(
         state.log_path.as_path(),
         format!("download_cancel_requested task_id={task_id}"),
     );
-    crate::downloader::cancel_download(&task_id).map_err(ErrorPayload::from)
+    stop_download_task(&state, &task_id, true).await?;
+    if let Some(task) = state.download_task_manager.cancel_stopped(&task_id).map_err(ErrorPayload::from)? {
+        let _ = app.emit(crate::download_tasks::CHANGED_EVENT, task);
+    }
+    Ok(())
+}
+
+async fn stop_download_task(state: &AppState, id: &str, cancel: bool) -> CommandResult<()> {
+    tokio::time::timeout(std::time::Duration::from_secs(35), async {
+        while state.download_task_manager.running(id)? {
+            if cancel { crate::downloader::cancel_download(id).await?; }
+            else { crate::downloader::pause_download(id).await?; }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        Ok::<_, BackendError>(())
+    }).await.map_err(|_| ErrorPayload::from(BackendError::Download("等待下载停止超时。".into())))?
+        .map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub fn list_download_tasks(state: State<'_, AppState>) -> CommandResult<Vec<crate::download_tasks::DownloadTask>> {
+    state.download_task_manager.list().map_err(ErrorPayload::from)
+}
+
+#[tauri::command]
+pub fn delete_download_task(state: State<'_, AppState>, task_id: String) -> CommandResult<()> {
+    state.download_task_manager.remove(&task_id).map_err(ErrorPayload::from)
 }
 
 #[tauri::command]

@@ -5,6 +5,7 @@ interface Props {
   enabledScriptTaskCount: number;
   runningScriptTaskCount: number;
   runningSshTunnelCount: number;
+  runningDownloadCount?: number;
   totalScriptTaskCount: number;
   onOpenReminders: () => void;
   onAddReminder: () => void;
@@ -20,6 +21,7 @@ export function WorkbenchHome({
   pendingReminderCount,
   runningScriptTaskCount,
   runningSshTunnelCount,
+  runningDownloadCount = 0,
   onOpenReminders,
   onAddReminder,
   onOpenTranslation,
@@ -122,7 +124,7 @@ export function WorkbenchHome({
       id: "downloads",
       icon: "download",
       label: "下载中",
-      value: "0",
+      value: String(runningDownloadCount),
       description: "正在进行的下载任务",
       meta: "查看下载",
       tone: "green",

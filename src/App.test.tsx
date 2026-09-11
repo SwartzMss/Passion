@@ -6,6 +6,7 @@ import { APP_VERSION } from "./version";
 
 vi.mock("./lib/api", () => ({
   listReminders: vi.fn(async () => []),
+  listDownloadTasks: vi.fn(async () => []),
   listScriptTasks: vi.fn(async () => [
     {
       id: "script-1",

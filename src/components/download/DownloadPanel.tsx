@@ -1,30 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { cancelDownload, downloadFile, getDefaultDownloadDir, pauseDownload } from "../../lib/api";
-import { onDownloadProgress } from "../../lib/events";
-import type { DownloadResult } from "../../types";
-import type { DownloadProgressEvent } from "../../types";
+import { cancelDownload, deleteDownloadTask, downloadFile, getDefaultDownloadDir, listDownloadTasks, pauseDownload } from "../../lib/api";
+import { onDownloadTaskChanged } from "../../lib/events";
+import type { DownloadTask } from "../../types";
 
 type DownloadTaskStatus = "running" | "paused" | "completed" | "failed";
 type DownloadTaskFilter = DownloadTaskStatus;
-
-interface DownloadTask {
-  id: string;
-  url: string;
-  saveDir: string;
-  requestedFileName: string;
-  startedAt: string;
-  finishedAt?: string | null;
-  status: DownloadTaskStatus;
-  result?: DownloadResult | null;
-  error?: string | null;
-  savedPath?: string | null;
-  totalBytes?: number | null;
-  downloadedBytes?: number;
-  bytesPerSecond?: number;
-  elapsedMs?: number;
-}
 
 export function DownloadPanel() {
   const [url, setUrl] = useState("");
@@ -35,6 +17,21 @@ export function DownloadPanel() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canceledTaskIdsRef = useRef(new Set<string>());
+  const deletedTaskIds = useRef(new Set<string>());
+  const generations = useRef(new Map<string, number>());
+  const [pendingControls, setPendingControls] = useState<Set<string>>(new Set());
+  const controlLocks = useRef(new Set<string>());
+
+  async function control(id: string, action: () => Promise<void>) {
+    if (controlLocks.current.has(id)) return;
+    controlLocks.current.add(id);
+    setPendingControls(new Set(controlLocks.current));
+    try { await action(); }
+    finally {
+      controlLocks.current.delete(id);
+      setPendingControls(new Set(controlLocks.current));
+    }
+  }
 
   useEffect(() => {
     getDefaultDownloadDir()
@@ -43,26 +40,30 @@ export function DownloadPanel() {
   }, []);
 
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | null = null;
-    onDownloadProgress((progress) => {
-      if (canceledTaskIdsRef.current.has(progress.taskId)) {
-        return;
-      }
-      setTasks((current) =>
-        current.map((task) => {
-          if (task.id !== progress.taskId) {
-            return task;
-          }
-          return applyDownloadProgress(task, progress);
-        }),
-      );
-    })
+    function receive(incoming: DownloadTask[]) {
+      if (disposed) return;
+      setTasks((current) => {
+        const merged = new Map(current.map((task) => [task.id, task]));
+        for (const task of incoming) {
+          if (deletedTaskIds.current.has(task.id) || canceledTaskIdsRef.current.has(task.id)) continue;
+          const existing = merged.get(task.id);
+          if (!existing || (task.revision ?? 0) >= (existing.revision ?? 0)) merged.set(task.id, task);
+        }
+        return [...merged.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+      });
+    }
+    onDownloadTaskChanged((task) => receive([task]))
       .then((cleanup) => {
+        if (disposed) { cleanup(); return; }
         unlisten = cleanup;
+        return listDownloadTasks().then(receive);
       })
-      .catch((err) => setError(readError(err)));
+      .catch((err) => { if (!disposed) setError(readError(err)); });
 
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, []);
@@ -99,18 +100,20 @@ export function DownloadPanel() {
   }
 
   async function runDownloadTask(taskId: string, trimmedUrl: string, targetDir: string) {
+    const generation = (generations.current.get(taskId) ?? 0) + 1;
+    generations.current.set(taskId, generation);
     try {
       const result = await downloadFile({
         taskId,
         url: trimmedUrl,
         saveDir: targetDir,
       });
-      if (canceledTaskIdsRef.current.has(taskId)) {
+      if (canceledTaskIdsRef.current.has(taskId) || generations.current.get(taskId) !== generation) {
         return;
       }
       setTasks((current) =>
         current.map((task) =>
-          task.id === taskId
+          task.id === taskId && !task.revision
             ? {
                 ...task,
                 status: "completed",
@@ -130,16 +133,16 @@ export function DownloadPanel() {
         ),
       );
     } catch (err) {
-      if (canceledTaskIdsRef.current.has(taskId)) {
+      if (canceledTaskIdsRef.current.has(taskId) || generations.current.get(taskId) !== generation) {
         return;
       }
       const message = readError(err);
       setTasks((current) =>
         current.map((task) =>
-          task.id === taskId && task.status !== "paused"
+          task.id === taskId && !task.revision && task.status !== "paused"
             ? {
                 ...task,
-                status: "failed",
+                status: message === "下载已暂停。" ? "paused" : "failed",
                 finishedAt: new Date().toISOString(),
                 error: message,
               }
@@ -177,19 +180,23 @@ export function DownloadPanel() {
         : "还没有失败下载。";
   const footerSummary = `总任务: ${tasks.length} | 活动: ${runningTasks.length} | 已完成: ${completedTasks.length} | 失败: ${failedTasks.length}`;
 
-  function removeTask(id: string) {
+  async function removeTask(id: string) {
+    try { await deleteDownloadTask(id); }
+    catch (err) { setError(readError(err)); return; }
+    deletedTaskIds.current.add(id);
     canceledTaskIdsRef.current.delete(id);
     setTasks((current) => current.filter((task) => task.id !== id));
   }
 
-  function cancelTask(id: string) {
-    canceledTaskIdsRef.current.add(id);
-    void cancelDownload(id).catch((err) => {
+  async function cancelTask(id: string) {
+    try { await cancelDownload(id); } catch (err) {
       setError(`取消失败：${readError(err)}`);
-    });
+      return;
+    }
+    canceledTaskIdsRef.current.add(id);
     setTasks((current) =>
       current.map((task) =>
-        task.id === id
+        task.id === id && task.status !== "completed"
           ? {
               ...task,
               status: "failed",
@@ -206,7 +213,7 @@ export function DownloadPanel() {
       await pauseDownload(task.id);
       setTasks((current) =>
         current.map((item) =>
-          item.id === task.id ? { ...item, status: "paused" } : item,
+          item.id === task.id && item.status === "running" ? { ...item, status: "paused" } : item,
         ),
       );
     } catch (err) {
@@ -312,13 +319,14 @@ export function DownloadPanel() {
                 {visibleTasks.map((task) => (
                   <DownloadTaskRow
                     key={task.id}
-                    onCancel={() => cancelTask(task.id)}
+                    onCancel={() => void control(task.id, () => cancelTask(task.id))}
                     onDelete={() => removeTask(task.id)}
                     onOpenFolder={() => void openTaskFolder(task)}
-                    onPause={() => void pauseTask(task)}
+                    onPause={() => void control(task.id, () => pauseTask(task))}
                     onResume={() => resumeTask(task)}
                     filter={activeFilter}
                     task={task}
+                    controlPending={pendingControls.has(task.id)}
                   />
                 ))}
               </tbody>
@@ -560,6 +568,7 @@ function DownloadTableHead({ filter }: { filter: DownloadTaskFilter }) {
 }
 
 function DownloadTaskRow({
+  controlPending,
   filter,
   onCancel,
   onDelete,
@@ -568,6 +577,7 @@ function DownloadTaskRow({
   onResume,
   task,
 }: {
+  controlPending: boolean;
   filter: DownloadTaskFilter;
   onCancel: () => void;
   onDelete: () => void;
@@ -640,14 +650,14 @@ function DownloadTaskRow({
         <div className="download-row-actions">
           {task.status === "running" ? (
             <>
-              <button onClick={onPause} type="button">暂停</button>
-              <button className="danger-action" onClick={onCancel} type="button">取消</button>
+              <button disabled={controlPending} onClick={onPause} type="button">暂停</button>
+              <button disabled={controlPending} className="danger-action" onClick={onCancel} type="button">取消</button>
             </>
           ) : null}
           {task.status === "paused" ? (
             <>
-              <button onClick={onResume} type="button">继续</button>
-              <button className="danger-action" onClick={onCancel} type="button">取消</button>
+              <button disabled={controlPending} onClick={onResume} type="button">继续</button>
+              <button disabled={controlPending} className="danger-action" onClick={onCancel} type="button">取消</button>
             </>
           ) : null}
           {task.status === "completed" ? (
@@ -672,22 +682,6 @@ function DownloadFileCell({ title }: { title: string }) {
 
 function downloadTaskTitle(task: DownloadTask) {
   return task.result?.fileName || task.requestedFileName || task.url;
-}
-
-function applyDownloadProgress(task: DownloadTask, progress: DownloadProgressEvent): DownloadTask {
-  const isDone = progress.status === "completed" || progress.status === "failed";
-  return {
-    ...task,
-    requestedFileName: progress.fileName || task.requestedFileName,
-    savedPath: progress.savedPath || task.savedPath,
-    totalBytes: progress.totalBytes ?? task.totalBytes,
-    downloadedBytes: progress.downloadedBytes,
-    bytesPerSecond: progress.bytesPerSecond || task.bytesPerSecond,
-    elapsedMs: progress.elapsedMs,
-    status: progress.status,
-    error: progress.error ?? task.error,
-    finishedAt: isDone ? new Date().toISOString() : task.finishedAt,
-  };
 }
 
 function inferDownloadFileName(source: string) {

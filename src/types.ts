@@ -37,6 +37,8 @@ export interface AiSettings {
 
 export interface TranslationRequest {
   text: string;
+  sourceLanguage?: string;
+  targetLanguage?: string;
 }
 
 export interface TranslationResult {
@@ -140,6 +142,24 @@ export interface DownloadResult {
   savedPath: string;
   bytes: number;
   elapsedMs: number;
+}
+
+export interface DownloadTask {
+  id: string;
+  url: string;
+  saveDir: string;
+  requestedFileName: string;
+  startedAt: string;
+  finishedAt?: string | null;
+  status: "running" | "paused" | "completed" | "failed";
+  result?: DownloadResult | null;
+  error?: string | null;
+  savedPath?: string | null;
+  totalBytes?: number | null;
+  downloadedBytes?: number;
+  bytesPerSecond?: number;
+  elapsedMs?: number;
+  revision?: number;
 }
 
 export interface DownloadProgressEvent {

@@ -1,8 +1,37 @@
 use crate::error::{BackendError, BackendResult};
 use crate::models::{AiSettings, TranslationRequest, TranslationResult};
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
+use std::time::Duration;
 
 const RESPONSE_PREVIEW_LIMIT: usize = 500;
+const MAX_INPUT_BYTES: usize = 100_000;
+const MAX_RESPONSE_BYTES: usize = 2 * 1024 * 1024;
+static CLIENT: OnceLock<Result<reqwest::Client, String>> = OnceLock::new();
+
+fn http_client() -> BackendResult<&'static reqwest::Client> {
+    CLIENT
+        .get_or_init(|| {
+            reqwest::Client::builder()
+                .connect_timeout(Duration::from_secs(10))
+                .read_timeout(Duration::from_secs(30))
+                .timeout(Duration::from_secs(90))
+                .build()
+                .map_err(|err| err.to_string())
+        })
+        .as_ref()
+        .map_err(|err| BackendError::AiProvider(err.clone()))
+}
+
+fn language_name(code: &str) -> Option<&'static str> {
+    match code {
+        "zh-CN" => Some("中文（简体）"),
+        "en" => Some("英语"),
+        "ja" => Some("日语"),
+        "ko" => Some("韩语"),
+        _ => None,
+    }
+}
 
 pub fn chat_completions_url(base_url: &str) -> String {
     format!("{}/chat/completions", base_url.trim().trim_end_matches('/'))
@@ -13,6 +42,16 @@ pub fn validate_translation_request(input: &TranslationRequest) -> BackendResult
         return Err(BackendError::Translation(
             "请输入要翻译的内容。".to_string(),
         ));
+    }
+    if input.text.len() > MAX_INPUT_BYTES {
+        return Err(BackendError::Translation(
+            "原文过长，请分段翻译（最多 100 KB）。".into(),
+        ));
+    }
+    if (input.source_language != "auto" && language_name(&input.source_language).is_none())
+        || language_name(&input.target_language).is_none()
+    {
+        return Err(BackendError::Translation("不支持所选翻译语言。".into()));
     }
     Ok(())
 }
@@ -82,6 +121,7 @@ pub async fn test_connection(settings: &AiSettings) -> BackendResult<()> {
     validate_ai_settings(settings)?;
     let input = TranslationRequest {
         text: "hello".to_string(),
+        ..Default::default()
     };
     validate_translation_request(&input)?;
     let body = send_chat_completion(settings, build_messages(&input)).await?;
@@ -98,11 +138,11 @@ fn build_messages(input: &TranslationRequest) -> Vec<ChatMessage> {
     vec![
         ChatMessage {
             role: "system".to_string(),
-            content: "你是专业中英互译助手。自动判断用户输入的主要语言：如果主要是中文，翻译成自然、准确的英文；如果主要不是中文，翻译成自然、准确的中文。处理中英混合文本时，按主要语义输出另一种语言，并保留必要的专有名词、代码、URL、数字、格式、换行、列表和 Markdown。只输出译文，不解释。".to_string(),
+            content: format!("你是专业翻译助手。源语言：{}。目标语言：{}。将用户文本翻译成目标语言，保留专有名词、代码、URL、数字、格式、换行、列表和 Markdown。只输出译文，不解释。", language_name(&input.source_language).unwrap_or("自动检测"), language_name(&input.target_language).unwrap_or("中文（简体）")),
         },
         ChatMessage {
             role: "user".to_string(),
-            content: format!("请进行中英互译：\n\n{}", input.text),
+            content: input.text.clone(),
         },
     ]
 }
@@ -117,7 +157,7 @@ async fn send_chat_completion(
         temperature: 0.2,
     };
     let url = chat_completions_url(&settings.base_url);
-    let client = reqwest::Client::new();
+    let client = http_client()?;
     let mut builder = client.post(&url).json(&request);
     if !settings.api_key.trim().is_empty() {
         builder = builder.bearer_auth(settings.api_key.trim());
@@ -129,7 +169,7 @@ async fn send_chat_completion(
         ))
     })?;
     let status = response.status();
-    let text = response.text().await.map_err(|err| {
+    let text = read_response(response).await.map_err(|err| {
         BackendError::AiProvider(format!(
             "failed to read provider response body: {err}; url={url}; model={}",
             settings.model.trim()
@@ -142,6 +182,27 @@ async fn send_chat_completion(
         )));
     }
     Ok(text)
+}
+
+async fn read_response(mut response: reqwest::Response) -> BackendResult<String> {
+    if response
+        .content_length()
+        .is_some_and(|size| size > MAX_RESPONSE_BYTES as u64)
+    {
+        return Err(BackendError::AiProvider("翻译响应超过 2 MB 限制。".into()));
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|err| BackendError::AiProvider(err.to_string()))?
+    {
+        if bytes.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES {
+            return Err(BackendError::AiProvider("翻译响应超过 2 MB 限制。".into()));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    String::from_utf8(bytes).map_err(|err| BackendError::AiProvider(err.to_string()))
 }
 
 fn provider_context(
@@ -164,6 +225,7 @@ fn provider_context(
 fn response_preview(body: &str) -> String {
     let normalized = body
         .chars()
+        .take(RESPONSE_PREVIEW_LIMIT + 1)
         .map(|ch| if ch.is_control() { ' ' } else { ch })
         .collect::<String>();
     let trimmed = normalized.trim();
@@ -218,6 +280,52 @@ mod tests {
     use super::*;
 
     #[test]
+    fn validates_languages_and_input_bounds() {
+        let mut input = TranslationRequest {
+            text: "hello".into(),
+            ..Default::default()
+        };
+        assert!(validate_translation_request(&input).is_ok());
+        input.target_language = "invalid".into();
+        assert!(validate_translation_request(&input).is_err());
+        input.target_language = "ko".into();
+        input.text = "x".repeat(MAX_INPUT_BYTES + 1);
+        assert!(validate_translation_request(&input).is_err());
+        assert!(std::ptr::eq(http_client().unwrap(), http_client().unwrap()));
+    }
+
+    #[tokio::test]
+    async fn bounds_provider_response_with_or_without_content_length() {
+        use std::io::{Read, Write};
+        for declared_length in [true, false] {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let server = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut request = [0; 1024];
+                stream.read(&mut request).unwrap();
+                if declared_length {
+                    write!(
+                        stream,
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        MAX_RESPONSE_BYTES + 1
+                    )
+                    .unwrap();
+                } else {
+                    stream
+                        .write_all(b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n")
+                        .unwrap();
+                    let _ = stream.write_all(&vec![b'x'; MAX_RESPONSE_BYTES + 1]);
+                }
+            });
+            let response = http_client().unwrap().get(url).send().await.unwrap();
+            let err = read_response(response).await.unwrap_err();
+            assert!(err.to_string().contains("2 MB"));
+            server.join().unwrap();
+        }
+    }
+
+    #[test]
     fn chat_completions_url_trims_trailing_slashes() {
         assert_eq!(
             chat_completions_url("http://localhost:11434/v1/"),
@@ -247,6 +355,7 @@ mod tests {
     fn validate_translation_request_rejects_empty_text() {
         let err = validate_translation_request(&TranslationRequest {
             text: "  ".to_string(),
+            ..Default::default()
         })
         .unwrap_err();
 
@@ -254,15 +363,15 @@ mod tests {
     }
 
     #[test]
-    fn build_messages_requests_automatic_chinese_english_translation() {
+    fn build_messages_honors_selected_languages() {
         let messages = build_messages(&TranslationRequest {
             text: "Hello world".to_string(),
+            source_language: "en".into(),
+            target_language: "ja".into(),
         });
 
-        assert!(messages[0].content.contains("自动判断用户输入的主要语言"));
-        assert!(messages[0].content.contains("主要是中文"));
-        assert!(messages[0].content.contains("主要不是中文"));
-        assert!(messages[1].content.contains("请进行中英互译"));
+        assert!(messages[0].content.contains("源语言：英语"));
+        assert!(messages[0].content.contains("目标语言：日语"));
         assert!(messages[1].content.contains("Hello world"));
     }
 }
