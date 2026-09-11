@@ -4,6 +4,7 @@ mod app_state;
 mod commands;
 mod db;
 mod downloader;
+mod download_tasks;
 mod error;
 mod http_tester;
 mod models;
@@ -150,6 +151,8 @@ pub fn run() {
             commands::start_ssh_tunnel,
             commands::stop_ssh_tunnel,
             commands::download_file,
+            commands::list_download_tasks,
+            commands::delete_download_task,
             commands::pause_download,
             commands::cancel_download,
             commands::get_default_download_dir,

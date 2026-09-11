@@ -194,7 +194,7 @@ pub async fn download_file(
     let result = if is_http_source(source) {
         let file_name = infer_http_file_name(source, input.file_name.as_deref())?;
         download_http_to_dir(source, &file_name, &save_dir, &task_id, |event| {
-            let _ = app.emit(DOWNLOAD_PROGRESS_EVENT, event);
+            crate::download_tasks::publish_progress(app, event);
         })
         .await
     } else {
@@ -211,7 +211,7 @@ pub async fn download_file(
                 &save_dir_for_copy,
                 COPY_BUFFER_SIZE,
                 |event| {
-                    let _ = app_for_copy.emit(DOWNLOAD_PROGRESS_EVENT, event);
+                    crate::download_tasks::publish_progress(&app_for_copy, event);
                 },
             )
         })

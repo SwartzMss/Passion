@@ -17,6 +17,7 @@ import {
   createReminder,
   deleteReminder,
   listScriptTasks,
+  listDownloadTasks,
   listSshTunnels,
   listReminders,
   updateReminder,
@@ -75,6 +76,7 @@ function MainApp() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [scriptTasks, setScriptTasks] = useState<ScriptTask[]>([]);
   const [runningSshTunnelCount, setRunningSshTunnelCount] = useState(0);
+  const [runningDownloadCount, setRunningDownloadCount] = useState(0);
   const [showAdd, setShowAdd] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,21 +85,26 @@ function MainApp() {
     setReminders(await listReminders());
   }
 
-  async function refreshScriptTasks() {
-    setScriptTasks(await listScriptTasks());
-  }
-
-  async function refreshSshTunnels() {
-    const tunnels = await listSshTunnels();
-    setRunningSshTunnelCount(
-      tunnels.filter((tunnel) => tunnel.status === "running").length,
-    );
-  }
+  useEffect(() => {
+    if (view !== "home") return;
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout>;
+    async function refreshDashboard() {
+      try {
+        const [scripts, tunnels, downloads] = await Promise.all([listScriptTasks(), listSshTunnels(), listDownloadTasks()]);
+        if (disposed) return;
+        setScriptTasks(scripts);
+        setRunningSshTunnelCount(tunnels.filter((task) => task.status === "running").length);
+        setRunningDownloadCount(downloads.filter((task) => task.status === "running").length);
+      } catch (err) { if (!disposed) setError(readError(err)); }
+      finally { if (!disposed) timer = setTimeout(refreshDashboard, 2000); }
+    }
+    void refreshDashboard();
+    return () => { disposed = true; clearTimeout(timer); };
+  }, [view]);
 
   useEffect(() => {
     refresh().catch((err) => setError(readError(err)));
-    refreshScriptTasks().catch((err) => setError(readError(err)));
-    refreshSshTunnels().catch((err) => setError(readError(err)));
     const unlisten = onReminderTriggered(() => {
       refresh().catch((err) => setError(readError(err)));
     });
@@ -183,6 +190,7 @@ function MainApp() {
                 ).length
               }
               runningSshTunnelCount={runningSshTunnelCount}
+              runningDownloadCount={runningDownloadCount}
               totalScriptTaskCount={scriptTasks.length}
               onOpenReminders={() => setView("reminders")}
               onAddReminder={() => {

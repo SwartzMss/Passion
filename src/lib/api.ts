@@ -3,6 +3,7 @@ import type {
   AiSettings,
   DownloadRequest,
   DownloadResult,
+  DownloadTask,
   HttpApiRequest,
   HttpApiResponse,
   NewReminder,
@@ -23,6 +24,14 @@ import type {
   TranslationRequest,
   TranslationResult,
 } from "../types";
+
+export function listDownloadTasks(): Promise<DownloadTask[]> {
+  return invoke("list_download_tasks");
+}
+
+export function deleteDownloadTask(taskId: string): Promise<void> {
+  return invoke("delete_download_task", { taskId });
+}
 
 export async function listReminders(): Promise<Reminder[]> {
   return invoke<Reminder[]>("list_reminders");

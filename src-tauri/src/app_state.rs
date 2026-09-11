@@ -14,6 +14,7 @@ pub struct AppState {
     pub scheduler: Scheduler,
     pub script_task_scheduler: ScriptTaskScheduler,
     pub port_scan_manager: PortScanManager,
+    pub download_task_manager: crate::download_tasks::DownloadTaskManager,
     pub ssh_tunnel_manager: SshTunnelManager,
     pub log_path: Arc<PathBuf>,
 }
@@ -30,6 +31,7 @@ impl AppState {
             scheduler,
             script_task_scheduler: ScriptTaskScheduler::default(),
             port_scan_manager: PortScanManager::default(),
+            download_task_manager: crate::download_tasks::DownloadTaskManager::default(),
             ssh_tunnel_manager: SshTunnelManager::default(),
             log_path: Arc::new(log_path),
         }
