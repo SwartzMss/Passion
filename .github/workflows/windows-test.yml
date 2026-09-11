@@ -5,17 +5,41 @@ on:
     paths:
       - ".github/workflows/windows-test.yml"
       - "src-tauri/**"
+      - "src/**"
+      - "package*.json"
+      - "tsconfig*.json"
+      - "vite.config.ts"
+      - "index.html"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/windows-test.yml"
       - "src-tauri/**"
+      - "src/**"
+      - "package*.json"
+      - "tsconfig*.json"
+      - "vite.config.ts"
+      - "index.html"
 
 permissions:
   contents: read
 
 jobs:
+  frontend:
+    name: Frontend tests and build
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test -- --run
+      - name: Typecheck and production build
+        run: npm run build
+
   rust:
     name: Rust tests on Windows
     runs-on: windows-2022
