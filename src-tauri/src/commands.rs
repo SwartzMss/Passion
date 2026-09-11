@@ -670,21 +670,21 @@ pub async fn download_file(
 }
 
 #[tauri::command]
-pub fn pause_download(state: State<'_, AppState>, task_id: String) -> CommandResult<()> {
+pub async fn pause_download(state: State<'_, AppState>, task_id: String) -> CommandResult<()> {
     crate::app_log::info(
         state.log_path.as_path(),
         format!("download_pause_requested task_id={task_id}"),
     );
-    crate::downloader::pause_download(&task_id).map_err(ErrorPayload::from)
+    crate::downloader::pause_download(&task_id).await.map_err(ErrorPayload::from)
 }
 
 #[tauri::command]
-pub fn cancel_download(state: State<'_, AppState>, task_id: String) -> CommandResult<()> {
+pub async fn cancel_download(state: State<'_, AppState>, task_id: String) -> CommandResult<()> {
     crate::app_log::info(
         state.log_path.as_path(),
         format!("download_cancel_requested task_id={task_id}"),
     );
-    crate::downloader::cancel_download(&task_id).map_err(ErrorPayload::from)
+    crate::downloader::cancel_download(&task_id).await.map_err(ErrorPayload::from)
 }
 
 #[tauri::command]
