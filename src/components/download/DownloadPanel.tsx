@@ -139,7 +139,7 @@ export function DownloadPanel() {
       const message = readError(err);
       setTasks((current) =>
         current.map((task) =>
-          task.id === taskId && !task.revision && task.status !== "paused"
+          task.id === taskId && task.status === "running"
             ? {
                 ...task,
                 status: message === "下载已暂停。" ? "paused" : "failed",

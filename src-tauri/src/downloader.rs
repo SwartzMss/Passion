@@ -44,7 +44,14 @@ impl TransferGuard {
         #[cfg(windows)]
         let path = PathBuf::from(path.to_string_lossy().to_lowercase());
         let mut active = active_downloads().lock().map_err(download_error)?;
-        if active.contains_key(task_id) || active.values().any(|target| target == &path) {
+        let files = transfer_paths(&path);
+        if active.contains_key(task_id)
+            || active.values().any(|target| {
+                transfer_paths(target)
+                    .iter()
+                    .any(|target| files.contains(target))
+            })
+        {
             return Err(download_error(
                 "此任务或目标文件正在下载，请等待当前操作结束。",
             ));
@@ -54,6 +61,11 @@ impl TransferGuard {
         active.insert(task_id.to_string(), path);
         Ok(Self(task_id.to_string()))
     }
+}
+
+fn transfer_paths(path: &Path) -> [PathBuf; 3] {
+    let part = part_file_path(path);
+    [path.to_path_buf(), part.clone(), metadata_path(&part)]
 }
 
 impl Drop for TransferGuard {
@@ -124,6 +136,14 @@ fn write_resume(part: &Path, metadata: &ResumeMetadata) -> BackendResult<()> {
         serde_json::to_vec(metadata).map_err(download_error)?,
     )
     .map_err(download_error)
+}
+
+fn invalidate_resume(part: &Path) -> BackendResult<()> {
+    match fs::remove_file(metadata_path(part)) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(download_error(err)),
+    }
 }
 
 fn local_metadata(source: &Path) -> BackendResult<ResumeMetadata> {
@@ -349,7 +369,7 @@ async fn download_http_to_dir(
     if !previous.as_ref().is_some_and(|meta| {
         meta.source == url
             && meta.validator.is_some()
-            && meta.total.is_none_or(|total| existing_bytes <= total)
+            && meta.total.is_none_or(|total| existing_bytes < total)
     }) {
         existing_bytes = 0;
     }
@@ -399,6 +419,9 @@ async fn download_http_to_dir(
         response.content_length()
     };
 
+    if existing_bytes == 0 {
+        invalidate_resume(&part_path)?;
+    }
     let mut file = if existing_bytes > 0 {
         async_fs::OpenOptions::new()
             .create(true)
@@ -441,6 +464,8 @@ async fn download_http_to_dir(
         file.write_all(&chunk)
             .await
             .map_err(|err| BackendError::Download(err.to_string()))?;
+        // Tokio's file writes use background blocking work. Drain it before acknowledging a stop.
+        file.flush().await.map_err(download_error)?;
         bytes += chunk.len() as u64;
         if total_bytes.is_some_and(|total| bytes > total) {
             return Err(download_error("下载数据超出声明长度。"));
@@ -545,6 +570,9 @@ fn copy_local_file_to_dir_with_progress(
         source_file
             .seek(SeekFrom::Start(bytes))
             .map_err(|err| BackendError::Download(err.to_string()))?;
+    }
+    if bytes == 0 {
+        invalidate_resume(&part_path)?;
     }
     let mut target_file = if bytes > 0 {
         OpenOptions::new()
@@ -1017,6 +1045,11 @@ mod tests {
         let path = dir.path().join("same.zip");
         let guard = TransferGuard::acquire("owner", &path).unwrap();
         assert!(TransferGuard::acquire("other", &path).is_err());
+        assert!(TransferGuard::acquire("part-owner", &part_file_path(&path)).is_err());
+        assert!(
+            TransferGuard::acquire("metadata-owner", &metadata_path(&part_file_path(&path)))
+                .is_err()
+        );
         assert!(TransferGuard::acquire("owner", &dir.path().join("different.zip")).is_err());
         drop(guard);
         assert!(TransferGuard::acquire("other", &path).is_ok());
@@ -1118,5 +1151,76 @@ mod tests {
             assert_eq!(fs::read(dir.path().join("file.bin")).unwrap(), b"correct");
             server.join().unwrap();
         }
+    }
+
+    #[tokio::test]
+    async fn disconnected_download_resumes_without_changing_existing_destination_early() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/file.bin", listener.local_addr().unwrap());
+        let server = thread::spawn(move || {
+            let (mut first, _) = listener.accept().unwrap();
+            let mut request = [0; 4096];
+            first.read(&mut request).unwrap();
+            first.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\nETag: \"v1\"\r\nConnection: close\r\n\r\ncor").unwrap();
+            drop(first);
+            let (mut second, _) = listener.accept().unwrap();
+            let size = second.read(&mut request).unwrap();
+            assert!(String::from_utf8_lossy(&request[..size])
+                .to_lowercase()
+                .contains("range: bytes=3-"));
+            second.write_all(b"HTTP/1.1 206 Partial Content\r\nContent-Length: 4\r\nContent-Range: bytes 3-6/7\r\nETag: \"v1\"\r\nConnection: close\r\n\r\nrect").unwrap();
+        });
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("file.bin");
+        fs::write(&target, b"old destination").unwrap();
+        assert!(
+            download_http_to_dir(&url, "file.bin", dir.path(), "disconnect", |_| {})
+                .await
+                .is_err()
+        );
+        assert_eq!(fs::read(&target).unwrap(), b"old destination");
+        download_http_to_dir(&url, "file.bin", dir.path(), "disconnect", |_| {})
+            .await
+            .unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"correct");
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn cancellation_interrupts_stalled_body_and_releases_partial_file() {
+        use tokio::io::AsyncReadExt;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/file.bin", listener.local_addr().unwrap());
+        let dir = tempfile::tempdir().unwrap();
+        let download = download_http_to_dir(&url, "file.bin", dir.path(), "cancel-body", |_| {});
+        let cancel = async {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut request = [0; 1024];
+            stream.read(&mut request).await.unwrap();
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\nETag: \"v1\"\r\n\r\nabc")
+                .await
+                .unwrap();
+            loop {
+                if file_len(&dir.path().join("file.bin.part")).unwrap() == 3 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+            cancel_download("cancel-body").await.unwrap();
+            // The acknowledgment means the .part file can already be opened exclusively/renamed.
+            fs::rename(
+                dir.path().join("file.bin.part"),
+                dir.path().join("released.part"),
+            )
+            .unwrap();
+        };
+        let (result, ()) = tokio::time::timeout(Duration::from_secs(2), async {
+            tokio::join!(download, cancel)
+        })
+        .await
+        .unwrap();
+        assert!(is_cancel_error(&result.unwrap_err()));
+        assert!(!dir.path().join("file.bin").exists());
     }
 }

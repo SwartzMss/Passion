@@ -1,11 +1,13 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { DownloadPanel } from "./DownloadPanel";
 import type { DownloadProgressEvent } from "../../types";
 import type { DownloadTask } from "../../types";
 import { listDownloadTasks } from "../../lib/api";
 import { onDownloadTaskChanged } from "../../lib/events";
+
+beforeEach(() => { vi.clearAllMocks(); });
 
 const savedTask: DownloadTask = {
   id: "restored", url: "https://example.com/restored.zip", saveDir: "D:\\Downloads",
@@ -43,6 +45,55 @@ it("cleans up a listener even if registration finishes after unmount", async () 
   view.unmount();
   await act(async () => resolveListener(cleanup));
   expect(cleanup).toHaveBeenCalledOnce();
+});
+
+it("disables resume until pause is acknowledged and ignores the previous run's late rejection", async () => {
+  const api = await import("../../lib/api");
+  let acknowledge!: () => void;
+  let rejectOldRun!: (error: unknown) => void;
+  vi.mocked(listDownloadTasks).mockResolvedValueOnce([savedTask]);
+  vi.mocked(api.pauseDownload).mockImplementationOnce(() => new Promise((resolve) => { acknowledge = resolve; }));
+  const user = userEvent.setup();
+  render(<DownloadPanel />);
+  await screen.findByText("restored.zip");
+  await user.click(screen.getByRole("button", { name: "暂停" }));
+  expect(screen.getByRole("button", { name: "暂停" })).toBeDisabled();
+  const calls = vi.mocked(onDownloadTaskChanged).mock.calls;
+  const receive = calls[calls.length - 1][0];
+  act(() => receive({ ...savedTask, status: "paused", revision: 3 }));
+  expect(screen.getByRole("button", { name: "继续" })).toBeDisabled();
+  await act(async () => acknowledge());
+  vi.mocked(api.downloadFile).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectOldRun = reject; }));
+  await user.click(screen.getByRole("button", { name: "继续" }));
+  act(() => receive({ ...savedTask, status: "paused", revision: 5 }));
+  await user.click(screen.getByRole("button", { name: "继续" }));
+  act(() => receive({ ...savedTask, status: "running", downloadedBytes: 90, revision: 6 }));
+  await act(async () => rejectOldRun({ message: "下载已暂停。" }));
+  expect(screen.getByText("90%")).toBeInTheDocument();
+  expect(screen.getByText("下载中")).toBeInTheDocument();
+});
+
+it("reports cancellation failure without hiding a running task", async () => {
+  const api = await import("../../lib/api");
+  vi.mocked(listDownloadTasks).mockResolvedValueOnce([savedTask]);
+  vi.mocked(api.cancelDownload).mockRejectedValueOnce({ message: "连接失败" });
+  const user = userEvent.setup();
+  render(<DownloadPanel />);
+  await screen.findByText("restored.zip");
+  await user.click(screen.getByRole("button", { name: "取消" }));
+  expect(await screen.findByText("取消失败：连接失败")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "当前任务 1" })).toBeInTheDocument();
+});
+
+it("does not leave a restored task running when the resume command fails before an event", async () => {
+  const api = await import("../../lib/api");
+  vi.mocked(listDownloadTasks).mockResolvedValueOnce([{ ...savedTask, status: "paused" }]);
+  vi.mocked(api.downloadFile).mockRejectedValueOnce({ message: "无法启动下载" });
+  const user = userEvent.setup();
+  render(<DownloadPanel />);
+  await user.click(await screen.findByRole("button", { name: "继续" }));
+  await user.click(await screen.findByRole("button", { name: "失败任务 1" }));
+  expect(screen.getByText("无法启动下载")).toBeInTheDocument();
 });
 
 let resolveDownload: ((value: {
