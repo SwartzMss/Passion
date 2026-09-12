@@ -729,11 +729,17 @@ pub fn get_default_download_dir(app: AppHandle) -> CommandResult<String> {
 
 #[tauri::command]
 pub async fn list_script_tasks(state: State<'_, AppState>) -> CommandResult<Vec<ScriptTask>> {
+    script_task_snapshot(state.inner()).map_err(ErrorPayload::from)
+}
+
+fn script_task_snapshot(state: &AppState) -> crate::error::BackendResult<Vec<ScriptTask>> {
     let conn = state
         .conn
         .lock()
         .map_err(|err| BackendError::Database(err.to_string()))?;
-    ScriptTaskRepository::list(&conn).map_err(ErrorPayload::from)
+    let mut tasks = ScriptTaskRepository::list(&conn)?;
+    state.script_task_scheduler.apply_runtime_state(&mut tasks);
+    Ok(tasks)
 }
 
 #[tauri::command]
@@ -1054,6 +1060,27 @@ mod tests {
     use crate::models::{NewReminder, ReminderPriority, ReminderRepeatRule, ReminderStatus};
     use crate::scheduler::Scheduler;
     use chrono::{Duration, Utc};
+
+    #[tokio::test]
+    async fn script_list_exposes_running_state_before_a_result_is_written() {
+        let conn = db::test_connection();
+        let task = ScriptTaskRepository::create(&conn, NewScriptTask {
+            name: "runtime snapshot".into(), script_path: "C:\\tasks\\test.ps1".into(),
+            script_args: None, schedule_type: "interval".into(), interval_minutes: Some(1),
+            time_of_day: None, weekdays: None, enabled: true,
+        }).unwrap();
+        let state = AppState::new(conn, Scheduler::default());
+        state.script_task_scheduler.run_if_idle(&task.id, || async {
+            let snapshot = script_task_snapshot(&state).unwrap();
+            let json = serde_json::to_value(&snapshot[0]).unwrap();
+            assert!(json["lastStartedAt"].is_string());
+            assert!(json["lastFinishedAt"].is_null());
+            // Runtime overlays must not persist a running flag that survives a crash/restart.
+            let stored = ScriptTaskRepository::get(&state.conn.lock().unwrap(), &task.id).unwrap();
+            assert!(stored.last_started_at.is_none());
+        }).await.unwrap();
+        assert!(script_task_snapshot(&state).unwrap()[0].last_started_at.is_none());
+    }
 
     #[test]
     fn trigger_dispatch_marks_due_reminder() {

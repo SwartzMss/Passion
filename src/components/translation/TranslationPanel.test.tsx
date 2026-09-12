@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { TranslationPanel } from "./TranslationPanel";
@@ -12,6 +12,29 @@ vi.mock("../../lib/api", () => ({
 
 beforeEach(() => {
   vi.mocked(translateText).mockClear();
+});
+
+it.each(["原文", "源语言", "目标语言", "交换语言"])("ignores an in-flight result after changing %s", async (field) => {
+  let finish!: (value: { translatedText: string }) => void;
+  vi.mocked(translateText).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  render(<TranslationPanel onOpenSettings={() => {}} />);
+  fireEvent.change(screen.getByLabelText("原文"), { target: { value: "hello" } });
+  fireEvent.click(screen.getByRole("button", { name: "翻译" }));
+  if (field === "交换语言") fireEvent.click(screen.getByRole("button", { name: field }));
+  else fireEvent.change(screen.getByLabelText(field), { target: { value: field === "原文" ? "new text" : "ko" } });
+  await act(async () => finish({ translatedText: "old translation" }));
+  expect(screen.getByLabelText("译文")).toHaveValue("");
+  fireEvent.click(screen.getByRole("button", { name: "翻译" }));
+  expect(await screen.findByDisplayValue("你好，世界")).toBeInTheDocument();
+});
+
+it("clears a completed translation when its target language changes", async () => {
+  render(<TranslationPanel onOpenSettings={() => {}} />);
+  fireEvent.change(screen.getByLabelText("原文"), { target: { value: "hello" } });
+  fireEvent.click(screen.getByRole("button", { name: "翻译" }));
+  await screen.findByDisplayValue("你好，世界");
+  fireEvent.change(screen.getByLabelText("目标语言"), { target: { value: "ja" } });
+  expect(screen.getByLabelText("译文")).toHaveValue("");
 });
 
 it("rejects empty source text", async () => {

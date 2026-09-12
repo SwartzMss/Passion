@@ -1,5 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useLiveList } from "../../lib/useLiveList";
 import {
   createSshTunnel,
   deleteSshTunnel,
@@ -30,7 +31,7 @@ const DEFAULT_FORM = {
 };
 
 export function SshTunnelsPanel() {
-  const [tunnels, setTunnels] = useState<SshTunnelInfo[]>([]);
+  const { items: tunnels, refresh, error: refreshError } = useLiveList(listSshTunnels);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<Mode>("list");
@@ -38,14 +39,6 @@ export function SshTunnelsPanel() {
   const [form, setForm] = useState(DEFAULT_FORM);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-
-  async function refresh() {
-    setTunnels(await listSshTunnels());
-  }
-
-  useEffect(() => {
-    refresh().catch((err) => setError(readError(err)));
-  }, []);
 
   const counts = useMemo(
     () => ({
@@ -161,7 +154,7 @@ export function SshTunnelsPanel() {
   return (
     <section className="ssh-panel">
       <Header />
-      {error && mode === "list" ? <p className="error" role="alert">{error}</p> : null}
+      {(error || refreshError) && mode === "list" ? <p className="error" role="alert">{error || refreshError}</p> : null}
 
       <div className="ssh-toolbar">
         <div className="ssh-filters" aria-label="SSH 隧道筛选">
