@@ -7,6 +7,7 @@ import {
   setScriptTaskEnabled,
 } from "../../lib/api";
 import type { ScriptTask, ScriptTaskScheduleType } from "../../types";
+import { useLiveList } from "../../lib/useLiveList";
 
 const WEEKDAYS = [
   { value: 1, label: "周一" },
@@ -21,7 +22,7 @@ const WEEKDAYS = [
 type ScriptFilter = "all" | "running" | "waiting" | "disabled";
 
 export function ScriptTasksPanel() {
-  const [tasks, setTasks] = useState<ScriptTask[]>([]);
+  const { items: tasks, refresh, error: refreshError } = useLiveList(listScriptTasks);
   const [activeFilter, setActiveFilter] = useState<ScriptFilter>("all");
   const [query, setQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -35,14 +36,6 @@ export function ScriptTasksPanel() {
   const [enabled, setEnabled] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-
-  async function refresh() {
-    setTasks(await listScriptTasks());
-  }
-
-  useEffect(() => {
-    refresh().catch((err) => setError(readError(err)));
-  }, []);
 
   const runningTasks = useMemo(() => tasks.filter(isRunningTask), [tasks]);
   const waitingTasks = useMemo(() => tasks.filter(isWaitingTask), [tasks]);
@@ -197,9 +190,9 @@ export function ScriptTasksPanel() {
         </div>
       </div>
 
-      {error && !isCreateOpen ? (
+      {(error || refreshError) && !isCreateOpen ? (
         <p className="error" role="alert">
-          {error}
+          {error || refreshError}
         </p>
       ) : null}
 

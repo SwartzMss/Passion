@@ -1,19 +1,35 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { SshTunnelsPanel } from "./SshTunnelsPanel";
+import { listSshTunnels } from "../../lib/api";
+
+it("shows an unexpected tunnel exit without navigating away", async () => {
+  vi.useFakeTimers();
+  vi.mocked(listSshTunnels)
+    .mockResolvedValueOnce([{ ...runningTunnel, status: "running" }])
+    .mockResolvedValueOnce([{ ...runningTunnel, status: "stopped", pid: null }]);
+  const view = render(<SshTunnelsPanel />);
+  try {
+    await act(async () => {});
+    expect(screen.getByRole("button", { name: /运行中\s*1/ })).toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    expect(screen.getByRole("button", { name: /运行中\s*0/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /已停止\s*1/ })).toBeInTheDocument();
+  } finally { view.unmount(); vi.useRealTimers(); }
+});
 
 const stoppedTunnel = {
   id: "ssh-1",
   name: "QNX调试",
   description: "debug",
   localPort: 8080,
-  bindAddress: "127.0.0.1",
+  bindAddress: "127.0.0.1" as const,
   remoteHost: "172.31.3.1",
   remotePort: 22,
   username: "root",
   keyPath: "C:\\keys\\8797_rsa2048",
-  authType: "private_key",
+  authType: "private_key" as const,
   status: "stopped",
   pid: null,
   startedAt: null,

@@ -1,8 +1,8 @@
 use crate::models::ScriptTask;
-use chrono::{DateTime, Datelike, Days, Local, NaiveTime, TimeZone};
-use std::collections::{HashMap, HashSet};
+use chrono::{DateTime, Datelike, Days, Local, NaiveTime, TimeZone, Utc};
+use std::collections::HashMap;
 use std::future::Future;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as SyncMutex};
 use std::time::Duration as StdDuration;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
@@ -10,7 +10,22 @@ use tokio::task::JoinHandle;
 #[derive(Default, Clone)]
 pub struct ScriptTaskScheduler {
     handles: Arc<Mutex<HashMap<String, JoinHandle<()>>>>,
-    running: Arc<Mutex<HashSet<String>>>,
+    running: Arc<SyncMutex<HashMap<String, DateTime<Utc>>>>,
+}
+
+// Synchronous cleanup also runs when an async execution is aborted or panics.
+struct RunningGuard {
+    id: String,
+    running: Arc<SyncMutex<HashMap<String, DateTime<Utc>>>>,
+}
+
+impl Drop for RunningGuard {
+    fn drop(&mut self) {
+        self.running
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .remove(&self.id);
+    }
 }
 
 impl ScriptTaskScheduler {
@@ -20,7 +35,12 @@ impl ScriptTaskScheduler {
         Fut: Future<Output = ()> + Send + 'static,
     {
         let id = task.id.clone();
-        self.cancel(&id).await;
+        // Serialize replacement, including completion of the old task's cleanup.
+        let mut handles = self.handles.lock().await;
+        if let Some(handle) = handles.remove(&id) {
+            handle.abort();
+            let _ = handle.await;
+        }
 
         let scheduler = self.clone();
         let task_for_schedule = task.clone();
@@ -36,12 +56,13 @@ impl ScriptTaskScheduler {
             }
         });
 
-        self.handles.lock().await.insert(id, handle);
+        handles.insert(id, handle);
     }
 
     pub async fn cancel(&self, id: &str) {
         if let Some(handle) = self.handles.lock().await.remove(id) {
             handle.abort();
+            let _ = handle.await;
         }
     }
 
@@ -51,16 +72,31 @@ impl ScriptTaskScheduler {
         Fut: Future<Output = T> + Send,
     {
         {
-            let mut running = self.running.lock().await;
-            if running.contains(id) {
+            let mut running = self.running.lock().unwrap_or_else(|err| err.into_inner());
+            if running.contains_key(id) {
                 return None;
             }
-            running.insert(id.to_string());
+            running.insert(id.to_string(), Utc::now());
         }
+        let _guard = RunningGuard {
+            id: id.to_string(),
+            running: Arc::clone(&self.running),
+        };
+        Some(run().await)
+    }
 
-        let result = run().await;
-        self.running.lock().await.remove(id);
-        Some(result)
+    pub fn apply_runtime_state(&self, tasks: &mut [ScriptTask]) {
+        let running = self.running.lock().unwrap_or_else(|err| err.into_inner());
+        for task in tasks {
+            if let Some(started_at) = running.get(&task.id) {
+                task.last_started_at = Some(*started_at);
+                task.last_finished_at = None;
+                task.last_exit_code = None;
+                task.last_error = None;
+                task.last_stdout = None;
+                task.last_stderr = None;
+            }
+        }
     }
 }
 
@@ -131,6 +167,80 @@ mod tests {
         atomic::{AtomicUsize, Ordering},
         Arc,
     };
+
+    #[tokio::test]
+    async fn cancel_running_schedule_cleans_status_before_it_can_be_enabled_again() {
+        let scheduler = ScriptTaskScheduler::default();
+        let mut task = script_task("interval");
+        task.interval_minutes = 0;
+        let started = Arc::new(tokio::sync::Notify::new());
+        for _ in 0..2 {
+            let notify = Arc::clone(&started);
+            scheduler
+                .schedule(&task, move |_| {
+                    let notify = Arc::clone(&notify);
+                    async move {
+                        notify.notify_one();
+                        std::future::pending::<()>().await;
+                    }
+                })
+                .await;
+            tokio::time::timeout(StdDuration::from_secs(1), started.notified())
+                .await
+                .unwrap();
+            let mut snapshot = vec![task.clone()];
+            scheduler.apply_runtime_state(&mut snapshot);
+            assert!(snapshot[0].last_started_at.is_some());
+            assert!(snapshot[0].last_finished_at.is_none());
+            scheduler.cancel(&task.id).await;
+            let mut snapshot = vec![task.clone()];
+            scheduler.apply_runtime_state(&mut snapshot);
+            assert!(snapshot[0].last_started_at.is_none());
+            assert_eq!(
+                scheduler.run_if_idle(&task.id, || async { 42 }).await,
+                Some(42)
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn manual_execution_reports_live_state_then_restores_stored_history() {
+        let scheduler = ScriptTaskScheduler::default();
+        let mut task = script_task("interval");
+        task.last_started_at = Some(Utc::now() - chrono::Duration::hours(1));
+        task.last_finished_at = Some(Utc::now() - chrono::Duration::minutes(59));
+        let persisted = task.clone();
+        scheduler
+            .run_if_idle(&task.id, || async {
+                let mut tasks = vec![persisted.clone()];
+                scheduler.apply_runtime_state(&mut tasks);
+                assert!(tasks[0].last_started_at > persisted.last_started_at);
+                assert!(tasks[0].last_finished_at.is_none());
+            })
+            .await
+            .unwrap();
+        let mut tasks = vec![persisted.clone()];
+        scheduler.apply_runtime_state(&mut tasks);
+        assert_eq!(tasks[0].last_finished_at, persisted.last_finished_at);
+    }
+
+    #[tokio::test]
+    async fn panic_does_not_leave_a_stale_running_marker() {
+        let scheduler = ScriptTaskScheduler::default();
+        let runner = scheduler.clone();
+        let crashed = tokio::spawn(async move {
+            runner
+                .run_if_idle("panic", || async {
+                    panic!("test panic");
+                })
+                .await;
+        });
+        assert!(crashed.await.unwrap_err().is_panic());
+        assert_eq!(
+            scheduler.run_if_idle("panic", || async { 1 }).await,
+            Some(1)
+        );
+    }
 
     #[tokio::test]
     async fn run_if_idle_skips_concurrent_run_for_same_task() {

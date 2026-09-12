@@ -1,7 +1,22 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { ScriptTasksPanel } from "./ScriptTasksPanel";
+import { listScriptTasks } from "../../lib/api";
+
+it("updates scheduled execution status while the panel stays open", async () => {
+  vi.useFakeTimers();
+  vi.mocked(listScriptTasks)
+    .mockResolvedValueOnce([{ ...sampleTask, scheduleType: "interval" }])
+    .mockResolvedValueOnce([{ ...runningTask, scheduleType: "interval" }]);
+  const view = render(<ScriptTasksPanel />);
+  try {
+    await act(async () => {});
+    expect(screen.getByRole("button", { name: "运行中 0" })).toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    expect(screen.getByRole("button", { name: "运行中 1" })).toBeInTheDocument();
+  } finally { view.unmount(); vi.useRealTimers(); }
+});
 
 const sampleTask = {
   id: "task-1",

@@ -16,6 +16,12 @@ export function TranslationPanel({ onOpenSettings }: Props) {
   const revision = useRef(0);
   useEffect(() => () => { revision.current += 1; }, []);
 
+  function invalidateTranslation() {
+    revision.current += 1;
+    setTranslatedText("");
+    setError(null);
+  }
+
   async function submit() {
     if (inFlight.current) return;
     if (!sourceText.trim()) {
@@ -50,19 +56,21 @@ export function TranslationPanel({ onOpenSettings }: Props) {
   async function pasteSource() {
     const text = await navigator.clipboard?.readText?.();
     if (text) {
+      invalidateTranslation();
       setSourceText(text);
       setError(null);
     }
   }
 
   function clearText() {
-    revision.current += 1;
+    invalidateTranslation();
     setSourceText("");
     setTranslatedText("");
     setError(null);
   }
 
   function swapLanguages() {
+    invalidateTranslation();
     if (sourceLanguage === "auto") {
       setSourceLanguage(targetLanguage);
       setTargetLanguage("en");
@@ -98,7 +106,7 @@ export function TranslationPanel({ onOpenSettings }: Props) {
         <select
           id="translation-source-language"
           value={sourceLanguage}
-          onChange={(event) => setSourceLanguage(event.target.value)}
+          onChange={(event) => { invalidateTranslation(); setSourceLanguage(event.target.value); }}
           aria-label="源语言"
         >
           <option value="auto">自动检测</option>
@@ -121,7 +129,7 @@ export function TranslationPanel({ onOpenSettings }: Props) {
         <select
           id="translation-target-language"
           value={targetLanguage}
-          onChange={(event) => setTargetLanguage(event.target.value)}
+          onChange={(event) => { invalidateTranslation(); setTargetLanguage(event.target.value); }}
           aria-label="目标语言"
         >
           <option value="zh-CN">中文（简体）</option>
@@ -155,7 +163,7 @@ export function TranslationPanel({ onOpenSettings }: Props) {
           <textarea
             id="translation-source"
             value={sourceText}
-            onChange={(event) => setSourceText(event.target.value)}
+            onChange={(event) => { invalidateTranslation(); setSourceText(event.target.value); }}
             onKeyDown={(event) => {
               if (event.ctrlKey && event.key === "Enter") {
                 event.preventDefault();
